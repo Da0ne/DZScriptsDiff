@@ -2,7 +2,7 @@
 //DeRap: scripts\config.bin
 //Produced from mikero's Dos Tools Dll version 7.95
 //https://mikero.bytex.digital/Downloads
-//'now' is Fri Jun 18 21:18:19 2021 : 'file' last modified on Tue May 04 18:23:07 2021
+//'now' is Fri Jun 18 21:25:49 2021 : 'file' last modified on Thu Jun 17 15:16:25 2021
 ////////////////////////////////////////////////////////////////////
 
 #define _ARMA_
