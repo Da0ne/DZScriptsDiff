@@ -1,0 +1,3 @@
+class LactariusMushroom : MushroomBase
+{
+}

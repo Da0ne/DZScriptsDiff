@@ -1,0 +1,3 @@
+class BoletusMushroom : MushroomBase
+{
+}
