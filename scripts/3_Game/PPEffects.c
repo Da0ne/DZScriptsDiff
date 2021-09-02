@@ -1,3 +1,4 @@
+//! Deprecated; 'PPEManager' used instead
 class PPEffects
 {
 	// COLORIZE IDs
@@ -112,7 +113,7 @@ class PPEffects
 		// colorize: r, g, b
 		// colorize effects registration
 		m_ColorizeEffects.Set(PPEffects.COLORIZE_NV, colorizeDefault);
-		SetNVParams(1.0, 0.0, 2.35, 2.75); //default values
+		//SetNVParams(1.0, 0.0, 2.35, 2.75); //default values
 		// ------------------------End of NV-related stuff------------------------
 	}
 	
@@ -417,10 +418,10 @@ class PPEffects
 	//!added for convenience
 	static void PerformSetLensEffect(float lens, float chromAbb, float centerX, float centerY)
 	{
-        m_MatColors.SetParam("LensDistort", lens);
+		m_MatColors.SetParam("LensDistort", lens);
 		SetChromAbbOptic(chromAbb);
-        m_MatColors.SetParam("LensCenterX", centerX);
-        m_MatColors.SetParam("LensCenterY", centerY);
+		m_MatColors.SetParam("LensCenterX", centerX);
+		m_MatColors.SetParam("LensCenterY", centerY);
 	}
 	
 	/*!
@@ -432,8 +433,6 @@ class PPEffects
 	*/
 	static void SetVignette(float intensity, float R, float G, float B, float A)
 	{
-		//Material matHDR = GetGame().GetWorld().GetMaterial("Graphics/Materials/postprocess/glow");
-
 		float color[4];
 		color[0] = R;
 		color[1] = G;
@@ -588,14 +587,13 @@ class PPEffects
 		SetColorValue(m_DyingEffect, 0, 0, 0, 1, value);
 		UpdateColor();
 		if (value > 0.99)
-			g_Game.SetEVValue(-5); //additional "darkness" to avoid lens flare
+			SetEVValuePP(-5); //additional "darkness" to avoid lens flare
 		else
-			g_Game.SetEVValue(0);
+			SetEVValuePP(0);
 	}
 
 	static void UpdateSaturation()
 	{
-		//Material matColors = GetGame().GetWorld().GetMaterial("graphics/materials/postprocess/glow");
 		m_MatColors.SetParam("Saturation", m_BloodSaturation/*+add_additional_modifiers_here*/);
 	}
 	
@@ -692,8 +690,6 @@ class PPEffects
 		}
 		if (foundActiveEffect)
 		{
-			// active effect found
-			//Material matHDR = GetGame().GetWorld().GetMaterial("Graphics/Materials/postprocess/glow");
 			float color[4];
 			color[0] = chosenArray[0];
 			color[1] = chosenArray[1];
@@ -709,7 +705,6 @@ class PPEffects
 	}
 	static void ResetColorize()
 	{
-		//Material matHDR = GetGame().GetWorld().GetMaterial("Graphics/Materials/postprocess/glow");
 		float color[4];
 		color[0] = 1.0;
 		color[1] = 1.0;
@@ -741,7 +736,6 @@ class PPEffects
 	// bloom PP, experimental stuff
 	static void SetBloom(float thres, float steep, float inten)
     {
-		//Material matHDR = GetGame().GetWorld().GetMaterial("Graphics/Materials/postprocess/glow");
 		m_MatColors.SetParam("BloomThreshold", thres);
 		m_MatColors.SetParam("BloomSteepness", steep);
 		m_MatColors.SetParam("BloomIntensity", inten);

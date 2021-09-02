@@ -74,7 +74,7 @@ class ActionEmptyBottleBase: ActionContinuousBase
 		}
 	}
 	
-	override void OnEndAnimationLoop( ActionData action_data )
+	override void OnEndServer( ActionData action_data )
 	{
 		if ( !GetGame().IsMultiplayer() || GetGame().IsServer() )
 		{

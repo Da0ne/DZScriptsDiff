@@ -133,6 +133,7 @@ class SmptAnimMetaFB extends SmptAnimMetaBase
 
 class SmptAnimMetaADD extends SmptAnimMetaBase
 {
+	bool m_CalledAnimStart;
 	override void Init(ParamsReadContext ctx, SymptomManager manager, PlayerBase player)
 	{
 		super.Init(ctx, manager, player);
@@ -154,6 +155,7 @@ class SmptAnimMetaADD extends SmptAnimMetaBase
 				//Print("------------------ Playing -----------------");
 				ad.StartModifier(m_AnimID);
 				m_IsPlaying = true;
+
 				return EAnimPlayState.OK;
 			}
 		}
@@ -169,6 +171,14 @@ class SmptAnimMetaADD extends SmptAnimMetaBase
 			{
 				//Print("------------------ Not Playing -----------------");
 				m_Manager.OnAnimationFinished();
+			}
+			else
+			{
+				if(!m_CalledAnimStart)
+				{
+					m_Manager.OnAnimationStarted();
+					m_CalledAnimStart = true;
+				}
 			}
 		}
 	}

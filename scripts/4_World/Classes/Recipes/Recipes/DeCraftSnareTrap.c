@@ -69,7 +69,7 @@ class DeCraftSnareTrap extends RecipeBase
 		//----------------------------------------------------------------------------------------------------------------------
 		
 		//result1
-		AddResult("WoodenStick");//add results here
+		AddResult("MetalWire");//add results here
 
 		m_ResultSetFullQuantity[0] = false;//true = set full quantity, false = do nothing
 		m_ResultSetQuantity[0] = 1;//-1 = do nothing
@@ -85,7 +85,7 @@ class DeCraftSnareTrap extends RecipeBase
 
 	override bool CanDo(ItemBase ingredients[], PlayerBase player)//final check for recipe's validity
 	{
-		return true;
+		return ingredients[0].GetInventory().AttachmentCount() == 0;
 	}
 
 	override void Do(ItemBase ingredients[], PlayerBase player,array<ItemBase> results, float specialty_weight)//gets called upon recipe's completion

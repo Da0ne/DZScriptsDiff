@@ -18,11 +18,17 @@ class NoiseAIEvaluate
 	//Noise multiplier based on player speed
 	protected static float GetNoiseMultiplierByPlayerSpeed(DayZPlayerImplement playerImplement)
 	{
-		ref HumanMovementState hms = new HumanMovementState();
+		HumanMovementState hms = new HumanMovementState();
 		
 		playerImplement.GetMovementState(hms);
 		
-		switch (AITargetCallbacksPlayer.StanceToMovementIdxTranslation(hms))
+		if ( playerImplement.GetCommand_Move() && playerImplement.GetCommand_Move().IsInRoll() )
+		{
+			// When rolling we are prone, so we load that Noise value, hence we multiply
+			return PlayerConstants.AI_NOISE_ROLL;
+		}
+		
+		switch ( AITargetCallbacksPlayer.StanceToMovementIdxTranslation(hms) )
 		{			
 			case DayZPlayerConstants.MOVEMENTIDX_IDLE:
 				return PlayerConstants.AI_NOISE_IDLE;
@@ -48,7 +54,7 @@ class NoiseAIEvaluate
 	//Noise multiplier based on type of boots
 	protected static float GetNoiseMultiplierByShoes(DayZPlayerImplement playerImplement)
 	{
-		switch(playerImplement.GetBootsType())
+		switch ( playerImplement.GetBootsType() )
 		{
 			case AnimBootsType.None:
 				return PlayerConstants.AI_NOISE_SHOES_NONE;

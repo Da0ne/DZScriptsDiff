@@ -4,11 +4,6 @@ class Pickaxe extends ItemBase
 	{
 		return true;
 	}
-
-	override bool IsMeleeFinisher()
-	{
-		return true;
-	}
 	
 	override void SetActions()
 	{

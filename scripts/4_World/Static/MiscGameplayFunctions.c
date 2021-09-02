@@ -205,7 +205,7 @@ enum ThrowEntityFlags
 }
 
 class MiscGameplayFunctions
-{	
+{
 	static string GetColorString(float r, float g, float b, float a)
 	{
 		return string.Format("#(argb,8,8,3)color(%1,CO)", string.Format("%1,%2,%3,%4", r, g, b, a));
@@ -395,7 +395,7 @@ class MiscGameplayFunctions
 	//!Spawns multiple piles of stackable ItemBase objects on ground (intended for generic use)
 	static array<ItemBase> CreateItemBasePiles(string item_name, vector ground_position, float quantity, float health, bool floaty_spawn = false)
 	{
-		ref array<ItemBase>	item_piles;
+		array<ItemBase>	item_piles;
 		float max_stack_size;
 		ItemBase pile;
 		
@@ -434,7 +434,7 @@ class MiscGameplayFunctions
 	
 	static array<Magazine> CreateMagazinePiles(string item_name, vector ground_position, float quantity,  float health )
 	{
-		ref array<Magazine>	items;
+		array<Magazine>	items;
 		float stack_size;
 		Magazine pile;
 		
@@ -461,7 +461,7 @@ class MiscGameplayFunctions
 	
 	static array<Magazine> CreateMagazinePilesFromBullet(string bullet_type, vector ground_position, float quantity,  float health )
 	{
-		ref array<Magazine>	items;
+		array<Magazine>	items;
 		items = new array<Magazine>;
 		float stack_size;
 		Magazine pile;
@@ -735,6 +735,14 @@ class MiscGameplayFunctions
 				bool boo;
 				if (base_building.PerformRoofCheckForBase(partName,player,boo) && boo)
 					return false;
+				if ( player.IsPlacingLocal() || player.IsPlacingServer() )
+					return false;
+				
+				float distance_root = vector.DistanceSq(target.GetCursorHitPos(), player.GetPosition());
+				
+				if (distance_root < UAMaxDistances.BASEBUILDING_SHORT)
+					return false; 
+				
 				return !construction.IsColliding( partName );
 			}
 		}
@@ -1138,7 +1146,7 @@ class MiscGameplayFunctions
 
 		array<ref array<Object>> tempGroups = new array<ref array<Object>>;
 		array<ref array<Object>> objectGroups = new array<ref array<Object>>;
-		ref array<Object> group;
+		array<Object> group;
 		
 		float cos = Math.Cos(90);
 		float sin = Math.Sin(90);
@@ -1209,7 +1217,7 @@ class MiscGameplayFunctions
 
 	static void SplitArrayIntoGroupsByDistance(array<Object> objects, array<ref array<Object>> objectGroups, float squaredDistanceDelta)
 	{
-		ref array<Object> group;
+		array<Object> group;
 		for ( int i = 0; i < objects.Count(); )
 		{
 			Object obj1 = objects[i];
@@ -1369,16 +1377,19 @@ class MiscGameplayFunctions
 		return cycle;
 	}
 	
+	// DEPRECATED, use Math.ModFloat directly instead
 	static float FModulus(float x, float y)
 	{
-		float res;
+		// Keeping this for reference in case someone wants it later
+		/*float res;
 		//Prevent division by 0
 		if (y == 0)
 			y = 1;
 		
 		int n = Math.Floor(x/y);
 		res = x - n * y;
-		return res;
+		return res;*/
+		return Math.ModFloat( x, y );
 	}
 	
 	static void RemoveSplint( PlayerBase player )
@@ -1432,6 +1443,52 @@ class MiscGameplayFunctions
 			
 			attachment.Delete();
 		}
+	}
+	
+	//! checks if we should teleport the player to a safe location and if so, performs the teleportation
+	static void TeleportCheck(notnull PlayerBase player, notnull array<ref array<float>> safe_positions)
+	{
+		if( player.GetSimulationTimeStamp() < 20 && !player.IsPersistentFlag(PersistentFlag.AREA_PRESENCE) )
+		{
+			//simulation time is bellow a threshold, which means the player has recently connected,
+			//the player does not have the AREA_PRESENCE flag set, which means they were not inside the area when they disconnected,
+			//that means they just spawned into a contaminated area, lets move them somewhere safe
+			vector player_pos = player.GetPosition();
+			vector closest_safe_pos = MiscGameplayFunctions.GetClosestSafePos(player_pos, safe_positions);
+			
+			if (player_pos!=closest_safe_pos)
+			{
+				closest_safe_pos[1] = GetGame().SurfaceY(closest_safe_pos[0], closest_safe_pos[2]);
+				
+				player.SetPosition( closest_safe_pos );//...so lets teleport them somewhere safe
+				//DeveloperTeleport.SetPlayerPosition(player, closest_safe_pos);
+				GetGame().RPCSingleParam(player, ERPCs.RPC_WARNING_TELEPORT, null, true, player.GetIdentity());
+			}
+			
+			player.SetPersistentFlag(PersistentFlag.AREA_PRESENCE, false);
+		}
+	}
+	
+	
+	static vector GetClosestSafePos(vector to_pos, notnull array<ref array<float>> positions)
+	{
+		vector closest_pos = to_pos;
+		float smallest_dist = float.MAX;
+		foreach( array<float> pos:positions)
+		{
+			vector vpos = "0 0 0";
+			vpos[0] = pos[0];
+			vpos[2] = pos[1];
+
+			to_pos[1] = 0;
+			float dist = vector.DistanceSq(to_pos, vpos);//2d dist sq
+			if ( dist < smallest_dist)
+			{
+				smallest_dist = dist;
+				closest_pos = vpos;
+			}
+		}
+		return closest_pos;
 	}
 };
 

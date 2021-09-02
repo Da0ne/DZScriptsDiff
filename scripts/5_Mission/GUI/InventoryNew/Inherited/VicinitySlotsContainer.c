@@ -387,11 +387,11 @@ class VicinitySlotsContainer: Container
 		int visible_rows = 0;
 		ref array<EntityAI> visible_items = new array<EntityAI>;
 		
-		for( x = 0; x < items.Count(); x++ )
+		for ( x = 0; x < items.Count(); ++x )
 		{
 			item = items.Get( x );
 			
-			if (item == null || ExcludeFromContainer(item))
+			if ( item == null || ExcludeFromContainer(item) )
 				continue;
 
 			visible_items.Insert( item );
@@ -400,7 +400,7 @@ class VicinitySlotsContainer: Container
 		
 		RecomputeNumberOfContainers( visible_items );
 		
-		for( x = 0; x < visible_items_count; x++ )
+		for ( x = 0; x < visible_items_count; ++x )
 		{
 			item			= visible_items.Get( x );
 			int row			= Math.Floor( x / ITEMS_IN_ROW );
@@ -411,17 +411,17 @@ class VicinitySlotsContainer: Container
 			icon.GetMainWidget().Show( true );
 			icon.GetPanelWidget().SetUserID( item.GetID() );
 			
-			if( m_ShowedItems.Find( item ) != x )
+			if ( m_ShowedItems.Find( item ) != x )
 				icon.Init( item );
 			icon.UpdateInterval();
 			
-			if( !ItemManager.GetInstance().IsDragging() )
+			if ( !ItemManager.GetInstance().IsDragging() )
 			{
 				ItemManager.GetInstance().SetTemperature( item, icon.GetRender() );
 			}
 			
 			bool draggable = false;
-			if( ItemBase.Cast( item ) )
+			if ( ItemBase.Cast( item ) )
 			{
 				PlayerBase player = PlayerBase.Cast(GetGame().GetPlayer());
 				draggable = !player.GetInventory().HasInventoryReservation( item, null ) && !player.IsItemsToDelete();
@@ -429,7 +429,7 @@ class VicinitySlotsContainer: Container
 				draggable = draggable && item.GetInventory().CanRemoveEntity();
 			}
 			
-			if( !draggable && GetDragWidget() == icon.GetPanelWidget() )
+			if ( !draggable && GetDragWidget() == icon.GetPanelWidget() )
 				CancelWidgetDragging();
 			ItemManager.GetInstance().SetWidgetDraggable( icon.GetPanelWidget(), draggable );
 
@@ -440,7 +440,7 @@ class VicinitySlotsContainer: Container
 			CollapsibleContainer conta2 = CollapsibleContainer.Cast( showed_items.Get( item.GetID() ) );
 			
 			bool show_radial_icon;
-			if( conta )
+			if ( conta )
 			{
 				show_radial_icon = conta.IsOpened();
 				show_radial_icon = show_radial_icon && ( item.GetInventory().GetCargo() || item.GetSlotsCountCorrect() > 0 );
@@ -450,7 +450,7 @@ class VicinitySlotsContainer: Container
 				icon.GetRadialIcon().Show( !show_radial_icon );
 				icon.GetRadialIconClosed().Show( show_radial_icon );		
 			}
-			else if( conta2 )
+			else if ( conta2 )
 			{
 				show_radial_icon = !conta2.IsHidden();
 				Widget rip = icon.GetRadialIconPanel();
@@ -465,7 +465,7 @@ class VicinitySlotsContainer: Container
 		}
 		
 		SlotsContainer slots_last = SlotsContainer.Cast( m_Container.Get( visible_items.Count() / ITEMS_IN_ROW ) );
-		for(int c = visible_items_count % ITEMS_IN_ROW; c < ITEMS_IN_ROW; c++)
+		for ( int c = visible_items_count % ITEMS_IN_ROW; c < ITEMS_IN_ROW; ++c )
 		{
 			icon = slots_last.GetSlotIcon( c );
 			icon.GetMainWidget().Show( false );
@@ -473,7 +473,7 @@ class VicinitySlotsContainer: Container
 		}
 		
 		#ifndef PLATFORM_CONSOLE
-		if( visible_items_count % ITEMS_IN_ROW == 0 )
+		if ( visible_items_count % ITEMS_IN_ROW == 0 )
 		{
 			slots_last = SlotsContainer.Cast( m_Container.Get( m_Container.Count() - 1 ) );
 			slots_last.GetSlotIcon( 0 ).GetMainWidget().Show( true );
@@ -565,7 +565,7 @@ class VicinitySlotsContainer: Container
 				return "";
 			}
 			int max = item.GetQuantityMax();
-			string unit = item.ConfigGetString( "stackedUnit" );
+			//string unit = item.ConfigGetString( "stackedUnit" );
 
 			if ( max > 0 )
 			{
@@ -634,6 +634,7 @@ class VicinitySlotsContainer: Container
 	
 	void MouseButtonDown( Widget w, int x, int y, int button)
 	{
+
 		string name = w.GetName();
 		name.Replace( "PanelWidget", "Render" );
 		ItemPreviewWidget item_preview = ItemPreviewWidget.Cast( w.FindAnyWidget( name ) );
@@ -645,6 +646,9 @@ class VicinitySlotsContainer: Container
 			draggable = !player.GetInventory().HasInventoryReservation( item, null ) && !player.IsItemsToDelete();
 			draggable = draggable && item.CanPutIntoHands( GetGame().GetPlayer() );
 			draggable = draggable && item.GetInventory().CanRemoveEntity();
+			
+			if( GetDayZGame().IsLeftCtrlDown() )
+				ShowActionMenu( item );
 		}
 		
 		ItemManager.GetInstance().SetWidgetDraggable( w, draggable );
@@ -727,15 +731,15 @@ class VicinitySlotsContainer: Container
 		int number_of_containers_needed = ( items.Count() / ITEMS_IN_ROW ) + 1;
 		int difference = number_of_containers_needed - number_of_containers;
 
-		if( difference != 0 )
+		if ( difference != 0 )
 		{	
-			if( difference > 0 )
+			if ( difference > 0 )
 			{
-				for( int g = 0; g < difference; g++ )
+				for ( int g = 0; g < difference; g++ )
 				{
 					SlotsContainer con = new SlotsContainer( m_Container, null );
-					m_Container.Insert( con );
-					for( int j = 0; j < ITEMS_IN_ROW; j++ )
+					m_Container.Insert( con, -1, false );
+					for ( int j = 0; j < ITEMS_IN_ROW; j++ )
 					{
 						SlotsIcon icon = con.GetSlotIcon( j );
 						WidgetEventHandler.GetInstance().RegisterOnDropReceived( icon.GetPanelWidget(),  m_Parent, "OnDropReceivedFromIcon" );
@@ -753,11 +757,11 @@ class VicinitySlotsContainer: Container
 					
 					con.SetColumnCount( items.Count() % ITEMS_IN_ROW );
 					m_SlotsCount++;
-				}
+				}	
 			}
 			else
 			{
-				for( int gx = 0; gx < ( difference * -1 ); gx++ )
+				for ( int gx = 0; gx < ( difference * -1 ); gx++ )
 				{
 					Widget w = m_Container.m_Body.Get( m_SlotsCount - 1 ).GetMainWidget();
 					delete w;
@@ -765,17 +769,17 @@ class VicinitySlotsContainer: Container
 					m_SlotsCount--;
 				}
 			}
-			if( m_Parent )
+			/*if ( m_Parent )
 			{
 				m_Parent.Refresh();
-				if( m_Parent.m_Parent )
+				if ( m_Parent.m_Parent )
 				{
 					m_Parent.m_Parent.Refresh();
 				}
-			}
+			}*/
 		}
 		
-		if( (items.Count() % ITEMS_IN_ROW) == 0 )
+		if ( (items.Count() % ITEMS_IN_ROW) == 0 )
 		{
 			SlotsContainer.Cast( m_Container.Get( number_of_containers_needed - 1 ) ).SetColumnCount( ITEMS_IN_ROW );
 		}
@@ -784,7 +788,7 @@ class VicinitySlotsContainer: Container
 			SlotsContainer.Cast( m_Container.Get( number_of_containers_needed - 1 ) ).SetColumnCount( items.Count() % ITEMS_IN_ROW );
 		}
 		
-		for( int i = 0; i < number_of_containers_needed - 1; i++ )
+		for ( int i = 0; i < number_of_containers_needed - 1; i++ )
 		{
 			SlotsContainer.Cast( m_Container.Get( i ) ).SetColumnCount( ITEMS_IN_ROW );
 		}

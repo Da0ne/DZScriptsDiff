@@ -488,7 +488,7 @@ class BiosLobbyService
 		@param response for debugging - this is the data returned by the server; or an empty string ;)
 	*/
 	
-	void OnDoneAsync(ref GetServersResult result_list, EBiosError error, string response)
+	void OnDoneAsync(GetServersResult result_list, EBiosError error, string response)
 	{
 		/*
 		if (result_list.m_Results != null && result_list.m_Results.Count() > 0)
@@ -497,13 +497,13 @@ class BiosLobbyService
 		OnlineServices.OnLoadServersAsync( result_list, error, response );
 	}
 	
-	void OnGetFirstServerWithEmptySlot(ref GetFirstServerWithEmptySlotResult result_list, EBiosError error)
+	void OnGetFirstServerWithEmptySlot(GetFirstServerWithEmptySlotResult result_list, EBiosError error)
 	{
 		OnlineServices.OnAutoConnectToEmptyServer( result_list, error );
 	}
 	
 	//! Async callback for GetServerModList
-	void OnServerModList(ref GetServerModListResult result_list, EBiosError error)
+	void OnServerModList(GetServerModListResult result_list, EBiosError error)
 	{
 		OnlineServices.OnGetServerModList( result_list, error );
 	}

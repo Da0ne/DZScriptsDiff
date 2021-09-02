@@ -148,20 +148,16 @@ class Cooking
 		float food_max_temp = -1;
 		
 		//Set next stage cooking properties if next stage possible
-		if ( item_to_cook.CanChangeToNewStage( cooking_method ) )
+		if ( item_to_cook.CanChangeToNewStage( cooking_method ) ) // new_stage_type != NONE
 		{
-			ref array<float> next_stage_cooking_properties = new array<float>;
+			array<float> next_stage_cooking_properties = new array<float>;
+			next_stage_cooking_properties = FoodStage.GetAllCookingPropertiesForStage( new_stage_type, null, item_to_cook.GetType() );
 			
-			string config_path = string.Format("CfgVehicles %1 Food FoodStages %2 cooking_properties", item_to_cook.GetType(), item_to_cook.GetFoodStageName( new_stage_type ) );
-			GetGame().ConfigGetFloatArray( config_path, next_stage_cooking_properties );
-			
-			food_min_temp = next_stage_cooking_properties.Get( 0 );
-			food_time_to_cook = next_stage_cooking_properties.Get( 1 );
-			
-			if ( next_stage_cooking_properties.Count() > 2)
-			{
-				food_max_temp = next_stage_cooking_properties.Get ( 2 );
-			}
+			food_min_temp = next_stage_cooking_properties.Get( eCookingPropertyIndices.MIN_TEMP );
+			food_time_to_cook = next_stage_cooking_properties.Get( eCookingPropertyIndices.COOK_TIME );
+			// The last element is optional and might not exist
+			if ( next_stage_cooking_properties.Count() > 2 )
+				food_max_temp = next_stage_cooking_properties.Get( eCookingPropertyIndices.MAX_TEMP );
 		}
 		
 		//add temperature
@@ -231,20 +227,16 @@ class Cooking
 		bool is_burned = false;	// burned
 
 		//Set next stage cooking properties if next stage possible
-		if ( item_to_cook.CanChangeToNewStage ( CookingMethodType.BAKING ) )
+		if ( item_to_cook.CanChangeToNewStage( CookingMethodType.BAKING ) )
 		{
-			ref array<float> next_stage_cooking_properties = new array<float>;
-
-			string config_path = string.Format("CfgVehicles %1 Food FoodStages %2 cooking_properties", item_to_cook.GetType(), item_to_cook.GetFoodStageName( new_stage_type ) );
-			GetGame().ConfigGetFloatArray( config_path, next_stage_cooking_properties );
-
-			food_min_temp = next_stage_cooking_properties.Get( 0 );
-			food_time_to_cook = next_stage_cooking_properties.Get( 1 );
-
-			if ( next_stage_cooking_properties.Count() > 2)
-			{
-				food_max_temp = next_stage_cooking_properties.Get( 2 );
-			}
+			array<float> next_stage_cooking_properties = new array<float>;
+			next_stage_cooking_properties = FoodStage.GetAllCookingPropertiesForStage( new_stage_type, null, item_to_cook.GetType() );
+			
+			food_min_temp = next_stage_cooking_properties.Get( eCookingPropertyIndices.MIN_TEMP );
+			food_time_to_cook = next_stage_cooking_properties.Get( eCookingPropertyIndices.COOK_TIME );
+			// The last element is optional and might not exist
+			if ( next_stage_cooking_properties.Count() > 2 )
+				food_max_temp = next_stage_cooking_properties.Get( eCookingPropertyIndices.MAX_TEMP );
 		}
 		
 		
@@ -306,16 +298,10 @@ class Cooking
 		{
 			if ( ( item_to_cook.GetFoodStageType() == FoodStageType.RAW ) || ( item_to_cook.GetFoodStageType() == FoodStageType.BAKED ) || ( item_to_cook.GetFoodStageType() == FoodStageType.BOILED ) )
 			{
-				ref array<float> next_stage_cooking_properties = new array<float>;
-				string config_path = string.Format("CfgVehicles %1 Food FoodStages %2 cooking_properties", item_to_cook.GetType(), item_to_cook.GetFoodStageName( FoodStageType.DRIED ));
-				GetGame().ConfigGetFloatArray( config_path, next_stage_cooking_properties );
-				if ( next_stage_cooking_properties.Count() == 0 )
-					return;
-				
 				float new_cooking_time = item_to_cook.GetCookingTime() + ( cook_time_inc );
 				item_to_cook.SetCookingTime( new_cooking_time );
 
-				if ( item_to_cook.GetCookingTime() >= next_stage_cooking_properties.Get( 1 ) )
+				if ( item_to_cook.GetCookingTime() >= FoodStage.GetCookingPropertyFromIndex( eCookingPropertyIndices.COOK_TIME, FoodStageType.DRIED, null, item_to_cook.GetType()) )
 				{
 					item_to_cook.ChangeFoodStage( FoodStageType.DRIED );
 					item_to_cook.RemoveAllAgentsExcept(eAgents.BRAIN);
@@ -387,24 +373,14 @@ class Cooking
 	
 	float GetTimeToCook( Edible_Base item_to_cook, CookingMethodType cooking_method )
 	{
-		ref array<float> next_stage_cooking_properties = new array<float>;
-		string config_path;// = "CfgVehicles" + " " + item_to_cook.GetType() + " " + "Food" + " " + "FoodStages";
-		config_path = string.Format("CfgVehicles %1 Food FoodStages", item_to_cook.GetType());
 		FoodStageType food_stage_type = item_to_cook.GetNextFoodStageType( cooking_method );
-		GetGame().ConfigGetFloatArray( config_path + " " + item_to_cook.GetFoodStageName( food_stage_type ) + " " + "cooking_properties", next_stage_cooking_properties );
-		
-		return next_stage_cooking_properties.Get( 1 );
+		return FoodStage.GetCookingPropertyFromIndex( eCookingPropertyIndices.COOK_TIME, food_stage_type, null, item_to_cook.GetType());
 	}
 
 	float GetMinTempToCook( Edible_Base item_to_cook, CookingMethodType cooking_method )
 	{
-		ref array<float> next_stage_cooking_properties = new array<float>;
-		string config_path;// = "CfgVehicles" + " " + item_to_cook.GetType() + " " + "Food" + " " + "FoodStages";
-		config_path = string.Format("CfgVehicles %1 Food FoodStages", item_to_cook.GetType() );
 		FoodStageType food_stage_type = item_to_cook.GetNextFoodStageType( cooking_method );
-		GetGame().ConfigGetFloatArray( config_path + " " + item_to_cook.GetFoodStageName( food_stage_type ) + " " + "cooking_properties", next_stage_cooking_properties );
-		
-		return next_stage_cooking_properties.Get( 0 );
+		return FoodStage.GetCookingPropertyFromIndex( eCookingPropertyIndices.MIN_TEMP, food_stage_type, null, item_to_cook.GetType());
 	}
 	
 	//add temperature to item
@@ -424,7 +400,6 @@ class Cooking
 			//add temperature
 			if ( actual_cooking_temp > item_temperature )
 			{
-				
 				item_temperature = actual_cooking_temp * 0.5;
 				item_temperature = Math.Clamp( item_temperature, min_temperature, FOOD_MAX_COOKING_TEMPERATURE );
 				

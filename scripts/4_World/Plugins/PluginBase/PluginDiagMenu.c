@@ -48,7 +48,8 @@ class PluginDiagMenu extends PluginBase
 	int m_BleedingSourceRequested;
 	int m_HairLevelSelected 		= 0;
 	int m_TotalHairLevelsAdjusted;
-	int m_burst = 0;
+	int m_Burst = 0;
+	static bool ENABLE_BREATH_VAPOR;
 	
 	//string m_HairSelections 		= "Clipping_GhillieHood, Clipping_grathelm, Clipping_ConstructionHelmet, Clipping_Hockey_hekmet, Clipping_Maska, Clipping_ProtecSkateHelmet2, Clipping_BandanaFace, Clipping_NioshFaceMask, Clipping_NBC_Hood, Clipping_MotoHelmet, Clipping_FireHelmet, Clipping_ushanka, Clipping_TankerHelmet, Clipping_SantasBeard, Clipping_Surgical_mask, Clipping_PumpkinHelmet, Clipping_Balaclava_3holes, Clipping_Balaclava, Clipping_GP5GasMask, Clipping_BoonieHat, Clipping_prison_cap, Clipping_MilitaryBeret_xx, Clipping_Policecap, Clipping_OfficerHat, Clipping_Hat_leather, Clipping_CowboyHat, Clipping_BandanaHead, Clipping_SantasHat, Clipping_FlatCap, Clipping_MxHelmet, Clipping_baseballcap, Clipping_BeanieHat, Clipping_MedicalScrubs_Hat, Clipping_RadarCap, Clipping_ZmijovkaCap, Clipping_HeadTorch, Clipping_pilotka, Clipping_MxHelmet, Clipping_HelmetMich, Clipping_Ssh68Helmet, Clipping_Mich2001, Clipping_Welding_Mask, Clipping_VintageHockeyMask, Clipping_mouth_rags, Clipping_Gasmask";
 	ref map<int,bool> m_HairHidingStateMap;
@@ -193,6 +194,7 @@ class PluginDiagMenu extends PluginBase
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_ITEM_DEBUG_ACTIONS_SHOW, "lalt+4", "Item Debug Actions", "Misc");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_BULLET_IMPACT, "lalt+7", "BulletImpact", "Misc");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_SHOCK_IMPACT, "lalt+8", "ShockHitEffect", "Misc");
+				DiagMenu.RegisterBool(DiagMenuIDs.DM_TARGETABLE_BY_AI, "", "Toggle Targetable By AI", "Misc");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_PLAYER_STATS_LOG_ENABLE, "", "Log Player Stats", "Misc");
 				DiagMenu.RegisterMenu(DiagMenuIDs.DM_ACTION_TARGETS_MENU, "Action Targets", "Misc");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_XBOX_CURSOR, "", "XboxCursor", "Misc");
@@ -212,11 +214,11 @@ class PluginDiagMenu extends PluginBase
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_CAM_SHAKE, "", "Simulate Cam Shake", "Misc");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_HOLOGRAM, "lctrl+h", "Hologram placing debug", "Misc");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_SHOW_FIREHEAT_RADIUS, "", "Show Fire Radius", "Misc"); 
-				DiagMenu.RegisterBool(DiagMenuIDs.DM_SHOW_AREADMG_TRIGGER, "", "Show Area Damage", "Misc");
-				#ifdef TRIGGER_DEBUG_BASIC
-				DiagMenu.SetValue(DiagMenuIDs.DM_SHOW_AREADMG_TRIGGER, true);
-				#endif
+				DiagMenu.RegisterBool(DiagMenuIDs.DM_BREATH_VAPOR_LVL, "", "Breath Vapor", "Misc");
+				DiagMenu.SetValue(DiagMenuIDs.DM_BREATH_VAPOR_LVL, true);
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_SHOW_PLUG_ARROWS, "", "Show Energy Manager Plug Arrows", "Misc");
+				
+				DiagMenu.SetValue(DiagMenuIDs.DM_TARGETABLE_BY_AI, true);
 					//---------------------------------------------------------------
 					// LEVEL 3
 					//---------------------------------------------------------------
@@ -236,9 +238,12 @@ class PluginDiagMenu extends PluginBase
 				// LEVEL 2
 				//---------------------------------------------------------------
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_MELEE_DEBUG_ENABLE, "", "Enable Melee Debug", "Melee");
+				DiagMenu.RegisterBool(DiagMenuIDs.DM_MELEE_CONTINUOUS, "", "Continuous update", "Melee");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_MELEE_SHOW_TARGETS, "", "Show targets", "Melee");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_MELEE_DRAW_TARGETS, "", "Draw targets", "Melee");
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_MELEE_DRAW_RANGE, "", "Draw range", "Melee");
+				DiagMenu.RegisterBool(DiagMenuIDs.DM_MELEE_DRAW_BLOCK_RANGE_AI, "", "Draw block range PVE", "Melee");
+				DiagMenu.RegisterBool(DiagMenuIDs.DM_MELEE_DRAW_BLOCK_RANGE_PVP, "", "Draw block range PVP", "Melee");
 			//---------------------------------------------------------------
 			// LEVEL 1
 			//---------------------------------------------------------------
@@ -254,7 +259,19 @@ class PluginDiagMenu extends PluginBase
 				DiagMenu.SetValue(DiagMenuIDs.DM_WEAPON_ALLOW_RECOIL, true);
 				DiagMenu.RegisterBool(DiagMenuIDs.DM_WEAPON_UNLIMITED, "lalt+9", "Unlimited Ammo", "Weapon");
 				DiagMenu.RegisterItem(DiagMenuIDs.DM_WEAPON_BURST, "lctrl+0", "Burst Version", "Weapon", "Holt, Press");
-		
+			//---------------------------------------------------------------
+			// LEVEL 1
+			//---------------------------------------------------------------
+			DiagMenu.RegisterMenu(DiagMenuIDs.DM_TRIGGER_MENU, "Triggers", "Script");
+				//---------------------------------------------------------------
+				// LEVEL 2
+				//---------------------------------------------------------------
+				DiagMenu.RegisterBool(DiagMenuIDs.DM_SHOW_AREADMG_TRIGGER, "", "Show Triggers", "Triggers");
+				DiagMenu.RegisterBool(DiagMenuIDs.DM_SHOW_PLAYER_TOUCHTRIGGER, "", "Show Player Touch", "Triggers");
+				#ifdef TRIGGER_DEBUG_BASIC
+				DiagMenu.SetValue(DiagMenuIDs.DM_SHOW_AREADMG_TRIGGER, true);
+				DiagMenu.SetValue(DiagMenuIDs.DM_SHOW_PLAYER_TOUCHTRIGGER, true);
+				#endif
 			//---------------------------------------------------------------
 			// LEVEL 1
 			//---------------------------------------------------------------
@@ -311,6 +328,7 @@ class PluginDiagMenu extends PluginBase
 		CheckDrawCheckerboard();
 		CheckBulletImpact();
 		CheckShockImpact();
+		CheckTargetableByAI();
 		CheckPresenceNotifierDebug();
 		CheckGoUnconscious();
 		CheckGoUnconsciousDelayed();
@@ -338,8 +356,14 @@ class PluginDiagMenu extends PluginBase
 		CheckFixItems();
 		CheckPlugArrows();
 		CheckBurst();
+		CheckBreathVapor();
 
 	}
+	//---------------------------------------------
+	void CheckBreathVapor()
+	{
+		ENABLE_BREATH_VAPOR = DiagMenu.GetBool(DiagMenuIDs.DM_BREATH_VAPOR_LVL);
+	}	
 	//---------------------------------------------
 	void CheckPlayerReset()
 	{
@@ -606,7 +630,9 @@ class PluginDiagMenu extends PluginBase
 		if ( DiagMenu.GetBool(DiagMenuIDs.DM_BULLET_IMPACT) )
 		{
 			PlayerBase pl_player = PlayerBase.Cast(GetGame().GetPlayer() );
-			pl_player.SpawnDamageDealtEffect2();
+			CachedObjectsParams.PARAM2_FLOAT_FLOAT.param1 = 32;
+			CachedObjectsParams.PARAM2_FLOAT_FLOAT.param2 = 0.3;
+			pl_player.SpawnDamageDealtEffect2(CachedObjectsParams.PARAM2_FLOAT_FLOAT);
 			DiagMenu.SetValue(DiagMenuIDs.DM_BULLET_IMPACT, false);
 		}
 		else
@@ -625,6 +651,20 @@ class PluginDiagMenu extends PluginBase
 			pl_player.SpawnShockEffect(tmp);
 			tmp += 0.25;
 			DiagMenu.SetValue(DiagMenuIDs.DM_SHOCK_IMPACT, false);
+		}
+	}
+	
+	void CheckTargetableByAI()
+	{
+		PlayerBase pl_player = PlayerBase.Cast(GetGame().GetPlayer());
+		if (pl_player)
+		{
+			bool value = DiagMenu.GetBool(DiagMenuIDs.DM_TARGETABLE_BY_AI);
+			if ( value != pl_player.m_CanBeTargetedDebug )
+			{
+				pl_player.m_CanBeTargetedDebug = value;
+				SendTargetabilityRPC(value);
+			}
 		}
 	}
 	
@@ -749,12 +789,12 @@ class PluginDiagMenu extends PluginBase
 	void CheckBurst()
 	{
 		int value = DiagMenu.GetValue(DiagMenuIDs.DM_WEAPON_BURST);
-		if( m_burst != value )
+		if( m_Burst != value )
 		{
-			m_burst = value;
+			m_Burst = value;
 			SendBurstRPC(value);
 			PlayerBase player = PlayerBase.Cast(GetGame().GetPlayer());
-			player.GetWeaponManager().SetBurstOption(m_burst);
+			player.GetWeaponManager().SetBurstOption(m_Burst);
 		}
 	} 
 
@@ -1463,6 +1503,13 @@ class PluginDiagMenu extends PluginBase
 			GetGame().RPCSingleParam( GetGame().GetPlayer(),ERPCs.RPC_ENABLE_INVINCIBILITY, CachedObjectsParams.PARAM1_INT, true, GetGame().GetPlayer().GetIdentity() );
  	}
 	//---------------------------------------------
+	void SendTargetabilityRPC(bool value)
+	{
+		CachedObjectsParams.PARAM1_BOOL.param1 = value;
+		if (GetGame() && GetGame().GetPlayer()) 
+			GetGame().RPCSingleParam( GetGame().GetPlayer(),ERPCs.DEV_RPC_TOGGLE_TARGETABLE, CachedObjectsParams.PARAM1_BOOL, true, GetGame().GetPlayer().GetIdentity() );
+ 	}
+	//---------------------------------------------
 	void SendBurstRPC(int opt)
 	{
 		CachedObjectsParams.PARAM1_INT.param1 = opt;
@@ -1749,6 +1796,12 @@ class PluginDiagMenu extends PluginBase
 				{
 					player.SetAllowDamage(false);
 				}
+			break;
+			
+			case ERPCs.DEV_RPC_TOGGLE_TARGETABLE:
+				ctx.Read(CachedObjectsParams.PARAM1_BOOL);
+				bool value = CachedObjectsParams.PARAM1_BOOL.param1;
+				player.m_CanBeTargetedDebug = value;
 			break;
 			
 			case ERPCs.RPC_BURST_OPT:

@@ -169,7 +169,7 @@ class TextWidget extends Widget
 	//! set text exact size. Exact Text flag must be enabled. 0 equals original size.
 	proto native void SetTextExactSize(int size);
   	proto native void SetTextOffset(int left, int top);
-	proto native void SetText(string text);
+	proto native void SetText(string text, bool immedUpdate = true);
 	proto native void SetOutline(int outlineSize, int argb = 0xFF000000);
 	proto native int GetOutlineSize();
 	proto native int GetOutlineColor();

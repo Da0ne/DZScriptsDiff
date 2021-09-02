@@ -25,6 +25,7 @@ class DayZPlayerCameraResult
 	bool		m_bUpdateWhenBlendOut;	//!< true - camera is updated when blending to new camera (Ironsights == false)
 	float 		m_fShootFromCamera;		//!< 1(default) - uses shoot from camera (+aiming sway), 0 pure weapon shoot (ironsights == 0)
 	float		m_fIgnoreParentRoll;	//!< 1 - resets base transforms roll
+	float		m_fIgnoreParentPitch;	//!< 1 - resets base transforms pitch
 	IEntity		m_CollisionIgnoreEntity;//!< ignore entity in 3rd person camera collision solver
 
 	//! cannot be instanced from script (always created from C++)
@@ -1078,6 +1079,9 @@ class DayZPlayer extends Human
 
 	//! gets current camera 
 	proto native 	DayZPlayerCamera		GetCurrentCamera();
+	
+	//! gets transform of current player camera
+	proto native 	void 					GetCurrentCameraTransform(out vector position, out vector direction, out vector rotation);
 
 	//! gets current camera 
 	proto native 	int 					GetCurrentPerItemCameraUD();

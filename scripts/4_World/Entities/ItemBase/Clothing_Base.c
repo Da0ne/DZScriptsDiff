@@ -3,6 +3,7 @@
 // since that will conflict with config and other parts of script and break mods :c
 class Clothing extends Clothing_Base
 {
+
 	override bool IsClothing()
 	{
 		return true;
@@ -12,7 +13,75 @@ class Clothing extends Clothing_Base
 	{
 		return true;
 	}
+	
+	//! Used for 'glasses' (and other colored layers triggered by attach/detach in the InventorySlots.EYEWEAR)
+	int GetGlassesEffectID()
+	{
+		return -1;
+	}
+	
+	//----------------------------------------------------------------
+	// GameplayWidgetEffects
+	array<int> GetEffectWidgetTypes()
+	{
+		return null;
+	}
 
+	//TODO - revisit priority
+	/*int GetOcclusionPriority()
+	{
+		return 0;
+	}*/
+	
+	void ToggleGlassesEffect(bool enable, PlayerBase player)
+	{
+		if (!player.IsControlledPlayer())
+			return;
+		
+		if (!enable)
+		{
+			PPERequesterBank.GetRequester(GetGlassesEffectID()).Stop();
+		}
+		else
+		{
+			PPERequesterBank.GetRequester(GetGlassesEffectID()).Start();
+		}
+	}
+	
+	override void OnWasAttached( EntityAI parent, int slot_id )
+	{
+		super.OnWasAttached( parent, slot_id );
+		PlayerBase player = PlayerBase.Cast(parent);
+		
+		if (player)
+		{
+			if (GetGame().IsClient() || !GetGame().IsMultiplayer() )
+			{
+				if (GetGlassesEffectID() > -1)
+				{
+					GetGame().GetCallQueue(CALL_CATEGORY_GAMEPLAY).Call(ToggleGlassesEffect,true,player);
+				}
+			}
+		}
+	}
+	
+	override void OnWasDetached( EntityAI parent, int slot_id )
+	{
+		super.OnWasDetached( parent, slot_id );
+		PlayerBase player = PlayerBase.Cast(parent);
+		
+		if (player)
+		{
+			if (GetGame().IsClient() || !GetGame().IsMultiplayer())
+			{
+				if (GetGlassesEffectID() > -1)
+				{
+					GetGame().GetCallQueue(CALL_CATEGORY_GAMEPLAY).Call(ToggleGlassesEffect,false,player);
+				}
+			}
+		}
+	}
+	
 	// Conditions	
 	override bool CanPutInCargo( EntityAI parent )
 	{
@@ -103,7 +172,6 @@ class Clothing extends Clothing_Base
 		}
 		return false;	
 	}
-	
 };
 
 typedef Clothing ClothingBase;

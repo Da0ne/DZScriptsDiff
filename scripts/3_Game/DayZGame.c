@@ -27,6 +27,8 @@ class LoginQueueBase extends UIScriptedMenu
 		m_txtNote = TextWidget.Cast( layoutRoot.FindAnyWidget("txtNote") );
 		m_btnLeave = ButtonWidget.Cast( layoutRoot.FindAnyWidget("btnLeave") );
 		m_txtNote.Show(true);
+		layoutRoot.FindAnyWidget("notification_root").Show(false);
+		
 		#ifdef PLATFORM_CONSOLE
 		layoutRoot.FindAnyWidget("toolbar_bg").Show(true);
 		#ifdef PLATFORM_PS4
@@ -154,6 +156,8 @@ class LoginTimeBase extends UIScriptedMenu
 		m_txtLabel = TextWidget.Cast( layoutRoot.FindAnyWidget("txtLabel") );
 		m_btnLeave = ButtonWidget.Cast( layoutRoot.FindAnyWidget("btnLeave") );
 		m_txtDescription.Show(true);
+		layoutRoot.FindAnyWidget("notification_root").Show(false);
+		
 		#ifdef PLATFORM_CONSOLE
 		layoutRoot.FindAnyWidget("toolbar_bg").Show(true);
 		#ifdef PLATFORM_PS4
@@ -322,6 +326,8 @@ class LoadingScreen
 		{
 			m_ProgressText.Show( GetGame().CommandlineGetParam("loadingTest", tmp) );
 		}
+		m_WidgetRoot.FindAnyWidget("notification_root").Show(false);
+		
 		#ifdef PLATFORM_CONSOLE
 		#ifdef PLATFORM_XBOX
 		#ifdef BUILD_EXPERIMENTAL
@@ -618,7 +624,7 @@ class DayZProfilesOptions
 		{
 			m_DayZProfilesOptions = new map<EDayZProfilesOptions, ref DayZProfilesOption>;
 		}
-		foreach ( EDayZProfilesOptions e_opt, ref DayZProfilesOption r_opt : m_DayZProfilesOptions )
+		foreach ( EDayZProfilesOptions e_opt, DayZProfilesOption r_opt : m_DayZProfilesOptions )
 		{
 			bool profileVal = GetGame().GetProfileValueBool(r_opt.param1, r_opt.param3);
 			SetProfileOption(e_opt, profileVal);
@@ -759,6 +765,9 @@ class DayZGame extends CGame
 	
 	private ref array<string> m_CharClassNames = new array<string>();
 	
+	//Used for helicrash sound
+	private ref EffectSound m_CrashSound;
+	
 	//Used for Artillery sound
 	private ref EffectSound m_ArtySound;
 	private const int MIN_ARTY_SOUND_RANGE = 300; // The distance under which sound is no longer heard
@@ -766,10 +775,11 @@ class DayZGame extends CGame
 	// CGame override functions
 	void DayZGame()
 	{
+		PPEManagerStatic.CreateManagerStatic();
+		
 #ifdef PLATFORM_CONSOLE
 		SetMainMenuWorld("MainMenuSceneXbox");
 #endif
-		
 		m_MissionState = MISSION_STATE_GAME;
 		
 		m_keyboard_handler = NULL;
@@ -865,6 +875,7 @@ class DayZGame extends CGame
 		m_volume_radio = GetSoundScene().GetRadioVolume();
 		
 		//m_CharacterData = new MenuDefaultCharacterData;
+		PPEManagerStatic.GetPPEManager().Init();
 		GetMenuDefaultCharacterData();
 	}
 	// ------------------------------------------------------------
@@ -891,6 +902,7 @@ class DayZGame extends CGame
 		m_DayZProfileOptions.RegisterProfileOption(EDayZProfilesOptions.SERVERINFO_DISPLAY, SHOW_SERVERINFO, true);
 	}
 
+	//! Called from C++
 	void SetMissionPath(string path)
 	{
 		m_MissionPath = path;
@@ -1124,7 +1136,7 @@ class DayZGame extends CGame
 			#endif
 			
 			// analytics - disconnected player
-			ref StatsEventDisconnectedData discData = new StatsEventDisconnectedData();
+			StatsEventDisconnectedData discData = new StatsEventDisconnectedData();
 			discData.m_CharacterId = g_Game.GetDatabaseID();
 			discData.m_Reason = "quit";
 			Analytics.PlayerDisconnected(discData);
@@ -1159,7 +1171,7 @@ class DayZGame extends CGame
 			#endif
 			
 			// analytics - spawned
-			ref StatsEventSpawnedData spawnData = new StatsEventSpawnedData();
+			StatsEventSpawnedData spawnData = new StatsEventSpawnedData();
 			spawnData.m_CharacterId = g_Game.GetDatabaseID();
 			spawnData.m_Lifetime = 0;
 			spawnData.m_Position = vector.Zero;
@@ -1388,7 +1400,7 @@ class DayZGame extends CGame
 			m_LoginQueue.SetPosition(pos);
 
 			//! manually update static login queue dialog
-			ref LoginQueueStatic loginQueue;
+			LoginQueueStatic loginQueue;
 			if (LoginQueueBase.CastTo(loginQueue, m_LoginQueue))
 			{
 				loginQueue.Update(timeslice);
@@ -1474,7 +1486,7 @@ class DayZGame extends CGame
 		}
 		if (GetPlayer())
 			GetPlayer().StopDeathDarkeningEffect();
-		PPEffects.SetDeathDarkening(1);
+		PPERequesterBank.GetRequester(PPERequester_DeathDarkening).Start(new Param1<float>(1.0));
 	}
 	
 	// ------------------------------------------------------------
@@ -1686,6 +1698,7 @@ class DayZGame extends CGame
 		DeleteTitleScreen();
 		m_IntroMenu = GetWorkspace().CreateWidgets("gui/layouts/xbox/day_z_title_screen.layout");
 		RichTextWidget text_widget = RichTextWidget.Cast( m_IntroMenu.FindAnyWidget("InputPromptText") );
+		m_IntroMenu.FindAnyWidget("notification_root").Show(false);
 		if (text_widget)
 		{
 			string text = Widget.TranslateString( "#console_start_game" );
@@ -1739,7 +1752,7 @@ class DayZGame extends CGame
 		
 		if( !GetInput().IsEnabledMouseAndKeyboard() || ( m_GameState == DayZGameState.IN_GAME && !GetWorld().IsMouseAndKeyboardEnabledOnServer() ) )
 		{
-			PPEffects.SetBlurMenu( 1 );
+			PPERequesterBank.GetRequester(PPERequester_ControllerDisconnectBlur).Start();
 			m_GamepadDisconnectMenu = GetWorkspace().CreateWidgets("gui/layouts/xbox/day_z_gamepad_connect.layout");
 			RichTextWidget text_widget = RichTextWidget.Cast( m_GamepadDisconnectMenu.FindAnyWidget("Text") );
 			TextWidget caption_widget = TextWidget.Cast( m_GamepadDisconnectMenu.FindAnyWidget("Caption") );
@@ -1772,7 +1785,7 @@ class DayZGame extends CGame
 	
 	void DeleteGamepadDisconnectMenu()
 	{
-		PPEffects.SetBlurMenu( 0 );
+		PPERequesterBank.GetRequester(PPERequester_ControllerDisconnectBlur).Stop();
 		if( m_GamepadDisconnectMenu )
 			delete m_GamepadDisconnectMenu;
 		if( GetUIManager().IsDialogVisible() )
@@ -2449,6 +2462,12 @@ class DayZGame extends CGame
 	}
 	
 	// ------------------------------------------------------------
+	override void OnPostUpdate(bool doSim, float timeslice)
+	{
+		
+	}
+	
+	// ------------------------------------------------------------
 	override void OnRPC(PlayerIdentity sender, Object target, int rpc_type, ParamsReadContext ctx)
 	{
 		Event_OnRPC.Invoke( sender, target, rpc_type, ctx );
@@ -2521,14 +2540,40 @@ class DayZGame extends CGame
 					}
 				}
 				#endif
+				case ERPCs.RPC_SOUND_HELICRASH:
+				{
+					bool playSound;
+					vector pos;
+					
+					//Helicrash is a world event, we want anyone to be able to hear it
+					Param2<bool, vector> playCrashSound = new Param2<bool, vector>( false, "0 0 0" );
+					if ( ctx.Read( playCrashSound ) )
+					{
+						playSound = playCrashSound.param1;
+						pos = playCrashSound.param2;
+					}
+					
+					if ( playSound )
+					{
+						m_CrashSound = SEffectManager.PlaySound( "HeliCrash_Distant_SoundSet", pos, 0.1, 0.1 );
+						m_CrashSound.SetSoundAutodestroy( true );
+					}
+				
+				break;
+				}
 				//Random off map artillery barrage
 				case ERPCs.RPC_SOUND_ARTILLERY:
 				{
-					ref Param1<vector> playArtySound = new Param1<vector>( "0 0 0" );
+					vector position;
+					Param1<vector> playArtySound = new Param1<vector>( vector.Zero );
 					if ( ctx.Read( playArtySound ) )
 					{
-						vector position = playArtySound.param1;
+						position = playArtySound.param1;
+						if ( position == vector.Zero )
+							break;
 					}
+					else
+						break;
 					
 					if ( !GetGame().GetPlayer() )
 						break;
@@ -2541,9 +2586,80 @@ class DayZGame extends CGame
 				
 				break;
 				}
+				case ERPCs.RPC_SOUND_CONTAMINATION:
+				{
+					vector soundPos;
+					
+					Param1<vector> playContaminatedSound = new Param1<vector>( vector.Zero );
+					if ( ctx.Read( playContaminatedSound ) )
+					{
+						soundPos = playContaminatedSound.param1;
+						if ( soundPos == vector.Zero )
+							break;
+					}
+					else
+						break;
+					
+					if ( !GetGame().GetPlayer() )
+						break;
+					
+					EffectSound closeArtySound = SEffectManager.PlaySound( "Artillery_Close_SoundSet", soundPos );
+					closeArtySound.SetSoundAutodestroy( true );
+					
+					// We add camera shake upon shell detonation
+					float distance_to_player = vector.DistanceSq( soundPos, GetGame().GetPlayer().GetPosition() );
+					if ( distance_to_player <= GameConstants.CAMERA_SHAKE_ARTILLERY_DISTANCE2 )
+					{
+						float strength_factor = Math.InverseLerp( GameConstants.CAMERA_SHAKE_ARTILLERY_DISTANCE, 0, Math.Sqrt( distance_to_player ) );
+						DayZPlayerCamera camera = GetGame().GetPlayer().GetCurrentCamera();
+						if ( camera )
+							camera.SpawnCameraShake( strength_factor * 4 );
+					}
+					
+					Particle.PlayInWorld( ParticleList.CONTAMINATED_AREA_GAS_SHELL, soundPos );
+					break;
+				}
+				// Single artillery shot to announce dynamic contaminated area
+				case ERPCs.RPC_SOUND_ARTILLERY_SINGLE:
+				{
+					vector soundPosition;
+					vector delayedSoundPos;
+					float soundDelay;
+					
+					Param3<vector, vector, float> playArtyShotSound = new Param3<vector, vector, float>( vector.Zero, vector.Zero, 0 );
+					if ( ctx.Read( playArtyShotSound ) )
+					{
+						soundPosition = playArtyShotSound.param1;
+						delayedSoundPos = playArtyShotSound.param2;
+						soundDelay = playArtyShotSound.param3;
+						if ( soundPosition == vector.Zero )
+							break;
+					}
+					else
+						break;
+					
+					if ( !GetGame().GetPlayer() )
+						break;
+					
+					m_ArtySound = SEffectManager.PlaySound( "Artillery_Distant_SoundSet", soundPosition, 0.1, 0.1 );
+					m_ArtySound.SetSoundAutodestroy( true );
+					
+					// We remove the amount of time the incoming sound lasts
+					soundDelay -= 5;
+					// We convert to milliseconds
+					soundDelay *= 1000;
+					GetCallQueue( CALL_CATEGORY_GAMEPLAY ).CallLater( DelayedMidAirDetonation, soundDelay, false, delayedSoundPos[0], delayedSoundPos[1], delayedSoundPos[2] );
+					break;
+				}
 			}
 			// global rpc's handling
 		}
+	}
+	
+	void DelayedMidAirDetonation( float x, float y, float z )
+	{
+		EffectSound artilleryFallSound = SEffectManager.PlaySound( "Artillery_Fall_SoundSet", Vector( x, y, z ) );
+		artilleryFallSound.SetSoundAutodestroy( true );
 	}
 	
 	// ------------------------------------------------------------
@@ -2747,7 +2863,7 @@ class DayZGame extends CGame
 		// add hit noise
 		if ( IsServer() )
 		{
-			ref NoiseParams npar = new NoiseParams();
+			NoiseParams npar = new NoiseParams();
 			npar.LoadFromPath("cfgAmmo " + ammoType + " NoiseHit");
 			
 			float surfaceCoef = SurfaceGetNoiseMultiplier(directHit, pos, componentIndex);
@@ -2778,7 +2894,7 @@ class DayZGame extends CGame
 		// add hit noise
 		if ( IsServer() )
 		{
-			ref NoiseParams npar = new NoiseParams();
+			NoiseParams npar = new NoiseParams();
 			npar.LoadFromPath("cfgAmmo " + ammoType + " NoiseHit");
 			
 			float surfaceCoef = SurfaceGetNoiseMultiplier(directHit, pos, componentIndex);

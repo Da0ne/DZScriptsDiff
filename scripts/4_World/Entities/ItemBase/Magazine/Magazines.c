@@ -51,3 +51,4 @@ class Mag_MakarovPB_8Rnd: MagazineStorage {};
 class Mag_VAL_20Rnd: MagazineStorage {};
 class Mag_STANAG_60Rnd: MagazineStorage {};
 class Mag_AK74_45Rnd: MagazineStorage {};
+class Mag_FAMAS_25Rnd: MagazineStorage {};

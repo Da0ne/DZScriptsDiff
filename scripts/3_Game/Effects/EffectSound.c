@@ -39,6 +39,7 @@ class EffectSound : Effect
 		m_SoundWaveVolume = 0;
 		m_SoundWaveVolumeMax = 1;
 		m_SoundAutodestroy = false;
+		m_SoundWaveStopping = false;
 	}
 	
 	//=====================================
@@ -61,6 +62,14 @@ class EffectSound : Effect
 	// GetSoundWaveLenght
 	//=====================================
 	float GetSoundWaveLenght()
+	{
+		return m_SoundWaveLenght;
+	}
+	
+	//=====================================
+	// GetSoundWaveLength :)
+	//=====================================
+	float GetSoundWaveLength()
 	{
 		return m_SoundWaveLenght;
 	}
@@ -187,12 +196,17 @@ class EffectSound : Effect
 	//=====================================
 	// SoundLoad
 	//=====================================
-	bool SoundLoad()
-	{
-		if ( !m_SoundParams )
+	bool SoundLoadEx(out SoundParams params)
+	{		
+		if ( !m_SoundParams || !m_SoundParams.IsValid() )
 		{
+			if (!params)
+			{
+				params = new SoundParams( m_SoundSetName );
+			}
+			
 			//Print("SoundLoad is loading..");
-			m_SoundParams = new SoundParams( m_SoundSetName );
+			m_SoundParams = params;
 			if ( !m_SoundParams.IsValid() )
 			{
 				//SoundError("Invalid sound set.");
@@ -200,7 +214,7 @@ class EffectSound : Effect
 			}
 			
 			m_SoundObjectBuilder = new SoundObjectBuilder( m_SoundParams );
-			if(m_SetEnvVariables)
+			if (m_SetEnvVariables)
 			{
 				m_SoundObjectBuilder.UpdateEnvSoundControllers(GetPosition());
 			}
@@ -225,6 +239,15 @@ class EffectSound : Effect
 	}
 	
 	//=====================================
+	// SoundLoad
+	//=====================================
+	bool SoundLoad()
+	{
+		SoundParams params;
+		return SoundLoadEx(params);
+	}
+	
+	//=====================================
 	// IsSoundValid
 	//=====================================
 	bool IsSoundValid()
@@ -234,19 +257,17 @@ class EffectSound : Effect
 	
 	// !Plays all elements this effects consists of
 	//=====================================
-	// Play
+	// SoundPlayEx
 	//=====================================
-	bool SoundPlay()
+	bool SoundPlayEx(out SoundParams params)
 	{
 		//SoundReset();
 		
 		if (m_SoundSetName != "")
 		{
-			bool was_loaded = (m_SoundParams != NULL);
-			bool is_sound_valid = SoundLoad();
-			if ( is_sound_valid )
+			if ( SoundLoadEx(params) )
 			{
-				if(m_SetEnvVariables && was_loaded)
+				if (m_SetEnvVariables && m_SoundParams)
 				{
 					m_SoundObjectBuilder.UpdateEnvSoundControllers(GetPosition());
 					m_SoundObject = m_SoundObjectBuilder.BuildSoundObject();
@@ -257,41 +278,29 @@ class EffectSound : Effect
 				{
 					m_SoundObject.SetPosition( GetPosition() );
 					m_SoundWaveObject = GetGame().GetSoundScene().Play3D( m_SoundObject, m_SoundObjectBuilder );
-					m_SoundWaveLenght = m_SoundWaveObject.GetLength();
+
+					// Wait for header to be loaded before asking for its length..
+					m_SoundWaveObject.GetEvents().Event_OnSoundWaveHeaderLoaded.Insert(ValidateSoundWave);
 					
-					if ( SoundWaveValidation() )
-					{
-						if ( m_SoundFadeInDuration > 0 )
-						{
-							m_SoundWaveObject.SetVolumeRelative( 0 );
-							m_SoundFadeOutStartTime = m_SoundWaveLenght - m_SoundFadeInDuration;
-						}
-						
-						SetSoundLoop( m_SoundLoop );
-						
-						m_SoundWaveStarting = true;
-						
-						AbstractWaveEvents events = AbstractWaveEvents.Cast(m_SoundWaveObject.GetUserData());
-						events.Event_OnSoundWaveStarted.Insert( Event_OnSoundWaveStarted );
-						events.Event_OnSoundWaveEnded.Insert( Event_OnSoundWaveEnded );
-						
-						UpdateEvents();
-						
-						return true;
-					}
-					else
-					{
-						m_SoundWaveObject.Stop();
-					}
+					return true;
 				}
 				else
 				{
-					Error("[Error][Sound]: SoundPlay() -> m_SoundObject is null -> m_SoundSetName: "+ m_SoundSetName);
+					Error("[Error][Sound]: SoundPlay() -> m_SoundObject is null -> m_SoundSetName: " + m_SoundSetName);
 				}
 			}
 		}
 		
 		return false;
+	}
+	
+	//=====================================
+	// SoundPlay
+	//=====================================
+	bool SoundPlay()
+	{
+		SoundParams params;
+		return SoundPlayEx(params);
 	}
 	
 	//=====================================
@@ -301,9 +310,10 @@ class EffectSound : Effect
 	{
 		if ( IsSoundPlaying() )
 		{
-			if ( m_SoundFadeOutDuration > 0 )
+			if ( m_SoundFadeOutDuration > 0 && !m_SoundWaveStopping )
 			{
 				m_SoundWaveStopping = true;
+				m_SoundWaveStarting = false;
 				m_SoundFadeOutStartTime = m_SoundWaveTime;
 			}
 			else
@@ -318,6 +328,37 @@ class EffectSound : Effect
 	}
 	
 	//=====================================
+	// ValidateSoundWave
+	//=====================================
+	protected void ValidateSoundWave()
+	{
+		m_SoundWaveLenght = m_SoundWaveObject.GetLength();
+					
+		if ( SoundWaveValidation() )
+		{
+			if ( m_SoundFadeInDuration > 0 )
+			{
+				m_SoundWaveObject.SetVolumeRelative( 0 );
+				m_SoundFadeOutStartTime = m_SoundWaveLenght - m_SoundFadeInDuration;
+			}
+						
+			SetSoundLoop( m_SoundLoop );
+						
+			m_SoundWaveStarting = true;
+						
+			AbstractWaveEvents events = m_SoundWaveObject.GetEvents();
+			events.Event_OnSoundWaveStarted.Insert( Event_OnSoundWaveStarted );
+			events.Event_OnSoundWaveEnded.Insert( Event_OnSoundWaveEnded );
+						
+			UpdateEvents();
+		}
+		else
+		{
+			m_SoundWaveObject.Stop();
+		}
+	}
+	
+	//=====================================
 	// SoundWaveValidation
 	//=====================================
 	protected bool SoundWaveValidation()
@@ -326,19 +367,19 @@ class EffectSound : Effect
 		
 		if ( m_SoundFadeInDuration > GetSoundWaveLenght() )
 		{
-			SoundError("FadeIn is longer than sound wave lengt.");
+			SoundError("FadeIn is longer than sound wave length.");
 			valid = false;
 		}
 		
 		if ( m_SoundFadeOutDuration > GetSoundWaveLenght() )
 		{
-			SoundError("FadeOut is longer than sound wave lengt.");
+			SoundError("FadeOut is longer than sound wave length.");
 			valid = false;
 		}
 		
 		if ( m_SoundFadeOutDuration + m_SoundFadeInDuration > GetSoundWaveLenght() )
 		{
-			SoundError("FadeIn & FadeOut are longer than sound wave lengt.");
+			SoundError("FadeIn & FadeOut are longer than sound wave length.");
 			valid = false;
 		}
 		
@@ -406,7 +447,6 @@ class EffectSound : Effect
 						m_SoundFadeOutInitVolume = GetSoundVolume();
 						Event_OnSoundFadeOutStarted();
 					}
-					
 					SetSoundVolume( GetSoundVolume() - (m_SoundFadeOutInitVolume / m_SoundFadeOutDuration * time_delta) );
 				}
 				else

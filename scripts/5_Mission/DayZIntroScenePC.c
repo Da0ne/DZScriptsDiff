@@ -31,8 +31,16 @@ class DayZIntroScenePC : DayZIntroScene
 			m_Radius = Math.Sqrt (Math.Pow(m_DeltaX, 2) + Math.Pow(m_DeltaZ, 2));
 			m_Radius_original = m_Radius;
 		}
+	}
+	
+	protected override void SetInitPostprocesses()
+	{
+		super.SetInitPostprocesses();
 		
-		PPEffects.SetMenuVignette(0.5);
+		PPERequester_MenuEffects requester;
+		Class.CastTo(requester,PPERequesterBank.GetRequester(PPERequester_MenuEffects));
+		
+		requester.SetVignetteIntensity(0.5);
 	}
 
 	// ------------------------------------------------------------

@@ -603,10 +603,17 @@ class FireplaceBase extends ItemBase
 			// Firewood state
 			if ( IsItemTypeAttached( ATTACHMENT_FIREWOOD ) )
 			{
-				if ( IsInAnimPhase( ANIMATION_BURNT_WOOD ) )
+				if ( IsBurning() && HasAshes() )
+				{
+					SetAnimationPhase( ANIMATION_BURNT_WOOD, 0 ); // Because this might not be set under certain circumstances
 					SetAnimationPhase( ANIMATION_WOOD, 1 );
-				else
+				}
+				
+				if ( IsWet() || !IsBurning() )
+				{
+					SetAnimationPhase( ANIMATION_BURNT_WOOD, 1 );
 					SetAnimationPhase( ANIMATION_WOOD, 0 );
+				}
 			}
 			else
 			{
@@ -1832,6 +1839,8 @@ class FireplaceBase extends ItemBase
 		}
 		else
 			m_CanNoise = true;
+		
+		Synchronize();
 	}
 
 	//Stop the fire process
@@ -1859,6 +1868,8 @@ class FireplaceBase extends ItemBase
 		
 		//Refresh fire visual
 		SetFireState( fire_state );
+		
+		RefreshFireplaceVisuals();
 		
 		//Update navmesh
 		if ( !IsFireplaceIndoor() )
@@ -2464,22 +2475,44 @@ class FireplaceBase extends ItemBase
 	//Check if object is in animation phase
 	bool IsInAnimPhase( string anim_phase )
 	{
-		return ( GetAnimationPhase ( anim_phase ) == 0 );
+		return ( GetAnimationPhase( anim_phase ) == 0 );
+	}
+	
+	bool IsSpaceFor(vector size)
+	{
+		array<Object> objs = {};
+		if (GetGame().IsBoxCollidingGeometry(GetWorldPosition() + Vector(0, size[1] * 0.5 + 0.1, 0), GetDirection().VectorToAngles(), size, ObjIntersect.View, ObjIntersect.Geom, {this}, objs))
+		{
+			foreach (Object obj : objs)
+			{
+				if (dBodyGetInteractionLayer(obj) == PhxInteractionLayers.ITEM_LARGE)
+					return false;
+			}
+		}
+		
+		return true;
 	}
 	
 	//Action condition for building oven
 	bool CanBuildOven()
-	{
+	{	
 		ItemBase attached_item = ItemBase.Cast( GetAttachmentByType( ATTACHMENT_STONES ) );
 		if ( attached_item )
 		{
 			float item_quantity = attached_item.GetQuantity();
 			
-			return ( !IsOven() && !IsBurning() && ( item_quantity >= MIN_STONES_TO_BUILD_OVEN ) && !IsItemTypeAttached( ATTACHMENT_TRIPOD ) && !HasStoneCircle() );
+			return ( !IsOven() && !IsBurning() && ( item_quantity >= MIN_STONES_TO_BUILD_OVEN ) && !IsItemTypeAttached( ATTACHMENT_TRIPOD ) && !HasStoneCircle() && IsSpaceForOven() );
 		}
 	
 		return false;
 	}
+	
+	bool IsSpaceForOven()
+	{
+		const float size = 0.6;		
+		return IsSpaceFor(Vector(size, size, size));
+	}
+	
 	//Action condition for stone circle
 	bool CanBuildStoneCircle()
 	{
@@ -2488,11 +2521,16 @@ class FireplaceBase extends ItemBase
 		{
 			float item_quantity = attached_item.GetQuantity();
 
-			if ( !HasStoneCircle() && !IsOven() && !IsBurning() && ( item_quantity >= MIN_STONES_TO_BUILD_CIRCLE ) )
+			if ( !HasStoneCircle() && !IsOven() && !IsBurning() && ( item_quantity >= MIN_STONES_TO_BUILD_CIRCLE ) && IsSpaceForCircle() )
 				return true;
 		}
 	
 		return false;
+	}
+	
+	bool IsSpaceForCircle()
+	{
+		return IsSpaceFor(Vector(0.9, 0.1, 0.9));
 	}
 	
 	//Action condition for dismantling oven

@@ -1,3 +1,4 @@
+//this is instantiated on the client for both the controlled character, as well as the remote characters
 class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 {
 	int m_BleedingBits;
@@ -145,8 +146,11 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 			pow++;
 			if( (m_BleedingBits & bit) != 0)
 			{
+				BleedingSourceZone bsz = GetBleedingSourceMeta(bit);
+				
 				string name = GetSelectionNameFromBit(bit);
-				DbgUI.Text(name);
+				string slot_name =  InventorySlots.GetSlotName(bsz.GetInvLocation());
+				DbgUI.Text(name + "| slot name: "+ slot_name);
 			}
 		}
 		

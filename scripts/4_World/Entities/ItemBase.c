@@ -63,6 +63,7 @@ class ItemBase extends InventoryItem
 	bool	m_IsStoreLoad = false;
 	bool	m_CanShowQuantity;
 	bool	m_HasQuantityBar;
+	protected bool 	m_CanBeDigged;
 	
 	string	m_SoundAttType;
 	// items color variables
@@ -196,6 +197,7 @@ class ItemBase extends InventoryItem
 		m_CanBeMovedOverride = false;
 		m_HeatIsolation = GetHeatIsolationInit();
 		m_ItemModelLength = GetItemModelLength();
+		m_CanBeDigged = ConfigGetBool("canBeDigged");
 		
 		ConfigGetIntArray("compatibleLocks", m_CompatibleLocks);
 		m_LockType = ConfigGetInt("lockType");
@@ -760,7 +762,7 @@ class ItemBase extends InventoryItem
 				{
 					InventoryLocation il = new InventoryLocation;
 					item2.GetInventory().GetCurrentInventoryLocation(il);
-					GetGame().GetPlayer().GetInventory().AddInventoryReservation(item2,il,GameInventory.c_InventoryReservationTimeoutShortMS);
+					GetGame().GetPlayer().GetInventory().AddInventoryReservationEx(item2,il,GameInventory.c_InventoryReservationTimeoutShortMS);
 					//entity2.GetInventory().GetCurrentInventoryLocation
 				}
 			}
@@ -845,6 +847,11 @@ class ItemBase extends InventoryItem
 		return m_IsHologram;
 	}
 	
+	bool CanBeDigged()
+	{
+		return m_CanBeDigged;
+	}
+	
 	bool CanMakeGardenplot()
 	{
 		return false;
@@ -908,17 +915,17 @@ class ItemBase extends InventoryItem
 		if ( oldLoc.GetParent() )
 			old_player = PlayerBase.Cast(oldLoc.GetParent().GetHierarchyRootPlayer());
 		
-		if ( old_player )
-			old_player.UpdateQuickBarEntityVisibility(this);
+		/*if ( old_player )
+			old_player.UpdateQuickBarEntityVisibility(this);*/
 		
-		if ( old_player != new_player )
+		/*if ( old_player != new_player )
 		{
 			if ( old_player )
 				old_player.SetEnableQuickBarEntityShortcut(this, false);
 			
 			if ( new_player )
 				new_player.SetEnableQuickBarEntityShortcut(this, true);
-		}
+		}*/
 		
 		if (old_player && oldLoc.GetType() == InventoryLocationType.HANDS)
 		{
@@ -1147,27 +1154,32 @@ class ItemBase extends InventoryItem
 		PlayerBase player = PlayerBase.Cast( GetHierarchyRootPlayer() );
 		if(player)
 		{
-			int r_index = player.GetHumanInventory().FindUserReservedLocationIndex(this);
-			if(r_index >= 0 )
-			{			
-				InventoryLocation r_il = new InventoryLocation;
-				player.GetHumanInventory().GetUserReservedLocation(r_index,r_il);
-
-				player.GetHumanInventory().ClearUserReservedLocationAtIndex(r_index);
-				int r_type = r_il.GetType();
-				if( r_type == InventoryLocationType.CARGO || r_type == InventoryLocationType.PROXYCARGO )
-				{
-					r_il.GetParent().GetOnReleaseLock().Invoke( this );
-				}
-				else if( r_type == InventoryLocationType.ATTACHMENT )
-				{
-					r_il.GetParent().GetOnAttachmentReleaseLock().Invoke( this, r_il.GetSlot() );
-				}
+			OnInventoryExit(player);
 			
+			if(player.IsAlive())
+			{
+				int r_index = player.GetHumanInventory().FindUserReservedLocationIndex(this);
+				if(r_index >= 0 )
+				{			
+					InventoryLocation r_il = new InventoryLocation;
+					player.GetHumanInventory().GetUserReservedLocation(r_index,r_il);
+	
+					player.GetHumanInventory().ClearUserReservedLocationAtIndex(r_index);
+					int r_type = r_il.GetType();
+					if( r_type == InventoryLocationType.CARGO || r_type == InventoryLocationType.PROXYCARGO )
+					{
+						r_il.GetParent().GetOnReleaseLock().Invoke( this );
+					}
+					else if( r_type == InventoryLocationType.ATTACHMENT )
+					{
+						r_il.GetParent().GetOnAttachmentReleaseLock().Invoke( this, r_il.GetSlot() );
+					}
+				
+				}
+				
+				player.RemoveQuickBarEntityShortcut(this);
 			}
 			
-			player.RemoveQuickBarEntityShortcut(this);
-			OnInventoryExit(player);
 		}
 	}
 	// -------------------------------------------------------------------------------
@@ -1725,7 +1737,7 @@ class ItemBase extends InventoryItem
 				AddQuantity(-split_quantity_new);
 				new_item.SetQuantity( split_quantity_new );
 			}
-		}	
+		}
 	}
 	
 	//! Called on server side when this item's quantity is changed. Call super.OnQuantityChanged(); first when overriding this event.
@@ -1763,9 +1775,9 @@ class ItemBase extends InventoryItem
 	{
 		super.EEHealthLevelChanged(oldLevel,newLevel,zone);
 		
-		if ( GetGame().IsServer() || !GetGame().IsMultiplayer() )
+		if ( GetGame().IsServer())
 		{
-			if ( m_Cleanness != 0 && (oldLevel < newLevel) && oldLevel != -1 )
+			if ( m_Cleanness != 0 && oldLevel < newLevel && newLevel != 0 )
 			{
 				SetCleanness(0);//unclean the item upon damage dealt
 			}
@@ -1802,10 +1814,14 @@ class ItemBase extends InventoryItem
 					else
 					{
 						dst.SetCargo( dst.GetParent(), this, dst.GetIdx(), dst.GetRow(), dst.GetCol(), dst.GetFlip());
-						if ( !GetGame().GetPlayer().GetInventory().AddInventoryReservation( null, dst, GameInventory.c_InventoryReservationTimeoutShortMS) )
+						if ( GetGame().GetPlayer().GetInventory().HasInventoryReservation( null, dst) )
 						{
 							root.GetTransform(m4);
 							dst.SetGround(this, m4);
+						}
+						else
+						{
+							GetGame().GetPlayer().GetInventory().AddInventoryReservationEx( null, dst, GameInventory.c_InventoryReservationTimeoutShortMS);
 						}
 					}
 					
@@ -1891,10 +1907,15 @@ class ItemBase extends InventoryItem
 	
 	int ComputeQuantityUsed( ItemBase other_item, bool use_stack_max = true )
 	{
+		return ComputeQuantityUsedEx(other_item, use_stack_max);
+	}
+	
+	float ComputeQuantityUsedEx( ItemBase other_item, bool use_stack_max = true )
+	{
 		float other_item_quantity = other_item.GetQuantity();
 		float this_free_space;
 			
-		int stack_max = GetQuantityMax();	
+		float stack_max = GetQuantityMax();	
 		
 		this_free_space = stack_max - GetQuantity();
 			
@@ -1915,7 +1936,7 @@ class ItemBase extends InventoryItem
 		
 		if( !IsMagazine() && other_item )
 		{
-			int quantity_used = ComputeQuantityUsed(other_item,use_stack_max);
+			float quantity_used = ComputeQuantityUsedEx(other_item,use_stack_max);
 			if( quantity_used != 0 )
 			{
 				float hp1 = GetHealth01("","");
@@ -2061,7 +2082,15 @@ class ItemBase extends InventoryItem
 			
 			if ( action_id == EActions.ADD_QUANTITY )
 			{
-				AddQuantity(GetQuantityMax() * 0.2);
+				if(IsMagazine())
+				{
+					Magazine mag = Magazine.Cast(this);
+					mag.ServerSetAmmoCount( mag.GetAmmoCount() + mag.GetAmmoMax() * 0.2 );
+				}
+				else
+				{
+					AddQuantity(GetQuantityMax() * 0.2);
+				}
 				
 				if ( m_EM )
 				{
@@ -2072,8 +2101,15 @@ class ItemBase extends InventoryItem
 						
 			if ( action_id == EActions.REMOVE_QUANTITY ) //Quantity -20%
 			{
-				AddQuantity(- GetQuantityMax() * 0.2);
-				
+				if(IsMagazine())
+				{
+					Magazine mag2 = Magazine.Cast(this);
+					mag2.ServerSetAmmoCount( mag2.GetAmmoCount() - mag2.GetAmmoMax() * 0.2 );
+				}
+				else
+				{
+					AddQuantity(- GetQuantityMax() * 0.2);
+				}
 				if ( m_EM )
 				{
 					m_EM.AddEnergy(- m_EM.GetEnergyMax() * 0.2);
@@ -2268,8 +2304,8 @@ class ItemBase extends InventoryItem
 	//has FoodStages in config?
 	bool HasFoodStage()
 	{
-		string config_path = "CfgVehicles" + " " + GetType() + " " + "Food" + " " + "FoodStages";
-		return GetGame().ConfigIsExisting ( config_path );
+		string config_path = string.Format("CfgVehicles %1 Food FoodStages", GetType());
+		return GetGame().ConfigIsExisting( config_path );
 	}
 	
 	bool CanBeCooked()
@@ -3105,7 +3141,8 @@ class ItemBase extends InventoryItem
 		//}
 		delta = m_VarQuantity - delta;
 		SetVariableMask(VARIABLE_QUANTITY);
-		OnQuantityChanged(delta);
+		if(delta != 0)
+			OnQuantityChanged(delta);
 		return false;
 	}
 
@@ -3641,6 +3678,11 @@ class ItemBase extends InventoryItem
 	}
 	
 	
+	bool AllowFoodConsumption()
+	{
+		return true;
+	}
+	
 	//----------------------------------------------------------------
 	// ATTACHMENT LOCKING
 	// Getters relevant to generic ActionLockAttachment
@@ -3825,7 +3867,7 @@ class ItemBase extends InventoryItem
 		
 		const int CONTAMINATED_MASK = eAgents.CHOLERA | eAgents.INFLUENZA | eAgents.SALMONELLA | eAgents.BRAIN;
 		const int POISONED_MASK = eAgents.FOOD_POISON | eAgents.CHEMICAL_POISON;
-		const int NERVE_GAS_MASK = eAgents.NERVE_AGENT;
+		const int NERVE_GAS_MASK = eAgents.CHEMICAL_POISON;
 		const int DIRTY_MASK = eAgents.WOUND_AGENT;
 		
 		Edible_Base edible = Edible_Base.Cast(this);
@@ -3873,8 +3915,48 @@ class ItemBase extends InventoryItem
 		ctx.Write(m_AttachedAgents);
 	}
 	// -------------------------------------------------------------------------
+	
+	
+	// returns item's protection level against enviromental hazard, for masks with filters, returns the filters protection for valid filter, otherwise 0
+	float GetProtectionLevel(int type, bool consider_filter = false, int system = 0)
+	{
+		if (IsDamageDestroyed() || (HasQuantity() && GetQuantity() <= 0) )
+		{
+			return 0;
+		}
+		
+		if( GetInventory().GetAttachmentSlotsCount() != 0 )//is it an item with attachable filter ?
+		{
+			ItemBase filter = ItemBase.Cast(FindAttachmentBySlotName("GasMaskFilter"));
+			if (filter )
+			{
+				return filter.GetProtectionLevel(type, false, system);//it's a valid filter, return the protection
+			}
+			else return 0;//otherwise return 0 when no filter attached
+		}
 
+		string subclass_path, entryName;
 
+		switch (type)
+		{
+			case DEF_BIOLOGICAL:
+				entryName = "biological";
+				break;
+			case DEF_CHEMICAL:
+				entryName = "chemical";
+				break;	
+			default:
+				entryName = "biological";
+				break;
+		}
+		
+		subclass_path = "CfgVehicles " + this.GetType() + " Protection ";
+		
+		return GetGame().ConfigGetFloat(subclass_path + entryName);
+	}
+	
+	
+	
 	//! Called when entity is being created as new by CE/ Debug
 	override void EEOnCECreate()
 	{

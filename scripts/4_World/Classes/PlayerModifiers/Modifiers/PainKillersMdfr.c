@@ -9,6 +9,7 @@ class PainKillersMdfr: ModifierBase
 		m_ID 					= eModifiers.MDF_PAINKILLERS;
 		m_TickIntervalInactive 	= DEFAULT_TICK_TIME_INACTIVE;
 		m_TickIntervalActive 	= 1;
+		DisableActivateCheck();
 	}
 
 	override bool ActivateCondition(PlayerBase player)

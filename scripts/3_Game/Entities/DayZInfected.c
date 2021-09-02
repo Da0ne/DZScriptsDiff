@@ -25,6 +25,13 @@ enum DayZInfectedConstantsMovement
 	MOVEMENTSTATE_SPRINT
 }
 
+enum DayZInfectedDeathAnims
+{
+	ANIM_DEATH_DEFAULT = 0,
+	ANIM_DEATH_IMPULSE = 1,
+	ANIM_DEATH_BACKSTAB = 2,
+}
+
 class DayZInfectedCommandMove
 {
 	proto native void SetStanceVariation(int pStanceVariation);

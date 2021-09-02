@@ -19,6 +19,8 @@ enum EActions
 	LIQUIDTYPE_DOWN,
 	PRINT_BULLETS,
 	SPIN,
+	FOOD_STAGE_PREV,
+	FOOD_STAGE_NEXT,
 	//<----add new individual types above this line
 	
 	

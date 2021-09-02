@@ -10,6 +10,15 @@ class Wreck_UH1Y extends House
 		}
 	}
 	
+	override void EEInit()
+	{
+		//Setup for local sound tests
+		#ifdef DEVELOPER
+		if ( !GetGame().IsMultiplayer() )
+			SEffectManager.PlaySound( "HeliCrash_Distant_SoundSet", GetPosition(), 0.1, 0.1 );
+		#endif
+	}
+	
 	override void EEDelete(EntityAI parent)
 	{
 		if ( !GetGame().IsMultiplayer() || GetGame().IsClient() )
@@ -19,13 +28,11 @@ class Wreck_UH1Y extends House
 		}
 	}
 	
-}
-
-class Wreck_Mi8 extends House
-{
-
-	void Wreck_Mi8()
+	override void EEOnCECreate()
 	{
-		//I'll leave this here if we want to add particles to MI-8
+		Param2<bool, vector> playSound = new Param2<bool, vector>(true, GetPosition() );
+		array<ref Param> params = new array<ref Param>;
+		params.Insert(playSound);
+		GetGame().RPC( null, ERPCs.RPC_SOUND_HELICRASH, params, true );
 	}
 }

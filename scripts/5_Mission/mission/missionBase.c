@@ -9,7 +9,7 @@ class MissionBase extends MissionBaseWorld
 	ref WorldLighting		m_WorldLighting;
 	
 	ref array<PlayerBase> m_DummyPlayers = new array<PlayerBase>;
-	
+
 	void MissionBase()
 	{
 		SetDispatcher(new DispatcherCaller);
@@ -44,6 +44,7 @@ class MissionBase extends MissionBaseWorld
 		{
 			GetDayZGame().GetAnalyticsClient().UnregisterEvents();	
 		}
+		TriggerEffectManager.DestroyInstance();
 	}
 	
 	void InitialiseWorldData()
@@ -196,6 +197,9 @@ class MissionBase extends MissionBaseWorld
 			break;
 		case MENU_WARNING_ITEMDROP:
 			menu = new ItemDropWarningMenu;
+			break;
+		case MENU_WARNING_TELEPORT:
+			menu = new PlayerRepositionWarningMenu;
 			break;
 		case MENU_RESPAWN_DIALOGUE:
 			menu = new RespawnDialogue;
@@ -437,6 +441,7 @@ class MissionBase extends MissionBaseWorld
 	{
 		m_DummyPlayers.Insert(PlayerBase.Cast( player ));
 	}
+
 }
 
 class MissionDummy extends MissionBase

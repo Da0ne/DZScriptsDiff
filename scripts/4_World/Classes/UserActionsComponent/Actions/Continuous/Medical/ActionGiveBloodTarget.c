@@ -42,6 +42,7 @@ class ActionGiveBloodTarget: ActionContinuousBase
 			ActionGiveBloodData action_data_b = ActionGiveBloodData.Cast( action_data );
 			action_data_b.m_ItemBloodType = action_data.m_MainItem.GetLiquidType();
 			action_data_b.m_BloodAmount = action_data.m_MainItem.GetQuantity();
+			action_data_b.m_Agents = action_data.m_MainItem.GetAgents();
 			return true;
 		}
 		return false;
@@ -64,14 +65,20 @@ class ActionGiveBloodTarget: ActionContinuousBase
 	override void OnEndServer(ActionData action_data)
 	{
 		ActionGiveBloodData action_data_b = ActionGiveBloodData.Cast( action_data );
-		
+		float blood_obtained = action_data_b.m_BloodAmount - action_data_b.m_MainItem.GetQuantity();
 		PlayerBase player_target = PlayerBase.Cast(action_data_b.m_Target.GetObject());
+		
+		
+		PluginTransmissionAgents plugin = PluginTransmissionAgents.Cast(GetPlugin(PluginTransmissionAgents));
+		plugin.TransmitAgents(action_data.m_MainItem, player_target, AGT_UACTION_TO_PLAYER,blood_obtained );
+		
+		
 		int bloodtypetarget = player_target.GetStatBloodType().Get();
 		bool bloodmatch = BloodTypes.MatchBloodCompatibility(action_data_b.m_ItemBloodType, bloodtypetarget);
 		
 		if ( !bloodmatch )
 		{
-			float blood_obtained = action_data_b.m_BloodAmount - action_data_b.m_MainItem.GetQuantity();
+			
 			
 			if (blood_obtained > PlayerConstants.HEMOLYTIC_RISK_SHOCK_THRESHOLD)
 			{
@@ -88,6 +95,13 @@ class ActionGiveBloodTarget: ActionContinuousBase
 		if ( action_data_b.m_MainItem && action_data_b.m_MainItem.GetQuantity() <= 0.01 )
 		{
 			action_data_b.m_MainItem.SetQuantity(0);
+		}
+		
+		if (!(action_data_b.m_Agents & eAgents.CHEMICAL_POISON))//does bloodbag NOT contain nerve agent ?
+		{
+			float remove_count_agents = blood_obtained * ActionGiveBloodSelf.CHEM_AGENT_BLOOD_REMOVAL_MODIFIER;
+			player_target.InsertAgent(eAgents.CHEMICAL_POISON, -remove_count_agents);
+			
 		}
 	}
 };

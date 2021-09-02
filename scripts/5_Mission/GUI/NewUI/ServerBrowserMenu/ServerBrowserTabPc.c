@@ -985,7 +985,7 @@ class ServerBrowserTabPc extends ServerBrowserTab
 	}
 	
 	void UpdateServerList()
-	{		
+	{
 		int i;
 		ServerBrowserEntry entry;
 		
@@ -1007,6 +1007,12 @@ class ServerBrowserTabPc extends ServerBrowserTab
 				entry.FillInfo( server_info );
 				entry.SetServerMapName();
 				entry.SetMods( m_EntryMods.Get( server_info.m_Id ) );
+				
+				if ( GetRootMenu() && GetRootMenu().GetServersLoadingTab() != TabType.NONE )
+				{
+					entry.SetName("#dayz_game_loading");
+				}
+
 				m_TotalLoadedServers++;
 			}
 			else
@@ -1025,9 +1031,10 @@ class ServerBrowserTabPc extends ServerBrowserTab
 	
 	void UpdateStatusBar()
 	{
+		string serversFound = string.Format("#servers_found: %1", m_EntriesSorted[m_SortType].Count());
 		if ( m_LoadingFinished )
 		{
-			m_LoadingText.SetText( "#servers_found: "+ m_EntriesSorted[m_SortType].Count() );
+			m_LoadingText.SetText( serversFound );
 		}
 		else
 		{
@@ -1044,7 +1051,7 @@ class ServerBrowserTabPc extends ServerBrowserTab
 			}
 			*/
 			
-			m_LoadingText.SetText( "#dayz_game_loading" );
+			m_LoadingText.SetText( string.Format("#dayz_game_loading %1", serversFound) );
 		}
 	}
 	

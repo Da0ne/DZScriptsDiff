@@ -46,7 +46,7 @@ class CargoContainer extends Container
 	
 	void ~CargoContainer()
 	{
-		if( m_Entity )
+		if ( m_Entity )
 		{
 			m_Entity.GetOnItemAddedIntoCargo().Remove( AddedToCargo );
 			m_Entity.GetOnItemRemovedFromCargo().Remove( RemovedFromCargo );
@@ -58,35 +58,37 @@ class CargoContainer extends Container
 	
 	int GetCargoIndex() { return m_CargoIndex; }
 	
-	void AddedToCargo( EntityAI item )
+	void AddedToCargoEx( EntityAI item, bool refresh = true )
 	{
 		InventoryLocation il = new InventoryLocation;
 		item.GetInventory().GetCurrentInventoryLocation( il );
 		int x = il.GetCol();
 		int y = il.GetRow();
 		
-		if( m_ShowedItemPositions.Contains( item ) )
+		if ( m_ShowedItemPositions.Contains( item ) )
 		{
 			Param3<ref Icon, int, int> item_pos = m_ShowedItemPositions.Get( item );
-			InitIcon( item_pos.param1, item, x, y );
+			InitIconEx( item_pos.param1, item, x, y, refresh );
 			item_pos.param2 = x;
 			item_pos.param3 = y;
 		}
 		else
 		{
-			ref Icon icon = new Icon( this );
+			ref Icon icon = new Icon( this, false );
 			m_Icons.Insert( icon );
-			InitIcon( icon, item, x, y );
+			InitIconEx( icon, item, x, y, refresh );
 			m_ShowedItemPositions.Insert( item, new Param3<ref Icon, int, int>( icon, x, y ) );
 		}
-		UpdateHeaderText();
+		
+		if (refresh)
+			UpdateHeaderText();
 		
 		#ifdef PLATFORM_CONSOLE
-		for( int i = 0; i < m_Cargo.GetItemCount(); i++ )
+		for ( int i = 0; i < m_Cargo.GetItemCount(); i++ )
 		{
 			EntityAI item2 = m_Cargo.GetItem( i );
 			Param3<ref Icon, int, int> data = m_ShowedItemPositions.Get( item2 );
-			if( data )
+			if ( data )
 			{
 				data.param1.SetCargoPos( i );
 				data.param1.SetPos();
@@ -95,8 +97,14 @@ class CargoContainer extends Container
 		
 		m_FocusedItemPosition = Math.Min( m_ShowedItemPositions.Count() - 1, m_FocusedItemPosition );
 		
-		Refresh();
+		if (refresh)
+			Refresh();
 		#endif
+	}
+	
+	void AddedToCargo( EntityAI item )
+	{
+		AddedToCargoEx( item );
 	}
 	
 	void RemovedFromCargo( EntityAI item )
@@ -173,7 +181,7 @@ class CargoContainer extends Container
 			{
 				GetGame().GetPlayer().GetHumanInventory().GetUserReservedLocation( index, il );
 				
-				ref Icon icon = new Icon( this );
+				ref Icon icon = new Icon( this, false );
 				m_Icons.Insert( icon );
 				icon.InitLock( m_Entity, item, il.GetCol(), il.GetRow(), il.GetFlip() );
 				m_ShowedLockPositions.Insert( item, new Param3<ref Icon, int, int>( icon, 1, 1 ) );
@@ -223,9 +231,9 @@ class CargoContainer extends Container
 			
 	}
 	
-	void SetEntity( EntityAI item, int cargo_index = 0 )
+	void SetEntity( EntityAI item, int cargo_index = 0, bool immedUpdate = true )
 	{
-		if( item )
+		if ( item )
 		{
 			m_Entity		= item;
 			m_Cargo			= item.GetInventory().GetCargoFromIndex(cargo_index);
@@ -236,28 +244,31 @@ class CargoContainer extends Container
 			m_Entity.GetOnItemMovedInCargo().Insert( MovedInCargo );
 			m_Entity.GetOnSetLock().Insert( SetLock );
 			m_Entity.GetOnReleaseLock().Insert( ReleaseLock );
-			UpdateHeaderText();
+			
+			if (immedUpdate)
+				UpdateHeaderText();
 
 			InitGridHeight();
 			m_MainWidget	= m_ItemsContainer;
 			
-			if( m_Cargo )
+			if ( m_Cargo )
 			{
 				int i;
 				int prev_count = m_ShowedItemPositions.Count();
 				
 				//START - Add new item Icons
-				for( i = 0; i < m_Cargo.GetItemCount(); i++ )
+				for ( i = 0; i < m_Cargo.GetItemCount(); i++ )
 				{
 					EntityAI cargo_item = m_Cargo.GetItem( i );
-					if( cargo_item )
+					if ( cargo_item )
 					{
-						AddedToCargo( cargo_item );
+						AddedToCargoEx( cargo_item, immedUpdate );
 					}
 				}
 				
 				#ifdef PLATFORM_CONSOLE
-				Refresh();
+				if (immedUpdate)
+					Refresh();
 				#endif
 			}
 		}
@@ -274,10 +285,10 @@ class CargoContainer extends Container
 		string name = m_Entity.GetDisplayName();
 		name.ToUpper();
 		
-		if( m_Entity.GetInventory().GetCargoFromIndex(m_CargoIndex) )
+		if ( m_Entity.GetInventory().GetCargoFromIndex(m_CargoIndex) )
 		{
 			name = name + " (" + GetCargoCapacity().ToString() + "/" + GetMaxCargoCapacity() + ")";
-			if( m_IsAttachment && m_CargoHeader )
+			if ( m_IsAttachment && m_CargoHeader )
 			{
 				TextWidget.Cast( m_CargoHeader.FindAnyWidget( "TextWidget0" ) ).SetText( name );
 				float x, y;
@@ -289,7 +300,7 @@ class CargoContainer extends Container
 			}
 		}
 		
-		if( Container.Cast( GetParent() ) && Container.Cast( GetParent() ).GetHeader() )
+		if ( Container.Cast( GetParent() ) && Container.Cast( GetParent() ).GetHeader() )
 			Container.Cast( GetParent() ).GetHeader().SetName( name );
 	}
 	
@@ -315,11 +326,11 @@ class CargoContainer extends Container
 			
 			#ifdef PLATFORM_WINDOWS
 			#ifndef PLATFORM_CONSOLE
-			row.SetWidth( m_Entity.GetInventory().GetCargoFromIndex(m_CargoIndex).GetWidth() );
+			row.SetWidth( m_Entity.GetInventory().GetCargoFromIndex(m_CargoIndex).GetWidth(), false );
 			#endif
 			#endif
 			
-			row.GetRootWidget().SetSort( j );
+			row.GetRootWidget().SetSort( j, false );
 			m_Rows.Insert( row );
 		}
 		
@@ -353,7 +364,7 @@ class CargoContainer extends Container
 		#endif
 		#endif
 		int total_size = 0;
-		for( int i = 0; i < m_Cargo.GetItemCount(); i++ )
+		for ( int i = 0; i < m_Cargo.GetItemCount(); ++i )
 		{
 			int x, y;
 			m_Cargo.GetItemSize( i, x, y );
@@ -374,7 +385,7 @@ class CargoContainer extends Container
 	
 	Icon GetIcon( EntityAI item )
 	{
-		if( item && m_ShowedItemPositions.Contains( item ) )
+		if ( item && m_ShowedItemPositions.Contains( item ) )
 		{
 			Param3<ref Icon, int, int> data = m_ShowedItemPositions.Get( item );
 			return data.param1;
@@ -480,9 +491,9 @@ class CargoContainer extends Container
 	override void Refresh()
 	{
 		#ifdef PLATFORM_CONSOLE
-		if( !m_ResizeTimer )
+		if ( !m_ResizeTimer )
 			m_ResizeTimer = new Timer();
-		if( m_ResizeTimer.IsRunning() )
+		if ( m_ResizeTimer.IsRunning() )
 			m_ResizeTimer.Stop();
 		m_ResizeTimer.Run( 0.05, this, "RefreshImpl" );
 		#endif
@@ -505,7 +516,7 @@ class CargoContainer extends Container
 		}
 	}
 
-	Icon InitIcon( Icon icon, EntityAI item, int pos_x, int pos_y )
+	Icon InitIconEx( Icon icon, EntityAI item, int pos_x, int pos_y, bool refresh = true )
 	{
 		#ifdef PLATFORM_CONSOLE
 			icon.SetSize( 1, 1 );
@@ -514,24 +525,27 @@ class CargoContainer extends Container
 			#endif
 			icon.SetCargoPos( pos_y );
 			icon.SetPosY( pos_y );
-			icon.SetPos();
+			icon.SetPosEx( refresh );
 		#else
 			int size_x, size_y;
 			GetGame().GetInventoryItemSize( InventoryItem.Cast( item ), size_x, size_y );
-			if( item.GetInventory().GetFlipCargo() )
-			{
+		
+			if ( item.GetInventory().GetFlipCargo() )
 				icon.SetSize( size_y, size_x );
-			}
 			else
-			{
 				icon.SetSize( size_x, size_y );
-			}
+		
 			icon.SetPosX( pos_x );
 			icon.SetPosY( pos_y );
-			icon.SetPos();
+			icon.SetPosEx( refresh );
 		#endif
-		icon.Init( item );
+		icon.InitEx( item, refresh );
 		return icon;
+	}
+	
+	Icon InitIcon( Icon icon, EntityAI item, int pos_x, int pos_y )
+	{
+		return InitIconEx( icon, item, pos_x, pos_y );
 	}
 	
 	bool HasItem( EntityAI item )

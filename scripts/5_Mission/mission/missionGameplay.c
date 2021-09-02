@@ -18,6 +18,8 @@ class MissionGameplay extends MissionBase
 	ref LogoutMenu					m_Logout;
 	ref DebugMonitor				m_DebugMonitor;
 	
+	protected ref GameplayEffectWidgets		m_EffectWidgets;
+	
 	ref Timer						m_ChatChannelHideTimer;
 	ref WidgetFadeTimer				m_ChatChannelFadeTimer;
 	ref WidgetFadeTimer				m_MicFadeTimer;
@@ -46,6 +48,7 @@ class MissionGameplay extends MissionBase
 	{
 		DestroyAllMenus();
 		m_Initialized				= false;
+		m_EffectWidgets 			= new GameplayEffectWidgets;
 		m_HudRootWidget				= null;
 		m_Chat						= new Chat;
 		m_ActionMenu				= new ActionMenu;
@@ -64,12 +67,10 @@ class MissionGameplay extends MissionBase
 	void ~MissionGameplay()
 	{
 		DestroyInventory();
-		PPEffects.ResetAll();
 		//GetGame().GetCallQueue(CALL_CATEGORY_GAMEPLAY).Remove(this.UpdateDebugMonitor);
 	#ifndef NO_GUI
 		if (g_Game.GetUIManager() && g_Game.GetUIManager().ScreenFadeVisible())
 		{
-			g_Game.SetEVValue(0);
 			g_Game.GetUIManager().ScreenFadeOut(0);
 		}
 	#endif
@@ -88,8 +89,8 @@ class MissionGameplay extends MissionBase
 		{
 			return;
 		}
-			
-		PPEffects.Init();
+		
+		PPEffects.Init(); //Deprecated, left in for legacy purposes only
 		MapMarkerTypes.Init();
 		
 		m_UIManager = GetGame().GetUIManager();
@@ -217,6 +218,7 @@ class MissionGameplay extends MissionBase
 		if (m_DebugMonitor)
 			m_DebugMonitor.Hide();
 		g_Game.GetUIManager().ShowUICursor(false);
+		PPEManagerStatic.GetPPEManager().StopAllEffects(PPERequesterCategory.ALL);
 		g_Game.SetMissionState( DayZGame.MISSION_STATE_FINNISH );
 	}
 	
@@ -360,11 +362,6 @@ class MissionGameplay extends MissionBase
 				{
 					GesturesMenu.OpenMenu();
 					m_Hud.ShowHudUI( false );
-					/*if (!m_ControlDisabled)
-					{
-						PlayerControlDisable(INPUT_EXCLUDE_MOUSE_RADIAL);
-						GetUApi().GetInputByName("UAUIGesturesOpen").Unlock();
-					}*/
 				}
 			}
 		}
@@ -620,6 +617,7 @@ class MissionGameplay extends MissionBase
 #ifdef DEVELOPER
 		DisplayHairDebug();
 #endif
+		super.OnUpdate( timeslice );
 	}
 	
 	override void OnKeyPress(int key)
@@ -1200,10 +1198,17 @@ class MissionGameplay extends MissionBase
 		m_Note = NoteMenu.Cast(menu);
 	};
 	
+	override void OnPlayerRespawned(Man player)
+	{
+		#ifdef DEVELOPER
+			if (m_HudDebug)
+				m_HudDebug.RefreshByLocalProfile();
+		#endif	
+	}
+	
 	override void SetPlayerRespawning(bool state)
 	{
 		m_PlayerRespawning = state;
-		//m_Hud.InitBadgesAndNotifiers();
 	}
 	
 	override bool IsPlayerRespawning()
@@ -1224,5 +1229,10 @@ class MissionGameplay extends MissionBase
 	override int GetRespawnModeClient()
 	{
 		return m_RespawnModeClient;
+	}
+	
+	override GameplayEffectWidgets GetEffectWidgets()
+	{
+		return m_EffectWidgets;
 	}
 }

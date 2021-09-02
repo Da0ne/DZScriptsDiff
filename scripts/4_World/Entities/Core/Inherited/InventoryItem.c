@@ -218,7 +218,7 @@ class CarDoor extends InventoryItemSuper
 	{
 		super.EEHealthLevelChanged(oldLevel,newLevel,zone);
 		
-		if ( newLevel ==  GameConstants.STATE_RUINED )
+		if ( newLevel ==  GameConstants.STATE_RUINED && m_Initialized )
 		{
 			EffectSound sound_plug;
 			switch ( zone )
@@ -590,17 +590,20 @@ class Clothing_Base extends ItemBase
 				if ( attaching && NVGAttachment.IsWorking() && NVGAttachment.m_Strap && NVGAttachment.m_IsLowered && !player.IsNVGWorking() )
 				{
 					NVGAttachment.SetPlayer(player);
-					player.SetNVGWorking(true);
+					player.AddActiveNV(NVTypes.NV_GOGGLES);
+					player.SetNVGLowered(true);
 				}
 				else if ( player.IsNVGWorking() )
 				{
 					NVGAttachment.SetPlayer(null);
-					player.SetNVGWorking(false);
+					player.RemoveActiveNV(NVTypes.NV_GOGGLES);
+					player.SetNVGLowered(false);
 				}
 			}
 			else if ( player.IsNVGWorking() && force_disable )
 			{
-				player.SetNVGWorking(false);
+				player.RemoveActiveNV(NVTypes.NV_GOGGLES);
+				player.SetNVGLowered(false);
 			}
 		}
 	}
@@ -651,6 +654,11 @@ class Clothing_Base extends ItemBase
 	int GetVoiceEffect()
 	{
 		return 0;
+	}
+	
+	bool IsGasMask()
+	{
+		return false;
 	}
 };
 

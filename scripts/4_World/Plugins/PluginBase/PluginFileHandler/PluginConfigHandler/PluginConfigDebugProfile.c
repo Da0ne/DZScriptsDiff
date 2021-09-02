@@ -573,14 +573,15 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 		}
 	}
 	
-	bool GetPresetItems( string preset_name, out TStringArray arr )
+	bool GetPresetItems( string preset_name, out TStringArray arr, string param_name = "" )
 	{
 		if ( m_PresetList.Find(preset_name) == -1 )
 		{
 			return false;
 		}
-		
-		GetSubParametersInStringArray( preset_name, SUB_PARAM_ITEM_NAME, arr );
+		if(param_name == "")
+			param_name = SUB_PARAM_ITEM_NAME;
+		GetSubParametersInStringArray( preset_name, param_name, arr );
 		
 		return true;
 	}

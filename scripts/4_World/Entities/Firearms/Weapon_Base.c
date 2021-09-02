@@ -33,7 +33,7 @@ class Weapon_Base extends Weapon
 	protected float m_DmgPerShot = 0; //default is set to zero, since C++ solution has been implemented. See 'damageBarrel' and 'barrelArmor' in configs.
 	protected float m_WeaponLength;
 	ref array<int> m_bulletSelectionIndex = new array<int>;
-	ref array<float> m_DOFProperties = new array<float>;
+	ref array<float> m_DOFProperties;
 	ref array<float> m_ChanceToJam = new array<float>;
 	protected float m_ChanceToJamSync = 0;
 	protected ref PropertyModifiers m_PropertyModifierObject;
@@ -47,6 +47,7 @@ class Weapon_Base extends Weapon
 		m_BayonetAttachmentIdx = -1;
 		m_ButtstockAttachmentIdx = -1;
 		m_BurstCount = 0;
+		m_DOFProperties = new array<float>;
 		
 		if ( ConfigIsExisting("simpleHiddenSelections") )
 		{

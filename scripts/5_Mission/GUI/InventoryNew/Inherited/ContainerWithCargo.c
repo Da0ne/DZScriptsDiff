@@ -8,7 +8,7 @@ class ContainerWithCargo: ClosableContainer
 		m_Parent = parent;
 
 		m_CargoGrid = new CargoContainer( this );
-		this.Insert( m_CargoGrid );
+		Insert( m_CargoGrid );
 		
 		m_CargoGrid.GetRootWidget().SetSort( 1 );
 		
@@ -47,9 +47,9 @@ class ContainerWithCargo: ClosableContainer
 	
 	override void UpdateInterval()
 	{
-		if( m_Entity )
+		if ( m_Entity )
 		{
-			if( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
+			if ( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
 			{
 				HideContent();
 			}
@@ -133,30 +133,29 @@ class ContainerWithCargo: ClosableContainer
 		return m_CargoGrid.InspectItem();
 	}
 
-	void SetEntity( EntityAI entity, int cargo_index = 0 )
+	void SetEntity( EntityAI entity, int cargo_index = 0, bool immedUpdate = true )
 	{
 		m_Entity = entity;
 		m_CargoIndex = cargo_index;
 
 		SetOpenState( ItemManager.GetInstance().GetDefaultOpenState( m_Entity.GetType() ) );
 
-		m_CargoGrid.SetEntity( entity );
+		m_CargoGrid.SetEntity( entity, immedUpdate );
 		m_CargoGrid.UpdateHeaderText();
 		m_ClosableHeader.SetItemPreview( entity );
+
+		( Container.Cast( m_Parent ) ).Insert( this, -1, false );
 		
-		( Container.Cast( m_Parent ) ).Insert( this );
-		
-		if( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
-		{
+		if ( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
 			HideContent();
-		}
 		else
-		{
 			ShowContent();
+
+		if ( immedUpdate )
+		{
+			Refresh();
+			GetMainWidget().Update();
 		}
-		
-		Refresh();
-		GetMainWidget().Update();
 	}
 
 	EntityAI GetEntity()

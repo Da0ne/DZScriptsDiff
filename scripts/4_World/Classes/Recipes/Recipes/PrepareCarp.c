@@ -111,7 +111,5 @@ class PrepareCarp extends PrepareFish
 	{
 		// Adjusts quantity of results to the quantity of the 1st ingredient
 		super.Do(ingredients, player, results, specialty_weight);
-		
-		Debug.Log("Recipe Do method called","recipes");
 	}
 };

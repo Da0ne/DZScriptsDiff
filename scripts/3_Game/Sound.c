@@ -66,8 +66,9 @@ class SoundParams
 {
 	void SoundParams(string name);
 		
-	proto native bool Load(string name);
+	proto native bool Load(string name);	
 	proto native bool IsValid();
+	proto string GetName();
 }
 
 class AbstractWaveEvents
@@ -75,6 +76,7 @@ class AbstractWaveEvents
 	ref ScriptInvoker Event_OnSoundWaveStarted = new ScriptInvoker();
 	ref ScriptInvoker Event_OnSoundWaveStopped = new ScriptInvoker();
 	ref ScriptInvoker Event_OnSoundWaveLoaded = new ScriptInvoker();
+	ref ScriptInvoker Event_OnSoundWaveHeaderLoaded = new ScriptInvoker();
 	ref ScriptInvoker Event_OnSoundWaveEnded = new ScriptInvoker();
 }
 
@@ -100,6 +102,7 @@ class AbstractWave
 	proto native void Stop();
 	proto native void Restart();
 	proto native void SetStartOffset(float offset);
+	//! WARNING: Blocking! Waits for header to load
 	proto native float GetLength();
 	proto native void Loop(bool setLoop);
 	proto native void SetVolume(float value);
@@ -111,35 +114,33 @@ class AbstractWave
 	proto native void SetFadeOutFactor(float volume);
 	proto native void Skip(float timeSec);
 	
+	AbstractWaveEvents GetEvents()
+	{
+		return AbstractWaveEvents.Cast(GetUserData());
+	}
+	
 	void OnPlay()
 	{
-		Managed data = GetUserData();
-		AbstractWaveEvents events;
-		Class.CastTo(events, data);
-		events.Event_OnSoundWaveStarted.Invoke(this);
+		GetEvents().Event_OnSoundWaveStarted.Invoke(this);
 	}
 	
 	void OnStop()
 	{
-		Managed data = GetUserData();
-		AbstractWaveEvents events;
-		Class.CastTo(events, data);
-		events.Event_OnSoundWaveStopped.Invoke(this);
+		GetEvents().Event_OnSoundWaveStopped.Invoke(this);
 	}
 		
 	void OnLoad()
 	{
-		Managed data = GetUserData();
-		AbstractWaveEvents events;
-		Class.CastTo(events, data);
-		events.Event_OnSoundWaveLoaded.Invoke(this);
+		GetEvents().Event_OnSoundWaveLoaded.Invoke(this);
+	}
+	
+	void OnHeaderLoad()
+	{
+		GetEvents().Event_OnSoundWaveHeaderLoaded.Invoke(this);
 	}
 	
 	void OnEnd()
 	{
-		Managed data = GetUserData();
-		AbstractWaveEvents events;
-		Class.CastTo(events, data);
-		events.Event_OnSoundWaveEnded.Invoke(this);
+		GetEvents().Event_OnSoundWaveEnded.Invoke(this);
 	}
 }

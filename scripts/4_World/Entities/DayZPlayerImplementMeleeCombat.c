@@ -6,54 +6,76 @@ enum EMeleeHitType
 	HEAVY,
 	SPRINT,
 	KICK,
+	FINISHER_LIVERSTAB,
+	FINISHER_GENERIC,
 
 	WPN_HIT,
 	WPN_HIT_BUTTSTOCK,
 	WPN_STAB,
+	WPN_STAB_FINISHER,
 }
 
 class DayZPlayerImplementMeleeCombat
 {
-	// target selection settings
-	protected const float				TARGETING_ANGLE_NORMAL	= 30.0;
-	protected const float				TARGETING_ANGLE_SPRINT	= 15.0;
-	protected const float				TARGETING_MIN_HEIGHT	= -2.0;
-	protected const float				TARGETING_MAX_HEIGHT	= 2.0;
-	protected const float				TARGETING_RAY_RADIUS	= 0.25;
-	protected const float				TARGETING_RAY_DIST		= 5.0;
-	protected const float				TARGETING_RAY_DIST_SHORT= 2.0;
+	//! Target selection settings
+	protected const float				TARGETING_ANGLE_NORMAL	= 30.0; //!< Second Pass: Half angle of cone
+	protected const float				TARGETING_ANGLE_SPRINT	= 15.0; //!< Second Pass: Half angle of cone during sprint
+	protected const float				TARGETING_MIN_HEIGHT	= -2.0; //!< Second Pass: How deep the cone goes in meters from player position
+	protected const float				TARGETING_MAX_HEIGHT	= 2.0; 	//!< Second Pass: How high the cone goes in meters from player position
+	protected const float 				TARGETING_RAY_RADIUS_EX = 0.5; 	//!< Second Pass: Max distance from ray projected from player looking direction
+	protected const float				TARGETING_RAY_RADIUS	= 0.25; //!< DEPRECATED: "HitZoneSelection"
+	protected const float				TARGETING_RAY_DIST		= 5.0; 	//!< DEPRECATED: "HitZoneSelection"
+	protected const float				TARGETING_RAY_DIST_SHORT= 2.0;	//!< DEPRECATED: "HitZoneSelection"
 
-	protected const float 				RANGE_EXTENDER_NORMAL	= 0.65;
-	protected const float 				RANGE_EXTENDER_SPRINT	= 1.35;
+	protected const float 				RANGE_EXTENDER_NORMAL	= 0.65; //!< General range extension
+	protected const float 				RANGE_EXTENDER_SPRINT	= 1.35; //!< General range extension while in sprint
 	
-	protected const string				DEFAULT_HIT_ZONE 		= "Torso";
+	protected const string				DEFAULT_HIT_ZONE 		= "Torso"; //!< DEPRECATED: "HitZoneSelection"
 	
-	// members
-	protected DayZPlayerImplement		m_DZPlayer;
+	//! Target selecting "component"
+	protected ref MeleeTargeting		m_MeleeTargeting; //!< Contains logic for Second Pass
 	
-	//! targets - types
-	protected Object					m_TargetObject;
-	protected EMeleeTargetType			m_TargetType;
-	protected ref array<Object> 		m_AllTargetObjects;
-	protected ref array<typename>		m_TargetableObjects;
-	protected ref array<typename>		m_NonAlignableObjects;
+	//! Targets - types
+	protected Object					m_TargetObject; 		//!< Main target found during most recent TargetSelection
+	protected EMeleeTargetType			m_TargetType;  			//!< DEPRECATED: Was added but never used..?
+	protected ref array<Object> 		m_AllTargetObjects; 	//!< All potential targets found during most recent TargetSelection
+	
+	#ifdef DEVELOPER
+	protected Object					m_PreviousTargetObject; 		//!< Main target found during most recent TargetSelection
+	protected ref array<Object> 		m_AllPreviousTargetObjects; 	//!< All potential targets found during most recent TargetSelection
+	#endif
+	
+	protected ref array<typename>		m_TargetableObjects; 	//!< Typenames of all directly/preferred targetable objects (1st Pass + 2nd Pass)
+	protected ref array<typename>		m_NonAlignableObjects; 	//!< Typenames of objects that can be targeted, but are not a priority (3rd Pass)
+	
+	//! Parent
+	protected DayZPlayerImplement		m_DZPlayer; //!< Player executing the melee
 
-	//! weapons
-	protected InventoryItem				m_Weapon;
-	protected int						m_WeaponMode;
-	protected float						m_WeaponRange;
+	//! Weapons - cache
+	protected InventoryItem				m_Weapon; 		//!< Weapon used during most recent Update
+	protected int						m_WeaponMode; 	//!< WeaponMode used during most recent Update
+	protected float						m_WeaponRange; 	//!< WeaponRange used during most recent Update
 	
-	protected bool 						m_SprintAttack;
+	//! Misc - cache
+	protected bool 						m_SprintAttack; //!< If most recent attack was a sprint attack
+	protected bool						m_WasHit; 		//!< If most recent attack was 
 	
-	protected vector 					m_RayStart;
-	protected vector	 				m_RayEnd;
-	protected vector	 				m_RayEndShort;
+	protected vector 					m_RayStart; 	//!< Start position of most recent HitZoneSelectionRaycast
+	protected vector	 				m_RayEnd; 		//!< End position of most recent HitZoneSelectionRaycast
+	protected vector	 				m_RayEndShort; 	//!< DEPRECATED: "HitZoneSelection"
+	
+	protected EMeleeHitType				m_HitType; 	//!< Hit type of the most recent attack
 
-	protected int 						m_HitZoneIdx;
-	protected string					m_HitZoneName;
-	protected vector					m_HitPositionWS;
+	//! Hit result - cache
+	protected int 						m_HitZoneIdx; 		//!< Most recent target HitZone index
+	protected string					m_HitZoneName; 		//!< Most recent target HitZone name
+	protected vector					m_HitPositionWS;	//!< Most recent target position
 	
-	protected EMeleeHitType				m_HitType;
+	#ifdef DEVELOPER
+	protected int 						m_PreviousHitZoneIdx; 		//!< Most recent target HitZone index
+	protected string					m_PreviousHitZoneName; 		//!< Most recent target HitZone name
+	protected vector					m_PreviousHitPositionWS;	//!< Most recent target position
+	#endif
 
 	// ------------------------------------------------------------
 	// CONSTRUCTOR
@@ -68,13 +90,21 @@ class DayZPlayerImplementMeleeCombat
 	{
 		m_DZPlayer 		= player;
 		
+		m_MeleeTargeting = new MeleeTargeting;
+		
 		m_HitZoneName	= "";
 		m_HitZoneIdx 	= -1;
-		m_HitPositionWS = "-1 -1 -1";
+		m_HitPositionWS = vector.Zero;
+		
+		m_SprintAttack 	= false;
+		m_WasHit 		= false;
 		
 		m_TargetObject      = null;
 		m_TargetType		= EMeleeTargetType.ALIGNABLE;
 		m_AllTargetObjects 	= new array<Object>;
+		#ifdef DEVELOPER
+		m_AllPreviousTargetObjects = new array<Object>;
+		#endif
 
 		m_TargetableObjects = new array<typename>; //checks against CONFIG hierarchy
 		m_TargetableObjects.Insert(DayZPlayer);
@@ -135,8 +165,8 @@ class DayZPlayerImplementMeleeCombat
 	{
 		return m_WeaponMode;
 	}
-
-	void Update(InventoryItem weapon, EMeleeHitType hitMask, bool wasHitEvent = false)
+	
+	void Reset(InventoryItem weapon, EMeleeHitType hitMask, bool wasHitEvent = false)
 	{
 		m_Weapon = weapon;
 		m_HitType = hitMask;
@@ -144,7 +174,28 @@ class DayZPlayerImplementMeleeCombat
 		m_SprintAttack = hitMask == EMeleeHitType.SPRINT;
 		m_WeaponMode = SelectWeaponMode(weapon);
 		m_WeaponRange = GetWeaponRange(weapon, m_WeaponMode);
+		#ifdef DEVELOPER
+		m_AllPreviousTargetObjects = m_AllTargetObjects;
+		#endif
 		m_AllTargetObjects.Clear();
+		m_WasHit = wasHitEvent;	
+	}
+	
+	void ResetTarget()
+	{
+		#ifdef DEVELOPER
+		m_PreviousTargetObject 	= m_TargetObject;
+		m_PreviousHitPositionWS = m_HitPositionWS;
+		m_PreviousHitZoneIdx 	= m_HitZoneIdx;
+		m_PreviousHitZoneName 	= m_HitZoneName;
+		#endif
+		
+		InternalResetTarget();
+	}
+
+	void Update(InventoryItem weapon, EMeleeHitType hitMask, bool wasHitEvent = false)
+	{
+		Reset(weapon, hitMask, wasHitEvent);
 
 		if ( !GetGame().IsMultiplayer() || !GetGame().IsServer() )
 		{
@@ -154,16 +205,10 @@ class DayZPlayerImplementMeleeCombat
 				return;
 			}
 
-			//! target in cone
+			//! Select target
 			TargetSelection();
 
-			//! skips Hit zone selection when called in hit part of anim (WasHit event)
-			if ( !wasHitEvent || m_TargetType != EMeleeTargetType.NONALIGNABLE )
-			{
-				HitZoneSelection();
-			}
-
-			//! store target into input packet
+			//! Store target into input packet
 			if ( GetGame().IsMultiplayer() )
 			{
 				ScriptInputUserData ctx = new ScriptInputUserData;
@@ -180,8 +225,7 @@ class DayZPlayerImplementMeleeCombat
 	{
 		if (m_Weapon)
 		{
-			ItemBase item;
-			item = ItemBase.Cast(m_Weapon.ProcessMeleeItemDamage(GetWeaponMode()));
+			ItemBase item = ItemBase.Cast(m_Weapon.ProcessMeleeItemDamage(GetWeaponMode()));
 			
 			if (item && item.GetHierarchyRootPlayer())
 			{
@@ -200,12 +244,12 @@ class DayZPlayerImplementMeleeCombat
 
 	protected int SelectWeaponMode(InventoryItem weapon)
 	{
-		if( weapon )
+		if ( weapon )
 		{
 			//! melee with firearm (TBD)
 			if (weapon.IsInherited(Weapon))
 			{
-				switch(m_HitType)
+				switch (m_HitType)
 				{
 					case EMeleeHitType.WPN_HIT:
 						return 0;
@@ -221,7 +265,7 @@ class DayZPlayerImplementMeleeCombat
 			else
 			{
 				//! melee weapon attacks - gets mode from the item
-				switch(m_HitType)
+				switch (m_HitType)
 				{
 					case EMeleeHitType.LIGHT:
 						return weapon.GetMeleeMode();
@@ -237,7 +281,7 @@ class DayZPlayerImplementMeleeCombat
 		}
 
 		//! bare hand melee mode selection
-		switch(m_HitType)
+		switch (m_HitType)
 		{
 			case EMeleeHitType.HEAVY:
 				return 1;
@@ -251,36 +295,162 @@ class DayZPlayerImplementMeleeCombat
 	
 	protected float GetWeaponRange(InventoryItem weapon, int weaponMode)
 	{
-		if( weapon )
-		{
+		if ( weapon )
 			return weapon.GetMeleeCombatData().GetModeRange(weaponMode);
-		}
 		else
-		{
 			return m_DZPlayer.GetMeleeCombatData().GetModeRange(weaponMode);
-		}
 	}
-
+		
+	protected float GetRange()
+	{
+		if (m_SprintAttack)
+			return m_WeaponRange + RANGE_EXTENDER_SPRINT;
+		else
+			return m_WeaponRange + RANGE_EXTENDER_NORMAL;
+	}
+	
+	protected float GetAngle()
+	{
+		if (m_SprintAttack)
+			return TARGETING_ANGLE_SPRINT;
+		else
+			return TARGETING_ANGLE_NORMAL;
+	}
+	
 	protected void TargetSelection()
 	{
+		// Prepare common variables
 		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
 		vector pos = m_DZPlayer.GetPosition();
-		vector dir = MiscGameplayFunctions.GetHeadingVector(player);
+		vector rayStart = m_DZPlayer.GetBonePositionWS(m_DZPlayer.GetBoneIndexByName("Head"));
+		vector dir;
 
-		float dist = m_WeaponRange + RANGE_EXTENDER_NORMAL;
-		float tgtAngle = TARGETING_ANGLE_NORMAL;
-		if (m_SprintAttack)
+		vector cameraPos, cameraRot;
+		m_DZPlayer.GetCurrentCameraTransform(cameraPos, dir, cameraRot);
+
+		// Calculate max distance
+		float dist = GetRange();
+		float angle = GetAngle();
+		
+		float dist2 = Math.SqrFloat(dist);
+		
+		// There's generally 2 TargetSelection calls per animation
+		// First to obtain target to move towards during animation
+		// Second one is to see if that target is still in range before applying damage to it
+		// m_WasHit means the hit event occured, so this is the second call
+		if ( m_WasHit )
 		{
-			dist = m_WeaponRange + RANGE_EXTENDER_SPRINT;
-			tgtAngle = TARGETING_ANGLE_SPRINT;
+			// See if the component is still in range
+			if (CanObjectBeTargeted(m_TargetObject) && ( vector.DistanceSq(rayStart, m_TargetObject.GetDamageZonePos(m_HitZoneName)) <= dist2 ))
+			{
+				m_AllTargetObjects.Insert(m_TargetObject);
+				// This result should still be cached, so no need to fill it in again
+				return;
+			}
 		}
+		
+		// Find a new target
+		InternalResetTarget();
+		
+		Object target;
+		vector hitPos;
+		int hitZone;
+		
+		// First pass - Prefer what the player is looking at (only aligneable ones, we will try for nonaligneable later)
+		if (HitZoneSelectionRaycastHelper(hitPos, hitZone, target))
+		{
+			if (CanObjectBeTargeted(target) && vector.DistanceSq(rayStart, hitPos) <= dist2)
+			{
+				m_AllTargetObjects.Insert(target);
+				
+				SetTarget(target, hitPos, hitZone);
+				return;
+			}
+		}
+		
+		// Second pass - Try to obtain something aligneable closeby the player watching direction		
+		MeleeTargetData targetData = m_MeleeTargeting.GetMeleeTarget(new MeleeTargetSettings(pos, dist, angle, TARGETING_MIN_HEIGHT, TARGETING_MAX_HEIGHT, rayStart, dir, TARGETING_RAY_RADIUS_EX, m_DZPlayer, m_TargetableObjects), m_AllTargetObjects);
+		
+		if (targetData)
+		{
+			SetTarget(targetData.Obj, targetData.HitPos, targetData.HitComponent);
+			return;
+		}
+		
+		// Third pass - We found no aligneable target, check if the target that we are directly looking at is nonalignable (big)
+		if (CanObjectBeTargeted(target, true) && vector.DistanceSq(rayStart, hitPos) <= dist2)
+		{
+			m_AllTargetObjects.Insert(target);
 
-		m_TargetObject = DayZPlayerUtils.GetMeleeTarget(pos, dir, tgtAngle, dist, TARGETING_MIN_HEIGHT, TARGETING_MAX_HEIGHT, m_DZPlayer, m_TargetableObjects, m_AllTargetObjects);
+			SetTarget(target, hitPos, hitZone);
+			return;
+		}
+	}
+	
+	protected void InternalResetTarget()
+	{
+		m_TargetObject 	= null;
+		m_HitPositionWS = vector.Zero;
+		m_HitZoneIdx 	= -1;
+		m_HitZoneName 	= "";
+	}
+	
+	protected void SetTarget(Object obj, vector hitPos, int hitZone)
+	{
+		m_TargetObject 	= obj;
+		m_HitPositionWS = hitPos;
+		m_HitZoneIdx 	= hitZone;
+		m_HitZoneName 	= m_TargetObject.GetDamageZoneNameByComponentIndex(m_HitZoneIdx);
+	}
+	
+	protected bool CanObjectBeTargeted(Object obj, bool checkNonAligneAble = false)
+	{
+		return obj && obj.IsAlive() && ( obj.IsAnyInherited(m_TargetableObjects) || (checkNonAligneAble && obj.IsAnyInherited(m_NonAlignableObjects)) );
+	}
+	
+	protected bool HitZoneSelectionRaycastHelper(out vector hitPos, out int hitZone, out Object target)
+	{
+		return HitZoneSelectionRaycast(hitPos, hitZone, target, false);
+		// Not sure if desired, as it can give some results that feel a little odd
+		// But it will depend entirely on the player and situation..
+		// I guess the crosshair is hidden while melee anyways though
+		// || ( m_DZPlayer.IsInThirdPerson() && HitZoneSelectionRaycast(hitPos, hitZone, target, true);
+	}
+	
+	protected bool HitZoneSelectionRaycast(out vector hitPos, out int hitZone, out Object target, bool useCamera)
+	{
+		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
+		
+		vector pos;
+		vector dir;
+		if (useCamera)
+		{ // What the player camera is looking at (crosshair)
+			vector cameraRotation;
+			player.GetCurrentCameraTransform(pos, dir, cameraRotation);
+		}
+		else
+		{ // What the player himself is looking at
+			dir =  GetGame().GetCurrentCameraDirection();
+			MiscGameplayFunctions.GetHeadBonePos(player, pos);
+		}		
 
-		if(IsObstructed(m_TargetObject))
-			m_TargetObject = null;
+		m_RayStart = pos;
+		m_RayEnd = m_RayStart + dir * GetRange();
+
+		// raycast
+		set<Object> hitObjects = new set<Object>;
+		vector hitNormal;
+		
+		if ( DayZPhysics.RaycastRV(m_RayStart, m_RayEnd, hitPos, hitNormal, hitZone, hitObjects, null, player, false, false, ObjIntersectIFire) && hitObjects.Count() > 0 )
+		{
+			target = hitObjects[0];
+			return true;
+		}
+		
+		return false;
 	}
 
+	//! DEPRECATED
 	protected void HitZoneSelection()
 	{
 		Object cursorTarget = null;
@@ -319,13 +489,13 @@ class DayZPlayerImplementMeleeCombat
 			hitPos[1] = 0;
 
 			//! just for building and transports (big objects)				
-			if( cursorTarget.IsAnyInherited(m_NonAlignableObjects) && vector.Distance(playerPos, hitPos) <= GetWeaponRange(m_Weapon, GetWeaponMode()))
+			if ( cursorTarget.IsAnyInherited(m_NonAlignableObjects) && vector.Distance(playerPos, hitPos) <= GetWeaponRange(m_Weapon, GetWeaponMode()))
 			{
 				//! if no object in cone, set this object from raycast for these special cases
 				if (m_TargetObject == null)
 				{
 					m_TargetObject = cursorTarget;
-				}
+			}
 			}
 
 			if ( cursorTarget == m_TargetObject )
@@ -336,7 +506,7 @@ class DayZPlayerImplementMeleeCombat
 			else
 			{
 				if (m_TargetObject == DayZInfected.Cast(m_TargetObject) || m_TargetObject == PlayerBase.Cast(m_TargetObject))
-					m_HitZoneName = DEFAULT_HIT_ZONE; //Default to torso if no zone is targeted 
+				m_HitZoneName = DEFAULT_HIT_ZONE; //Default to torso if no zone is targeted 
 			}
 		}
 		else
@@ -346,6 +516,7 @@ class DayZPlayerImplementMeleeCombat
 		}
 	}
 
+	//! DEPRECATED - New function in MeleeTargeting
 	protected bool IsObstructed(Object object)
 	{
 		// check direct visibility of object (obstruction check)
@@ -356,12 +527,12 @@ class DayZPlayerImplementMeleeCombat
 		Object hitObject = null;
 		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
 
-		if(object)
+		if (object)
 		{
 			MiscGameplayFunctions.GetHeadBonePos(player, start);
 			end = start + MiscGameplayFunctions.GetHeadingVector(player) * vector.Distance(player.GetPosition(), object.GetPosition());
 			
-			if( end == start )
+			if ( end == start )
 				return true; //! not possible to trace when this happens (zero length raycast)
 
 			return DayZPhysics.RayCastBullet( start, end, collisionLayerMask, null, hitObject, hitPosObstructed, hitNormal, hitFraction);
@@ -380,154 +551,151 @@ class DayZPlayerImplementMeleeCombat
 	
 	void Debug(InventoryItem weapon, EMeleeHitType hitType)
 	{
-		bool show_targets = DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_SHOW_TARGETS) && DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DEBUG_ENABLE);
-		bool draw_targets = DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DRAW_TARGETS) && DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DEBUG_ENABLE);
-		bool draw_range = DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DRAW_RANGE) && DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DEBUG_ENABLE);
+		CleanAllDebugShapes();
+		
+		if (!DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DEBUG_ENABLE))
+			return;
 
-		if( show_targets || draw_targets || draw_range )
+		if ( DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_CONTINUOUS) && ( !GetGame().IsMultiplayer() || !GetGame().IsServer() ) )
+			Update(weapon, hitType);
+
+		if (DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_SHOW_TARGETS))
+			ShowDebugMeleeTarget();
+		
+		if (DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DRAW_TARGETS))
+			DrawDebugTargets();
+		
+		if (DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DRAW_RANGE))
 		{
-			if( !GetGame().IsMultiplayer() || !GetGame().IsServer() )
-			{
-				m_Weapon = weapon;
-				m_HitType = hitType;
-				m_SprintAttack = (hitType & EMeleeHitType.SPRINT) == EMeleeHitType.SPRINT;
-				m_WeaponMode = SelectWeaponMode(weapon);
-				m_WeaponRange = GetWeaponRange(weapon, m_WeaponMode);
-				m_AllTargetObjects.Clear();
-				m_HitPositionWS = "0.5 0.5 0.5";
-				
-				TargetSelection();
-				HitZoneSelection();
-			}
+			DrawDebugMeleeHitPosition();
+			DrawDebugMeleeCone();
 		}
-
-		ShowDebugMeleeTarget(show_targets);
-		DrawDebugTargets(show_targets);
-		DrawDebugMeleeHitPosition(draw_targets);
-		DrawDebugMeleeCone(draw_range);
+		
+		if (DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DRAW_BLOCK_RANGE_AI))
+			DrawDebugBlockCone(GameConstants.AI_MAX_BLOCKABLE_ANGLE, COLOR_GREEN);
+		
+		if (DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DRAW_BLOCK_RANGE_PVP))
+			DrawDebugBlockCone(GameConstants.PVP_MAX_BLOCKABLE_ANGLE, COLOR_YELLOW);
 	}
 
 	//! shows target in DbgUI 'window'
-	protected void ShowDebugMeleeTarget(bool enabled)
+	protected void ShowDebugMeleeTarget()
 	{
 		int windowPosX = 0;
 		int windowPosY = 500;
 
 		//DbgUI.BeginCleanupScope();
 		DbgUI.Begin("Melee Target", windowPosX, windowPosY);
-		if (enabled )
+		HumanCommandMelee2 hmc2 = m_DZPlayer.GetCommand_Melee2();
+		if (hmc2)		
 		{
-			if ( m_TargetObject )
-			{
-				DbgUI.Text("Character: " + m_TargetObject.GetDisplayName());
-				DbgUI.Text("HitZone: " + m_HitZoneName + "(" + m_HitZoneIdx + ")");
-				DbgUI.Text("HitPosWS:" + m_HitPositionWS);
-				DbgUI.Text("Distance:" + vector.Distance(m_HitPositionWS,m_RayStart));
-			}
+			DbgUI.Text("Current combo: " + hmc2.GetComboCount());
+		}
+		if (m_PreviousTargetObject)
+		{
+			DbgUI.Text("Previous Character: " + m_PreviousTargetObject.GetDisplayName());
+			DbgUI.Text("Previous HitZone: " + m_PreviousHitZoneName + "(" + m_PreviousHitZoneIdx + ")");
+			DbgUI.Text("Previous HitPosWS:" + m_PreviousHitPositionWS);
+			DbgUI.Text("Previous Distance:" + vector.Distance(m_PreviousHitPositionWS, m_DZPlayer.GetPosition()));
+		}
+		if (m_TargetObject)
+		{
+			DbgUI.Text("Character: " + m_TargetObject.GetDisplayName());
+			DbgUI.Text("HitZone: " + m_HitZoneName + "(" + m_HitZoneIdx + ")");
+			DbgUI.Text("HitPosWS:" + m_HitPositionWS);
+			DbgUI.Text("Distance:" + vector.Distance(m_HitPositionWS, m_DZPlayer.GetPosition()));
 		}
 		DbgUI.End();
 		//DbgUI.EndCleanupScope();
 	}
 
 	//! shows debug sphere above the target
-	protected void DrawDebugTargets(bool enabled)
+	protected void DrawDebugTargets()
 	{
-		vector w_pos, w_pos_sphr, w_pos_lend;
-		Object obj;
-
-		if ( enabled )
+		DrawDebugTargetsHelper(m_AllPreviousTargetObjects, m_PreviousTargetObject, COLOR_RED_A, COLOR_YELLOW_A);
+		DrawDebugTargetsHelper(m_AllTargetObjects, m_TargetObject, COLOR_RED, COLOR_YELLOW);
+	}
+	
+	protected void DrawDebugTargetsHelper(array<Object> allTargets, Object target, int colorMainTarget, int colorTarget)
+	{
+		for (int i = 0; i < allTargets.Count(); ++i )
 		{
-			CleanupDebugShapes(dbgTargets);
-
-			for (int i = 0; i < m_AllTargetObjects.Count(); i++ )
+			if ( m_TargetObject && allTargets.Count() )
 			{
-				if ( m_TargetObject && m_AllTargetObjects.Count() )
-				{
-					obj = m_AllTargetObjects.Get(i);
-					w_pos = obj.GetPosition();
-					// sphere pos tweaks
-					w_pos_sphr = w_pos;
-					w_pos_sphr[1] = w_pos_sphr[1] + 1.8;
-					// line pos tweaks
-					w_pos_lend = w_pos;
-					w_pos_lend[1] = w_pos_lend[1] + 1.8;
+				Object obj = allTargets[i];
+				vector w_pos = obj.GetPosition();
+				// sphere pos tweaks
+				vector w_pos_sphr = w_pos;
+				w_pos_sphr[1] = w_pos_sphr[1] + 1.8;
+				// line pos tweaks
+				vector w_pos_lend = w_pos;
+				w_pos_lend[1] = w_pos_lend[1] + 1.8;
 					
-					if ( m_AllTargetObjects.Get(i) == m_TargetObject )
-					{
-						dbgTargets.Insert( Debug.DrawSphere(w_pos_sphr, 0.05, COLOR_RED, ShapeFlags.NOOUTLINE) );
-						dbgTargets.Insert( Debug.DrawLine(w_pos, w_pos_lend, COLOR_RED) );
-					}
-					else
-					{
-						dbgTargets.Insert( Debug.DrawSphere(w_pos_sphr, 0.05, COLOR_YELLOW, ShapeFlags.NOOUTLINE) );
-						dbgTargets.Insert( Debug.DrawLine(w_pos, w_pos_lend, COLOR_YELLOW) );
-					}
+				if ( obj == m_TargetObject )
+				{
+					dbgTargets.Insert( Debug.DrawSphere(w_pos_sphr, 0.05, colorMainTarget, ShapeFlags.NOOUTLINE) );
+					dbgTargets.Insert( Debug.DrawLine(w_pos, w_pos_lend, colorMainTarget) );
+				}
+				else
+				{
+					dbgTargets.Insert( Debug.DrawSphere(w_pos_sphr, 0.05, colorTarget, ShapeFlags.NOOUTLINE) );
+					dbgTargets.Insert( Debug.DrawLine(w_pos, w_pos_lend, colorTarget) );
 				}
 			}
 		}
-		else
-			CleanupDebugShapes(dbgTargets);
+	}
+	
+	protected void DrawDebugMeleeHitPosition()
+	{	
+		if (m_PreviousTargetObject)
+			hitPosShapes.Insert( Debug.DrawSphere(m_PreviousHitPositionWS, 0.15, COLOR_YELLOW_A, ShapeFlags.NOOUTLINE|ShapeFlags.TRANSP) );
+		
+		if (m_TargetObject)
+			hitPosShapes.Insert( Debug.DrawSphere(m_HitPositionWS, 0.15, COLOR_YELLOW, ShapeFlags.NOOUTLINE|ShapeFlags.TRANSP) );			
 	}
 		
-	protected void DrawDebugMeleeCone(bool enabled)
+	protected void DrawDebugMeleeCone()
 	{
-		// "cone" settings
-		vector start, end, endL, endR;
-		float playerAngle;
-		float xL,xR,zL,zR;
-		float dist = m_WeaponRange + RANGE_EXTENDER_NORMAL;
-		float tgtAngle = TARGETING_ANGLE_NORMAL;
-		
-		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
-		if (m_SprintAttack)
-		{
-			dist = m_WeaponRange + RANGE_EXTENDER_SPRINT;
-			tgtAngle = TARGETING_ANGLE_SPRINT;
-		}
-
-		if (enabled)
-		{
-			CleanupDebugShapes(dbgConeShapes);
-
-			start = m_DZPlayer.GetPosition();
-			playerAngle = MiscGameplayFunctions.GetHeadingAngle(player);
+		// cone settings
+		float dist = GetRange();
+		vector start = m_DZPlayer.GetPosition();
+					
+		vector cameraPos, cameraDir, cameraRot;
+		m_DZPlayer.GetCurrentCameraTransform(cameraPos, cameraDir, cameraRot);
+		vector normDir = cameraDir;
+		normDir[1] = 0;
+		normDir.Normalize();
+		float playerAngle = -Math.Atan2(normDir[0], normDir[2]);		
 			
-			endL = start;
-			endR = start;
-			xL = dist * Math.Cos(playerAngle + Math.PI_HALF + tgtAngle * Math.DEG2RAD); // x
-			zL = dist * Math.Sin(playerAngle + Math.PI_HALF + tgtAngle * Math.DEG2RAD); // z
-			xR = dist * Math.Cos(playerAngle + Math.PI_HALF - tgtAngle * Math.DEG2RAD); // x
-			zR = dist * Math.Sin(playerAngle + Math.PI_HALF - tgtAngle * Math.DEG2RAD); // z
-			endL[0] = endL[0] + xL;
-			endL[2] = endL[2] + zL;
-			endR[0] = endR[0] + xR;
-			endR[2] = endR[2] + zR;
-
-			dbgConeShapes.Insert( Debug.DrawLine(start, endL, COLOR_BLUE ) );
-			dbgConeShapes.Insert( Debug.DrawLine(start, endR, COLOR_BLUE) ) ;
-			dbgConeShapes.Insert( Debug.DrawLine(endL, endR, COLOR_BLUE  ) );
-		}
-		else
-			CleanupDebugShapes(dbgConeShapes);		
+		dbgConeShapes.InsertArray(Debug.DrawCone(start, dist, GetAngle() * Math.DEG2RAD, playerAngle + Math.PI_HALF, COLOR_BLUE));
 	}
 
-	protected void DrawDebugMeleeHitPosition(bool enabled)
+	protected void DrawDebugBlockCone(float angle, int color)
 	{
-		if (enabled && m_TargetObject)
-		{
-			CleanupDebugShapes(hitPosShapes);
-			hitPosShapes.Insert( Debug.DrawSphere(m_HitPositionWS, TARGETING_RAY_RADIUS, COLOR_YELLOW, ShapeFlags.NOOUTLINE|ShapeFlags.TRANSP) );
-		}
-		else
-			CleanupDebugShapes(hitPosShapes);
+		// cone settings
+		float dist = 3;
+		vector start = m_DZPlayer.GetPosition();
+					
+		vector dir = MiscGameplayFunctions.GetHeadingVector(PlayerBase.Cast(m_DZPlayer));
+		vector normDir = dir;
+		dir[1] = 0;
+		dir.Normalize();
+		float playerAngle = -Math.Atan2(dir[0], dir[2]);
+		
+		dbgConeShapes.InsertArray(Debug.DrawCone(start, dist, angle * Math.DEG2RAD, playerAngle + Math.PI_HALF, color));
+	}
+	
+	protected void CleanAllDebugShapes()
+	{
+		CleanupDebugShapes(dbgTargets);
+		CleanupDebugShapes(dbgConeShapes);
+		CleanupDebugShapes(hitPosShapes);
 	}
 
 	protected void CleanupDebugShapes(array<Shape> shapes)
 	{
 		for ( int it = 0; it < shapes.Count(); ++it )
-		{
 			Debug.RemoveShape( shapes[it] );
-		}
 
 		shapes.Clear();
 	}

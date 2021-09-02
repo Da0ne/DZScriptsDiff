@@ -225,7 +225,7 @@ class OnlineServices
 		port = m_InviteServerPort;
 	}
 	
-	static void OnLoadServersAsync( ref GetServersResult result_list, EBiosError error, string response )
+	static void OnLoadServersAsync( GetServersResult result_list, EBiosError error, string response )
 	{
 		if( !ErrorCaught( error ) )
 		{
@@ -300,38 +300,41 @@ class OnlineServices
 		ErrorCaught( error );
 	}
 	
-	static void OnFriendsAsync( ref BiosFriendInfoArray friend_list, EBiosError error )
+	static void OnFriendsAsync( BiosFriendInfoArray friend_list, EBiosError error )
 	{
-		if( !ErrorCaught( error ) )
+		if ( !ErrorCaught( error ) )
 		{
 			m_FriendsAsyncInvoker.Invoke( friend_list );
 			
 			array<string> friends_simple = new array<string>;
-			for( int i = 0; i < friend_list.Count(); i++ )
+			for ( int i = 0; i < friend_list.Count(); ++i )
 			{
-				string uid = friend_list.Get( i ).m_Uid;
-				if( m_FriendsList.Get( uid ) )
+				string uid = friend_list[i].m_Uid;
+				BiosFriendInfo storedBfi = m_FriendsList[uid];
+				BiosFriendInfo newBfi = friend_list[i];
+				
+				if (storedBfi)
 				{
-					if( !BiosFriendInfo.Compare( m_FriendsList.Get( uid ), friend_list.Get( i ) ) )
+					if ( !BiosFriendInfo.Compare( storedBfi, newBfi ) )
 					{
-						friends_simple.Insert( friend_list.Get( i ).m_Uid );
+						friends_simple.Insert( newBfi.m_Uid );
 					}
-					m_FriendsList.Set( uid, friend_list.Get( i ) );
+					m_FriendsList.Set( uid, newBfi );
 				}
 				else
 				{
-					m_FriendsList.Insert( uid, friend_list.Get( i ) );
-					friends_simple.Insert( friend_list.Get( i ).m_Uid );
+					m_FriendsList.Insert( uid, newBfi );
+					friends_simple.Insert( newBfi.m_Uid );
 				}
 			}
 			
-			if( !m_FirstFriendsLoad )
+			if ( !m_FirstFriendsLoad )
 			{
-				if( ClientData.m_LastNewPlayers && ClientData.m_LastNewPlayers.m_PlayerList.Count() > 0 )
+				if ( ClientData.m_LastNewPlayers && ClientData.m_LastNewPlayers.m_PlayerList.Count() > 0 )
 				{
-					foreach( SyncPlayer player : ClientData.m_LastNewPlayers.m_PlayerList )
+					foreach ( SyncPlayer player : ClientData.m_LastNewPlayers.m_PlayerList )
 					{
-						if( m_FriendsList.Contains( player.m_UID ) )
+						if ( m_FriendsList.Contains( player.m_UID ) )
 						{
 							NotificationSystem.AddNotification( NotificationType.FRIEND_CONNECTED, 6, player.m_PlayerName + " " + "#ps4_invite_has_joined_your_session" );
 						}
@@ -359,23 +362,24 @@ class OnlineServices
 		}
 	}
 	
-	static void OnPermissionsAsync( ref BiosPrivacyUidResultArray result_list, EBiosError error )
+	static void OnPermissionsAsync( BiosPrivacyUidResultArray result_list, EBiosError error )
 	{
-		if( !ErrorCaught( error ) )
+		if ( !ErrorCaught( error ) )
 		{
-			ref BiosPrivacyUidResultArray new_list = new BiosPrivacyUidResultArray;
-			ref map<string, bool> mute_list = new map<string, bool>;
+			BiosPrivacyUidResultArray new_list = new BiosPrivacyUidResultArray;
+			map<string, bool> mute_list = new map<string, bool>;
 			
-			for( int i = 0; i < result_list.Count(); i++ )
+			for ( int i = 0; i < result_list.Count(); i++ )
 			{
-				string uid = result_list.Get( i ).m_Uid;
+				BiosPrivacyUidResult result = result_list.Get( i );
+				string uid = result.m_Uid;
 				BiosPrivacyPermissionResultArray result_array = m_PermissionsList.Get( uid );
-				BiosPrivacyPermissionResultArray result_array2 = result_list.Get( i ).m_Results;
-				if( result_array && result_array2 )
+				BiosPrivacyPermissionResultArray result_array2 = result.m_Results;
+				if ( result_array && result_array2 )
 				{
-					if( !BiosPrivacyPermissionResult.Compare( result_array.Get( 0 ), result_array2.Get( 0 ) ) )
+					if ( !BiosPrivacyPermissionResult.Compare( result_array.Get( 0 ), result_array2.Get( 0 ) ) )
 					{
-						new_list.Insert( result_list.Get( i ) );
+						new_list.Insert( result );
 						m_PermissionsList.Set( uid, result_array2 );
 						mute_list.Insert( uid, IsPlayerMuted( uid ) );
 					}
@@ -383,11 +387,11 @@ class OnlineServices
 				else
 				{
 					m_PermissionsList.Insert( uid, result_array2 );
-					new_list.Insert( result_list.Get( i ) );
+					new_list.Insert( result );
 					mute_list.Insert( uid, IsPlayerMuted( uid ) );
 				}
 				
-				if( !m_MuteList.Contains( uid ) )
+				if ( !m_MuteList.Contains( uid ) )
 				{
 					m_MuteList.Insert( uid, !result_array2.Get( 0 ).m_IsAllowed );
 				}
@@ -676,7 +680,7 @@ class OnlineServices
 		if( m_ClientServices && m_AutoConnectTries == 0 )
 		{
 			m_AutoConnectTries = 1;
-			ref GetFirstServerWithEmptySlotInput input = new GetFirstServerWithEmptySlotInput;
+			GetFirstServerWithEmptySlotInput input = new GetFirstServerWithEmptySlotInput;
 			input.SetOfficial( true );
 			m_ClientServices.GetLobbyService().GetFirstServerWithEmptySlot( input );
 		}
@@ -701,12 +705,12 @@ class OnlineServices
 		return results_free.GetRandomElement();
 	}
 	
-	static void OnAutoConnectToEmptyServer( ref GetFirstServerWithEmptySlotResult result_list, EBiosError error )
+	static void OnAutoConnectToEmptyServer( GetFirstServerWithEmptySlotResult result_list, EBiosError error )
 	{
-		if( !ErrorCaught( error ) )
+		if ( !ErrorCaught( error ) )
 		{
 			GetServersResultRow result = GetRandomFreeResult( result_list );
-			if( result )
+			if ( result )
 			{
 				g_Game.ConnectFromServerBrowser( result.m_HostIp, result.m_HostPort );
 				m_AutoConnectTries = 0;
@@ -718,10 +722,10 @@ class OnlineServices
 			}
 		}
 		
-		if( m_AutoConnectTries < 3 )
+		if ( m_AutoConnectTries < 3 )
 		{
 			m_AutoConnectTries++;
-			ref GetFirstServerWithEmptySlotInput input = new GetFirstServerWithEmptySlotInput;
+			GetFirstServerWithEmptySlotInput input = new GetFirstServerWithEmptySlotInput;
 			input.SetOfficial( true );
 			m_ClientServices.GetLobbyService().GetFirstServerWithEmptySlot( input );
 		}
@@ -734,15 +738,15 @@ class OnlineServices
 	static void GetServerModList( string server_id )
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			m_ClientServices.GetLobbyService().GetServerModList( server_id );
 		}
 	}
 	
-	static void OnGetServerModList( ref GetServerModListResult result_list, EBiosError error )
+	static void OnGetServerModList( GetServerModListResult result_list, EBiosError error )
 	{
-		if( !ErrorCaught( error ) )
+		if ( !ErrorCaught( error ) )
 		{
 			m_ServerModLoadAsyncInvoker.Invoke( result_list );
 		}

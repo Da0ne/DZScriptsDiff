@@ -6,14 +6,14 @@ class SlotsContainer: LayoutHolder
 	void SlotsContainer( LayoutHolder parent, EntityAI slot_parent ) 
 	{
 		m_Icons = new array<ref SlotsIcon>;
-		for( int i = 0; i < ITEMS_IN_ROW; i++ )
+		for ( int i = 0; i < ITEMS_IN_ROW; i++ )
 		{
-			if( GetRootWidget().FindAnyWidget( "Icon" + i ) )
+			if ( GetRootWidget().FindAnyWidget( "Icon" + i ) )
 				m_Icons.Insert( new SlotsIcon( this, GetRootWidget().FindAnyWidget( "Icon" + i ), i , slot_parent) );
 			else
 			{
 				Widget child = GetRootWidget().GetChildren();
-				while( child )
+				while ( child )
 				{
 					child = child.GetSibling();
 				}
@@ -23,7 +23,7 @@ class SlotsContainer: LayoutHolder
 	
 	void SetFocus( int index )
 	{
-		if( index >= 0 &&index < m_Icons.Count() )
+		if ( index >= 0 && index < m_Icons.Count() )
 		{
 			m_Icons.Get( index ).GetCursorWidget().Show( true );
 		}
@@ -31,7 +31,7 @@ class SlotsContainer: LayoutHolder
 	
 	void UnfocusAll()
 	{
-		for( int i = 0; i < m_Icons.Count(); i++ )
+		for ( int i = 0; i < m_Icons.Count(); i++ )
 		{
 			m_Icons.Get( i ).GetCursorWidget().Show( false );
 		}
@@ -49,7 +49,7 @@ class SlotsContainer: LayoutHolder
 	
 	SlotsIcon GetSlotIcon( int index )
 	{
-		if( m_Icons.IsValidIndex( index ) )
+		if ( m_Icons.IsValidIndex( index ) )
 		{
 			return m_Icons.Get( index );
 		}
@@ -62,7 +62,7 @@ class SlotsContainer: LayoutHolder
 		#ifdef PLATFORM_CONSOLE
 			m_LayoutName = WidgetLayoutName.InventorySlotsContainerXbox;
 		#else
-			switch( InventoryMenu.GetWidthType() )
+			switch ( InventoryMenu.GetWidthType() )
 			{
 				case ScreenWidthType.NARROW:
 				{

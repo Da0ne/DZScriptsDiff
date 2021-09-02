@@ -12,6 +12,7 @@ class CharcoalMdfr: ModifierBase
 		m_TickIntervalInactive 	= DEFAULT_TICK_TIME_INACTIVE;
 		m_TickIntervalActive 	= 3;
 		m_Killrate = 2.85;	// # of killed agents * m_TickIntervalActive
+		DisableActivateCheck();
 	}
 
 	override bool ActivateCondition(PlayerBase player)

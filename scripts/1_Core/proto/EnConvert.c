@@ -89,6 +89,9 @@ class int
 
 class float
 {
+	const float MIN = FLT_MIN;
+	const float MAX = FLT_MAX;
+	
 	proto string ToString();
 };
 

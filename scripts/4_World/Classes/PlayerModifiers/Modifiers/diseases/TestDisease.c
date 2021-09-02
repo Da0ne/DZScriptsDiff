@@ -11,6 +11,9 @@ class TestDiseaseMdfr: ModifierBase
 		m_TickIntervalActive 	= DEFAULT_TICK_TIME_ACTIVE;
 		m_SomeValue		= new Param1<float>(0);
 		MakeParamObjectPersistent(m_SomeValue);
+		
+		DisableDeactivateCheck();
+		DisableActivateCheck();
 	}
 	
 	override bool ActivateCondition(PlayerBase player)

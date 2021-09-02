@@ -34,6 +34,15 @@ class ActionEatBig: ActionConsume
 	{
 		return "#eat";
 	}
+	
+	
+	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
+	{	
+		if (!super.ActionCondition(player, target, item))
+			return false;
+		
+		return player.CanEatAndDrink();
+	}
 };
 
 
@@ -52,6 +61,8 @@ class ActionEat: ActionEatBig
 	{
 		m_CallbackClass = ActionEatCB;
 	}
+	
+	
 };
 
 //-------------- Action Eat Small

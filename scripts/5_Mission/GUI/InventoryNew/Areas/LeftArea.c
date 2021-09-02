@@ -7,10 +7,11 @@ class LeftArea: Container
 	protected ScrollWidget				m_ScrollWidget;
 	protected ref SizeToChild			m_ContentResize;
 	protected bool						m_ShouldChangeSize = true;
+	protected bool						m_IsProcessing = false; // Prevents refreshing every time a child is added while it is still processing
 	
 	void LeftArea( LayoutHolder parent )
 	{
-		m_MainWidget.Show( true );
+		m_MainWidget.Show( true, false );
 		
 		m_ContentParent	= m_MainWidget.FindAnyWidget( "ContentParent" );
 		m_ContentParent.GetScript( m_ContentResize );
@@ -21,7 +22,7 @@ class LeftArea: Container
 		m_UpIcon		= m_RootWidget.FindAnyWidget( "Up" );
 		m_DownIcon		= m_RootWidget.FindAnyWidget( "Down" );
 		
-		m_VicinityContainer = new VicinityContainer( this );
+		m_VicinityContainer = new VicinityContainer( this, false );
 		m_Body.Insert( m_VicinityContainer );
 		m_ActiveIndex = 0;
 		
@@ -271,7 +272,7 @@ class LeftArea: Container
 	{
 		float x, y, cont_screen_pos;
 		m_MainWidget.GetScreenPos( x, y );
-		if( m_Body.IsValidIndex( m_ActiveIndex ) )
+		if ( m_Body.IsValidIndex( m_ActiveIndex ) )
 			cont_screen_pos = Container.Cast( m_Body.Get( m_ActiveIndex ) ).GetFocusedContainerYScreenPos();
 
 		return cont_screen_pos - y;
@@ -282,7 +283,7 @@ class LeftArea: Container
 		float x, y, cont_screen_pos, cont_screen_height;
 		m_MainWidget.GetScreenPos( x, y );
 		
-		if( m_Body.IsValidIndex( m_ActiveIndex ) )
+		if ( m_Body.IsValidIndex( m_ActiveIndex ) )
 		{
 			cont_screen_pos = Container.Cast( m_Body.Get( m_ActiveIndex ) ).GetFocusedContainerYScreenPos();
 			cont_screen_height = Container.Cast( m_Body.Get( m_ActiveIndex ) ).GetFocusedContainerHeight();
@@ -293,7 +294,7 @@ class LeftArea: Container
 	
 	void ExpandCollapseContainer()
 	{
-		if( m_VicinityContainer == GetFocusedContainer() )
+		if ( m_VicinityContainer == GetFocusedContainer() )
 			m_VicinityContainer.ExpandCollapseContainer();
 		else
 		{
@@ -301,11 +302,11 @@ class LeftArea: Container
 			PlayerContainer pc = PlayerContainer.Cast( GetFocusedContainer() );
 			ZombieContainer zc = ZombieContainer.Cast( GetFocusedContainer() );
 			
-			if( acc )
+			if ( acc )
 				acc.ExpandCollapseContainer();
-			else if( pc )
+			else if ( pc )
 				pc.ExpandCollapseContainer();
-			else if( zc )
+			else if ( zc )
 				zc.ExpandCollapseContainer();
 		}
 		
@@ -327,7 +328,7 @@ class LeftArea: Container
 		#ifdef PLATFORM_CONSOLE
 			m_LayoutName = WidgetLayoutName.LeftAreaXbox;
 		#else
-			switch( InventoryMenu.GetWidthType() )
+			switch ( InventoryMenu.GetWidthType() )
 			{
 				case ScreenWidthType.NARROW:
 				{
@@ -386,17 +387,20 @@ class LeftArea: Container
 	
 	override void UpdateInterval()
 	{
+		m_IsProcessing = true;
 		super.UpdateInterval();
+		m_IsProcessing = false;
+		
 		float x, y;
 		float x2, y2;
 		m_ContentParent.GetScreenSize( x, y );
 		m_MainWidget.GetScreenSize( x2, y2 );
-		if( y2 != y )
+		if ( y2 != y )
 			m_ShouldChangeSize = true;
 		bool changed_size;
-		if( m_ShouldChangeSize )
+		if ( m_ShouldChangeSize )
 			m_ContentResize.ResizeParentToChild( changed_size );
-		if( changed_size || m_ShouldChangeSize )
+		if ( changed_size || m_ShouldChangeSize )
 		{
 			CheckScrollbarVisibility();
 			m_ShouldChangeSize = false;
@@ -421,13 +425,15 @@ class LeftArea: Container
 	
 	override bool OnChildRemove( Widget w, Widget child )
 	{
-		Refresh();
+		if (!m_IsProcessing)
+			Refresh();
 		return true;
 	}
 	
 	override bool OnChildAdd( Widget w, Widget child )
 	{
-		Refresh();
+		if (!m_IsProcessing)
+			Refresh();
 		return true;
 	}
 }

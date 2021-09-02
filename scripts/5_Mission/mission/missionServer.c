@@ -25,7 +25,7 @@ class MissionServer extends MissionBase
 	protected ref array<vector> m_FiringPos; 					// Where we should fire from. On Init set the relevant data
 	
 	//All Chernarus firing coordinates 
-	protected ref const array<vector> CHERNARUS_STRIKE_POS = 
+	protected const ref array<vector> CHERNARUS_STRIKE_POS = 
 	{
 		"-500.00 165.00 5231.69",
 		"-500.00 300.00 9934.41",
@@ -35,7 +35,7 @@ class MissionServer extends MissionBase
 	};
 	
 	//All livonia firing coordinates
-	protected ref const array<vector> LIVONIA_STRIKE_POS = 
+	protected const ref  array<vector> LIVONIA_STRIKE_POS = 
 	{ 
 		"7440.00 417.00 -500.00",
 		"-500.00 276.00 5473.00",
@@ -83,6 +83,14 @@ class MissionServer extends MissionBase
 		m_FiringPos = new array<vector>;
 	}
 	
+	override void OnMissionStart()
+	{
+		super.OnMissionStart();
+		
+		// We will load the Effect areas on Default mission start
+		EffectAreaLoader.CreateZones();
+	}
+	
 	override void OnUpdate(float timeslice)
 	{
 		UpdateDummyScheduler();
@@ -90,63 +98,74 @@ class MissionServer extends MissionBase
 		UpdateLogoutPlayers();		
 		m_WorldData.UpdateBaseEnvTemperature( timeslice );	// re-calculate base enviro temperature
 		
+		RandomArtillery( timeslice );
+		
+		super.OnUpdate( timeslice );
+	}
+	
+	void RandomArtillery( float deltaTime )
+	{
 		// ARTY barrage 
-		if ( m_PlayArty && m_ArtyBarrageTimer > m_ArtyDelay )
+		if ( m_PlayArty )
 		{
-			//We clamp to guarantee 1 and never have multiple shots on same pos, even in case of entry error
-			m_MaxSimultaneousStrikes = Math.Clamp( m_MaxSimultaneousStrikes, 1, m_FiringPos.Count() );
-			m_MinSimultaneousStrikes = Math.Clamp( m_MinSimultaneousStrikes, 1, m_MaxSimultaneousStrikes );
-			
-			// Variables to be used in this scope
-			int randPos; // Select random position
-			ref Param1<vector> pos; // The value to be sent through RPC
-			array<ref Param> params; // The RPC params
-			
-			if ( m_MaxSimultaneousStrikes == 1 )
+			// We only perform timer checks and increments if we enabled the artillery barrage
+			if ( m_ArtyBarrageTimer > m_ArtyDelay )
 			{
-				// We only have one set off coordinates to send
-				randPos = Math.RandomIntInclusive( 0, m_FiringPos.Count() - 1 );
-				pos = new Param1<vector>( m_FiringPos[randPos] );
-				params = new array<ref Param>;
-				params.Insert( pos );
-				GetGame().RPC( null, ERPCs.RPC_SOUND_ARTILLERY, params, true);
-			}
-			else
-			{
-				//We will do some extra steps to
-				/*
-				1. Send multiple coords ( Send one RPC per coord set )
-				2. Ensure we don't have duplicates
-				*/
-				array<int> usedIndices = new array<int>; // Will store all previusly fired upon indices
+				//We clamp to guarantee 1 and never have multiple shots on same pos, even in case of entry error
+				m_MaxSimultaneousStrikes = Math.Clamp( m_MaxSimultaneousStrikes, 1, m_FiringPos.Count() );
+				m_MinSimultaneousStrikes = Math.Clamp( m_MinSimultaneousStrikes, 1, m_MaxSimultaneousStrikes );
 				
-				// We determine how many positions fire between MIN and MAX
-				int randFireNb = Math.RandomIntInclusive( m_MinSimultaneousStrikes, m_MaxSimultaneousStrikes );
-				for ( int i = 0; i < randFireNb; i++ )
+				// Variables to be used in this scope
+				int randPos; // Select random position
+				ref Param1<vector> pos; // The value to be sent through RPC
+				array<ref Param> params; // The RPC params
+				
+				if ( m_MaxSimultaneousStrikes == 1 )
 				{
+					// We only have one set of coordinates to send
 					randPos = Math.RandomIntInclusive( 0, m_FiringPos.Count() - 1 );
+					pos = new Param1<vector>( m_FiringPos[randPos] );
+					params = new array<ref Param>;
+					params.Insert( pos );
+					GetGame().RPC( null, ERPCs.RPC_SOUND_ARTILLERY, params, true);
+				}
+				else
+				{
+					//We will do some extra steps to
+					/*
+					1. Send multiple coords ( Send one RPC per coord set )
+					2. Ensure we don't have duplicates
+					*/
+					array<int> usedIndices = new array<int>; // Will store all previusly fired upon indices
 					
-					if ( usedIndices.Count() <= 0 || usedIndices.Find( randPos ) < 0 ) //We do not find the index or array is empty
+					// We determine how many positions fire between MIN and MAX
+					int randFireNb = Math.RandomIntInclusive( m_MinSimultaneousStrikes, m_MaxSimultaneousStrikes );
+					for ( int i = 0; i < randFireNb; i++ )
 					{
-						// We prepare to send the message
-						pos = new Param1<vector>( m_FiringPos[randPos] );
-						params = new array<ref Param>;
+						randPos = Math.RandomIntInclusive( 0, m_FiringPos.Count() - 1 );
 						
-						// We send the message with this set of coords
-						params.Insert( pos );
-						GetGame().RPC( null, ERPCs.RPC_SOUND_ARTILLERY, params, true);
-						
-						// We store the last used value
-						usedIndices.Insert(randPos);
+						if ( usedIndices.Count() <= 0 || usedIndices.Find( randPos ) < 0 ) //We do not find the index or array is empty
+						{
+							// We prepare to send the message
+							pos = new Param1<vector>( m_FiringPos[randPos] );
+							params = new array<ref Param>;
+							
+							// We send the message with this set of coords
+							params.Insert( pos );
+							GetGame().RPC( null, ERPCs.RPC_SOUND_ARTILLERY, params, true);
+							
+							// We store the last used value
+							usedIndices.Insert(randPos);
+						}
 					}
 				}
+				
+				// Reset timer for new loop
+				m_ArtyBarrageTimer = 0.0;
 			}
 			
-			// Reset timer for new loop
-			m_ArtyBarrageTimer = 0.0;
+			m_ArtyBarrageTimer += deltaTime;
 		}
-		
-		m_ArtyBarrageTimer += timeslice;
 	}
 
 	override bool IsServer()
@@ -601,17 +620,20 @@ class MissionServer extends MissionBase
 	void TickScheduler(float timeslice)
 	{
 		GetGame().GetWorld().GetPlayerList(m_Players);
-		if( m_Players.Count() == 0 ) return;
-		for(int i = 0; i < SCHEDULER_PLAYERS_PER_TICK; i++)
+		int players_count = m_Players.Count();
+		int tick_count_max = Math.Min(players_count, SCHEDULER_PLAYERS_PER_TICK);
+		
+		for(int i = 0; i < tick_count_max; i++)
 		{
-			if(m_currentPlayer >= m_Players.Count() )
+			if(m_currentPlayer >= players_count )
 			{
 				m_currentPlayer = 0;
 			}
-			//PrintString(m_currentPlayer.ToString());
+			
 			PlayerBase currentPlayer = PlayerBase.Cast(m_Players.Get(m_currentPlayer));
 			
-			currentPlayer.OnTick();
+			if(currentPlayer)
+				currentPlayer.OnTick();
 			m_currentPlayer++;
 		}
 	}
@@ -625,6 +647,8 @@ class MissionServer extends MissionBase
 	
 	void UpdateCorpseStatesServer()
 	{
+		if (m_DeadPlayersArray.Count() == 0)//nothing to process, abort
+			return;
 		int current_time = GetGame().GetTime();
 		array<int> invalid_corpses = new array<int>;
 		CorpseData corpse_data;

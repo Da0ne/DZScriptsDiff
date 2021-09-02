@@ -61,11 +61,4 @@ class PlayerBaseClient extends PlayerBase
 			m_PersonalLight.SetEnabled(false);
 		}
 	}
-	
-	/*override void SetNVGWorking(bool state)
-	{
-		super.SetNVGWorking(state);
-		
-		SwitchPersonalLight(!state);
-	}*/
 }

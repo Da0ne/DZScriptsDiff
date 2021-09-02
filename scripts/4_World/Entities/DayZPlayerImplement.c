@@ -201,6 +201,11 @@ class DayZPlayerImplement extends DayZPlayer
 	{
 		return m_CameraOptics;
 	}
+	
+	bool IsInThirdPerson()
+	{
+		return m_Camera3rdPerson;
+	}
 
 	bool IsFireWeaponRaised()
 	{
@@ -263,8 +268,8 @@ class DayZPlayerImplement extends DayZPlayer
 	void DepleteStamina(EStaminaModifiers modifier, float dT = -1) {}
 	
 	bool PlaySoundEvent(EPlayerSoundEventID id, bool from_anim_system = false, bool is_from_server = false);
-	
-		
+	bool PlaySoundEventEx(EPlayerSoundEventID id, bool from_anim_system = false, bool is_from_server = false, int param = 0);
+
 	bool IsFBSymptomPlaying()
 	{
 		return m_isFBsymptomPlaying;
@@ -631,7 +636,9 @@ class DayZPlayerImplement extends DayZPlayer
 		}
 	}
 	void RequestSoundEvent(EPlayerSoundEventID id, bool from_server_and_client = false);
+	void RequestSoundEventEx(EPlayerSoundEventID id, bool from_server_and_client = false, int param = 0);
 	protected void SendSoundEvent(EPlayerSoundEventID id);
+	protected void SendSoundEventEx(EPlayerSoundEventID id, int param = 0);
 	
 	override void OnItemInHandsChanged()
 	{
@@ -995,6 +1002,8 @@ class DayZPlayerImplement extends DayZPlayer
 	//! selects animation type and direction based on damage system data
 	bool EvaluateDamageHitAnimation(TotalDamageResult pDamageResult, int pDamageType, EntityAI pSource, string pComponent, string pAmmoType, vector pModelPos, out int pAnimType, out float pAnimHitDir, out bool pAnimHitFullbody)
 	{
+		int invertHitDir = 0; //Used to flip the heavy hit animation direction
+		
 		pAnimType = 0;
 		pAnimHitFullbody = false; // additive anm
 		GetMovementState(m_MovementState);
@@ -1011,6 +1020,7 @@ class DayZPlayerImplement extends DayZPlayer
 					break;
 
 				pAnimType = GetGame().ConfigGetInt("cfgAmmo " + pAmmoType + " hitAnimation");
+				invertHitDir = GetGame().ConfigGetInt("cfgAmmo " + pAmmoType + " invertHitDir");
 				if ( !IsUnconscious() && pAnimType == 1 && !m_MeleeFightLogic.IsInBlock() )
 					pAnimHitFullbody = true;
 			break;
@@ -1058,6 +1068,11 @@ class DayZPlayerImplement extends DayZPlayer
 		vector cross = targetDirection * toSourceDirection;
 
 		pAnimHitDir = Math.Acos(cosFi) * Math.RAD2DEG;
+		
+		// We will invert direction of the hit
+		if ( invertHitDir > 0 )
+			pAnimHitDir -= 180;
+		
 		if (cross[1] < 0)
 			pAnimHitDir = -pAnimHitDir;
 
@@ -2866,34 +2881,13 @@ class DayZPlayerImplement extends DayZPlayer
 		}
 		else
 		{
-			Print("OnSoundEvent: Unknown sound event \"" + pEventType + "\"");
+			Debug.Log("OnSoundEvent: Unknown sound event \"" + pEventType + "\"");
 		}
 	}
 
 	void OnParticleEvent(string pEventType, string pUserString, int pUserInt)
 	{
-		if( GetGame().IsClient() || !GetGame().IsMultiplayer() )
-		{
-			if ( pUserInt == 123456 ) // 123456 is ID for vomiting effect. The current implementation is WIP.
-				{
-				/*Print(pEventType);
-				Print(pUserString);
-				Print(pUserInt);*/
-				
-				PlayerBase player = PlayerBase.Cast(this);
-				int boneIdx = player.GetBoneIndexByName("Head");
-				
-				if( boneIdx != -1 )
-				{
-					EffVomit eff = new EffVomit();
-					vector player_pos = player.GetPosition();
-					eff.SetDecalOwner( player );
-					SEffectManager.PlayInWorld( eff, "0 0 0" );
-					Particle p = eff.GetParticle();
-					player.AddChild(p, boneIdx);
-				}
-			}
-		}
+		
 	}
 
 	
@@ -2917,6 +2911,7 @@ class DayZPlayerImplement extends DayZPlayer
 
 		if (soundEvent == NULL)
 		{
+			quantity = 0;
 			soundEvent = type.GetSoundWeaponEvent(pUserInt);
 		}
 
@@ -3108,6 +3103,7 @@ class DayZPlayerImplement extends DayZPlayer
 			if (soundBuilder)
 			{
 				PlayerBase player = PlayerBase.Cast(this);
+				//this code block looks super shady, but it's the only way the sounds play correctly, god knows what's going on on c++ side
 				int maleVoiceType = 0;
 				int femaleVoiceType = 0;
 				if(player.IsMale())
@@ -3122,6 +3118,7 @@ class DayZPlayerImplement extends DayZPlayer
 				soundBuilder.SetVariable("male", maleVoiceType);
 				soundBuilder.SetVariable("female", femaleVoiceType);
 				
+				// end of weirdness
 				SoundObject soundObject = soundBuilder.BuildSoundObject();
 				if (soundObject != NULL)
 				{

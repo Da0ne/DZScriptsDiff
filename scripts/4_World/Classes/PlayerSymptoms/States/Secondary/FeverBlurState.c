@@ -7,16 +7,16 @@ class FeverBlurSymptom extends SymptomBase
 	float m_EffectTime;
 	float m_EffectStartTime;
 	float m_Time;
+	protected PPERequester_FeverEffects 	m_Requester;
 	
+	const float BLUR_STRENGTH_MIN = 0.15;
+	const float BLUR_STRENGTH_MAX = 0.25;
 	
-	const float BLUR_STRENGTH_MIN = 0.1;
-	const float BLUR_STRENGTH_MAX = 0.3;
+	const int BLUR_DURATION_TIME_MIN = 1.5;
+	const int BLUR_DURATION_TIME_MAX = 2.5;
 	
-	const int BLUR_DURATION_TIME_MIN = 3;
-	const int BLUR_DURATION_TIME_MAX = 5;
-	
-	const int MIN_TIME_BETWEEN_EFFECTS = 10.0;
-	const int MAX_TIME_BETWEEN_EFFECTS = 16.0;
+	const int MIN_TIME_BETWEEN_EFFECTS = 25.0;
+	const int MAX_TIME_BETWEEN_EFFECTS = 35.0;
 
 	//this is just for the Symptom parameters set-up and is called even if the Symptom doesn't execute, don't put any gameplay code in here
 	override void OnInit()
@@ -27,6 +27,11 @@ class FeverBlurSymptom extends SymptomBase
 		m_DestroyOnAnimFinish = true;
 		m_IsPersistent = false;
 		m_SyncToClient = true;
+		
+		if ( GetGame().IsClient() || !GetGame().IsMultiplayer() )
+		{
+			Class.CastTo(m_Requester,PPERequesterBank.GetRequester(PPERequester_FeverEffects));
+		}
 	}
 	
 	//!gets called every frame
@@ -53,7 +58,7 @@ class FeverBlurSymptom extends SymptomBase
 			float cos_value = Math.Sin(m_EffectTime  * Math.PI);
 			float val = cos_value * m_BlurStrength;
 			//Print(val);
-			PPEffects.SetBlurDrunk(val);
+			m_Requester.SetFeverIntensity(val);
 			//PrintString("cos=" +cos_value.ToString());
 			
 			if( m_EffectTime >= 1 )
@@ -84,7 +89,7 @@ class FeverBlurSymptom extends SymptomBase
 	//!only gets called once on an active Symptom that is being deactivated
 	override void OnGetDeactivatedClient(PlayerBase player)
 	{
-		PPEffects.SetBlurDrunk(0);
+		m_Requester.Stop();
 		if (LogManager.IsSymptomLogEnable()) Debug.SymptomLog("n/a", this.ToString(), "n/a", "OnGetDeactivated", m_Player.ToString());
 	}
 }

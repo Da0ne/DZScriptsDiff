@@ -42,6 +42,9 @@ class ActionDrinkWellContinuous: ActionContinuousBase
 		if ( item && item.IsHeavyBehaviour() )
 			return false;
 		
+		if ( !player.CanEatAndDrink() )
+			return false;
+		
 		return target.GetObject() && target.GetObject().IsWell();
 	}
 

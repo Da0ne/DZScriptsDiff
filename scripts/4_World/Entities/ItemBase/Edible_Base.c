@@ -213,6 +213,11 @@ class Edible_Base extends ItemBase
 		return false;
 	}
 	
+	override bool IsCorpse()
+	{
+		return false;
+	}
+	
 	override bool IsFruit()
 	{
 		return false;
@@ -238,7 +243,7 @@ class Edible_Base extends ItemBase
 		{
 			return FoodStage.GetFullnessIndex(null, food_stage, classname);
 		}
-		string class_path = "cfgVehicles " + classname + " Nutrition";
+		string class_path = string.Format("cfgVehicles %1 Nutrition", classname);
 		return GetGame().ConfigGetFloat( class_path + " fullnessIndex" );
 
 	}
@@ -254,7 +259,7 @@ class Edible_Base extends ItemBase
 		{
 			return FoodStage.GetEnergy(null, food_stage, classname);
 		}
-		string class_path = "cfgVehicles " + classname + " Nutrition";
+		string class_path = string.Format("cfgVehicles %1 Nutrition", classname);
 		return GetGame().ConfigGetFloat( class_path + " energy" );			
 	}
 	
@@ -269,7 +274,7 @@ class Edible_Base extends ItemBase
 		{
 			return FoodStage.GetWater(null, food_stage, classname);
 		}
-		string class_path = "cfgVehicles " + classname + " Nutrition";
+		string class_path = string.Format("cfgVehicles %1 Nutrition", classname);
 		return GetGame().ConfigGetFloat( class_path + " water" );			
 	}
 	
@@ -284,7 +289,7 @@ class Edible_Base extends ItemBase
 		{
 			return FoodStage.GetNutritionalIndex(null, food_stage, classname);
 		}
-		string class_path = "cfgVehicles " + classname + " Nutrition";
+		string class_path = string.Format("cfgVehicles %1 Nutrition", classname);
 		return GetGame().ConfigGetFloat( class_path + " nutritionalIndex" );		
 		
 	}
@@ -300,7 +305,7 @@ class Edible_Base extends ItemBase
 		{
 			return FoodStage.GetToxicity(null, food_stage, classname);
 		}
-		string class_path = "cfgVehicles " + classname + " Nutrition";
+		string class_path = string.Format("cfgVehicles %1 Nutrition", classname);
 		return GetGame().ConfigGetFloat( class_path + " toxicity" );			
 	}
 	
@@ -315,7 +320,7 @@ class Edible_Base extends ItemBase
 		{
 			return FoodStage.GetAgents(null, food_stage, classname);
 		}
-		string class_path = "cfgVehicles " + classname + " Nutrition";
+		string class_path = string.Format("cfgVehicles %1 Nutrition", classname);
 		return GetGame().ConfigGetInt( class_path + " agents" );
 	}
 	
@@ -330,7 +335,7 @@ class Edible_Base extends ItemBase
 		{
 			return FoodStage.GetDigestibility(null, food_stage, classname);
 		}
-		string class_path = "cfgVehicles " + classname + " Nutrition";
+		string class_path = string.Format("cfgVehicles %1 Nutrition", classname);
 		return GetGame().ConfigGetInt( class_path + " digestibility" );
 	}
 	
@@ -532,9 +537,9 @@ class Edible_Base extends ItemBase
 		Print( m_DecayDelta );
 		Print( m_LastDecayStage );*/
 		
-		if ( IsFruit() )
+		if ( IsFruit() || IsMushroom() )
 		{
-			// fruit and vegetables
+			// fruit, vegetables and mushrooms
 			if ( m_LastDecayStage != GetFoodStageType() )
 			{
 				switch ( GetFoodStageType() )
@@ -634,8 +639,41 @@ class Edible_Base extends ItemBase
 						m_LastDecayStage = FoodStageType.NONE;
 						return;
 				}
-				
-				//m_DecayTimer = m_DecayTimer / 1000.0;
+			}
+			
+			m_DecayTimer -= ( delta * m_DecayDelta );
+			
+			if ( m_DecayTimer <= 0 ) 
+			{
+				if ( m_LastDecayStage != FoodStageType.NONE )
+				{
+					// switch to decayed stage
+					if ( ( m_LastDecayStage == FoodStageType.DRIED ) || ( m_LastDecayStage == FoodStageType.RAW ) || ( m_LastDecayStage == FoodStageType.BOILED ) || ( m_LastDecayStage == FoodStageType.BAKED ) )
+					{
+						ChangeFoodStage( FoodStageType.ROTTEN );
+					}
+				}
+			}
+		}
+		else if ( IsCorpse() )
+		{
+			// corpse
+			if ( m_LastDecayStage != GetFoodStageType() )
+			{
+				switch ( GetFoodStageType() )
+				{
+					case FoodStageType.RAW:
+						m_DecayTimer = ( GameConstants.DECAY_FOOD_RAW_CORPSE + ( Math.RandomFloat01() * ( GameConstants.DECAY_FOOD_RAW_CORPSE * ( GameConstants.DECAY_TIMER_RANDOM_PERCENTAGE / 100.0 ) ) ) );
+						m_LastDecayStage = FoodStageType.RAW;
+						break;
+
+					case FoodStageType.BURNED:
+					case FoodStageType.ROTTEN:
+					default:
+						m_DecayTimer = -1;
+						m_LastDecayStage = FoodStageType.NONE;
+						return;
+				}
 			}
 			
 			m_DecayTimer -= ( delta * m_DecayDelta );
@@ -676,6 +714,46 @@ class Edible_Base extends ItemBase
 		m_DecayDelta = 0.0;
 	}
 	
+	override void GetDebugActions(out TSelectableActionInfoArray outputList)
+	{
+		super.GetDebugActions(outputList);
+		
+		if(HasFoodStage())
+		{
+			outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.FOOD_STAGE_PREV, "Food Stage Prev"));
+			outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.FOOD_STAGE_NEXT, "Food Stage Next"));
+		}
+	}
+	
+	override bool OnAction(int action_id, Man player, ParamsReadContext ctx)
+	{
+		super.OnAction(action_id, player, ctx);
+		
+		if ( GetGame().IsServer() )
+		{
+			if ( action_id == EActions.FOOD_STAGE_PREV )
+			{
+				int food_stage_prev = GetFoodStageType() - 1;
+				if (food_stage_prev <= 0)
+				{
+					food_stage_prev = FoodStageType.COUNT - 1;
+				}
+				ChangeFoodStage(food_stage_prev);
+				return true;
+			}
+			else if ( action_id == EActions.FOOD_STAGE_NEXT )
+			{
+				int food_stage_next = GetFoodStageType() + 1;
+				if (food_stage_next >= FoodStageType.COUNT )
+				{
+					food_stage_next = FoodStageType.RAW;
+				}
+				ChangeFoodStage(food_stage_next);
+				return true;
+			}
+		}
+		return false;
+	}
 	//================================================================
 	// GENERAL GETTERS
 	//================================================================
@@ -698,5 +776,5 @@ class Edible_Base extends ItemBase
 
 class ReplaceEdibleWithNewLambda : TurnItemIntoItemLambda
 {
-	void ReplaceEdibleWithNewLambda (EntityAI old_item, string new_item_type, PlayerBase player) { }
+	void ReplaceEdibleWithNewLambda(EntityAI old_item, string new_item_type, PlayerBase player) { }
 };

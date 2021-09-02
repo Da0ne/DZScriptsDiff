@@ -193,3 +193,26 @@ class ZmbM_VillagerOld_LT_Base extends ZombieMaleBase
 {
 };
 
+class ZmbM_NBC_Yellow extends ZombieMaleBase
+{
+	override bool ResistContaminatedEffect()
+	{
+		return true;
+	}
+};
+
+class ZmbM_NBC_Grey extends ZombieMaleBase
+{
+	override bool ResistContaminatedEffect()
+	{
+		return true;
+	}
+	
+	override bool IsZombieMilitary()
+	{
+		return true;
+	}
+};
+
+
+

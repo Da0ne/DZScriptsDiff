@@ -463,8 +463,12 @@ class HumanCommandMelee
 // *************************************************************************************
 class HumanCommandMelee2
 {
+	static const int HIT_TYPE_LIGHT = 0;
+	static const int HIT_TYPE_HEAVY	= 1;
+	static const int HIT_TYPE_FINISHER = 2;
+	
 	//! marks command to continue to combo 
-	proto native void 		ContinueCombo(bool pHeavyHit, float pComboValue);
+	proto native void 		ContinueCombo(bool pHeavyHit, float pComboValue, EntityAI target = null, vector hitPos = vector.Zero);
 
 	//! returns true if hit is in range, where person can continue to combo
 	proto native bool		IsInComboRange();
@@ -477,6 +481,8 @@ class HumanCommandMelee2
 
 	//! is on back in prone stance?
 	proto native bool		IsOnBack();
+	
+	proto native int		GetComboCount();
 }
 
 
@@ -1195,9 +1201,9 @@ class Human extends Man
 
 	proto native 	HumanCommandMelee			GetCommand_Melee();
 
-	//! starts command - melee
-	proto native 	HumanCommandMelee2			StartCommand_Melee2(EntityAI pTarget, bool pHeavyHit, float pComboValue);
-
+	//! starts command - melee2
+	proto native 	HumanCommandMelee2			StartCommand_Melee2(EntityAI pTarget, int pHitType, float pComboValue, vector hitPos = vector.Zero);
+	
 	proto native 	HumanCommandMelee2			GetCommand_Melee2();
 
 

@@ -4,98 +4,12 @@ class PlaceObjectActionReciveData : ActionReciveData
 	vector m_Orientation;
 }
 
-class PlaceObjectActionData : ActionData
-{
-	vector m_Position;
-	vector m_Orientation;
-	bool m_AlreadyPlaced;
-}
-
-class ActiondeployObjectCB : ActionContinuousBaseCB
-{
-	override void CreateActionComponent()
-	{
-		m_ActionData.m_ActionComponent = new CAContinuousTime(UATimeSpent.DEFAULT_DEPLOY);
-	}
-	
-	void DropDuringPlacing()
-	{
-		EntityAI entity_for_placing = m_ActionData.m_MainItem;
-		if ( entity_for_placing.IsBasebuildingKit() )
-			return;
-		
-		m_ActionData.m_Player.PredictiveDropEntity(m_ActionData.m_MainItem);
-		
-		/*vector orientation = m_ActionData.m_Player.GetOrientation();
-		float size_x = 1;
-		float size_z = 1;
-		if (m_ActionData.m_MainItem.MemoryPointExists("BoundingBox_min"))
-		{
-			vector mins, maxs;
-			//m_ActionData.m_MainItem.GetBounds(mins,maxs);
-			mins = m_ActionData.m_MainItem.GetMemoryPointPos("BoundingBox_min");
-			maxs = m_ActionData.m_MainItem.GetMemoryPointPos("BoundingBox_max");
-			
-			size_x = vector.Distance(Vector(mins[0],0,0),Vector(maxs[0],0,0));
-			size_z = vector.Distance(Vector(0,0,mins[2]),Vector(0,0,maxs[2]));
-		}
-		
-		vector 	position = m_ActionData.m_Player.GetPosition() + m_ActionData.m_Player.GetDirection() * Math.Max(size_x,size_z);
-		vector rotation_matrix[3];
-		float direction[4];
-		InventoryLocation source = new InventoryLocation;
-		InventoryLocation destination = new InventoryLocation;
-		
-		Math3D.YawPitchRollMatrix( orientation, rotation_matrix );
-		Math3D.MatrixToQuat( rotation_matrix, direction );
-			
-		vector ground_position = position;
-		ground_position[1] = GetGame().SurfaceY(ground_position[0],ground_position[2]);
-		
-		if ( vector.DistanceSq( m_ActionData.m_Player.GetPosition(), ground_position ) > UAMaxDistances.DEFAULT * UAMaxDistances.DEFAULT)
-		{
-			if ( entity_for_placing.GetInventory().GetCurrentInventoryLocation( source ) )
-			{
-				destination.SetGroundEx( entity_for_placing, position, direction );
-				m_ActionData.m_Player.PredictiveTakeToDst(source, destination);
-			}
-		}
-		else
-		{
-			if ( entity_for_placing.GetInventory().GetCurrentInventoryLocation( source ) )
-			{
-				destination.SetGroundEx( entity_for_placing, ground_position, direction );
-				m_ActionData.m_Player.PredictiveTakeToDst(source, destination);
-			}
-		}*/
-	}
-};
-
-class ActionDeployObject: ActionContinuousBase
+class ActionDeployObject: ActionDeployBase
 {			 
 	void ActionDeployObject()
 	{
-		m_CallbackClass		= ActiondeployObjectCB;
-		m_SpecialtyWeight 	= UASoftSkillsWeight.PRECISE_LOW;
 		m_CommandUID		= 0;
-		m_FullBody			= true;
 		m_StanceMask		= DayZPlayerConstants.STANCEMASK_CROUCH | DayZPlayerConstants.STANCEMASK_ERECT;
-	}
-	
-	override void CreateConditionComponents()  
-	{	
-		m_ConditionItem = new CCINone;
-		m_ConditionTarget = new CCTNone;
-	}
-
-	override bool HasTarget()
-	{
-		return false;
-	}
-
-	override bool HasProgress()
-	{
-		return true;
 	}
 	
 	override bool HasAlternativeInterrupt()
@@ -108,20 +22,15 @@ class ActionDeployObject: ActionContinuousBase
 		return true;
 	}
 	
-	override string GetText()
-	{
-		return "#deploy_object";
-	}
-	
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
 	{
+		//Action not allowed if player has broken legs
+		if (player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
+			return false;
+		
 		//Client
-		if ( !GetGame().IsMultiplayer() || GetGame().IsClient() )
+		if ( GetGame().IsClient() || !GetGame().IsMultiplayer() )
 		{
-			//Action not allowed if player has broken legs
-			if (player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
-				return false;
-			
 			if ( player.IsPlacingLocal() )
 			{
 				if ( !player.GetHologramLocal().IsColliding() )
@@ -140,23 +49,15 @@ class ActionDeployObject: ActionContinuousBase
 	
 	override bool ActionConditionContinue( ActionData action_data )
 	{
-		//Client
-		if ( !GetGame().IsMultiplayer() || GetGame().IsClient() )
+		if ( action_data.m_Player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS )
 		{
 			//Action not allowed if player has broken legs
-			if (action_data.m_Player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
-				return false;
-			
-			return true; //redundant?
+			return false;
 		}
+		
 		//Server
-		else
+		if ( GetGame().IsServer() || !GetGame().IsMultiplayer() )
 		{
-			/*if ( !action_data.m_Player.IsPlacingServer() )
-			{
-				return true;
-			}
-			else*/
 			if (action_data.m_Player.IsPlacingServer())
 			{
 				action_data.m_Player.GetHologramServer().EvaluateCollision(action_data.m_MainItem);
@@ -171,12 +72,7 @@ class ActionDeployObject: ActionContinuousBase
 			}
 			return false;
 		}
-	}
-	
-	override ActionData CreateActionData()
-	{
-		PlaceObjectActionData action_data = new PlaceObjectActionData;
-		return action_data;
+		return true;
 	}
 	
 	override bool SetupAction(PlayerBase player, ActionTarget target, ItemBase item, out ActionData action_data, Param extra_data = NULL)
@@ -219,7 +115,7 @@ class ActionDeployObject: ActionContinuousBase
 		
 		if ( !poActionData ) { return; }
 		
-		if (GetGame().IsMultiplayer())
+		if ( GetGame().IsMultiplayer() )
 			action_data.m_Player.PlacingCompleteLocal();
 	}
 	
@@ -269,40 +165,6 @@ class ActionDeployObject: ActionContinuousBase
 		entity_for_placing.OnPlacementComplete( action_data.m_Player, position, orientation);
 	}
 	
-	override void OnFinishProgressServer( ActionData action_data )
-	{	
-		PlaceObjectActionData poActionData;
-		poActionData = PlaceObjectActionData.Cast(action_data);
-		
-		if ( !poActionData ) { return; }
-		if( !action_data.m_MainItem ) { return; }
-		
-		EntityAI entity_for_placing = action_data.m_MainItem;
-		vector position = action_data.m_Player.GetLocalProjectionPosition();
-		vector orientation = action_data.m_Player.GetLocalProjectionOrientation();
-		
-		action_data.m_Player.GetHologramServer().EvaluateCollision(action_data.m_MainItem);
-		if ( GetGame().IsMultiplayer() && action_data.m_Player.GetHologramServer().IsColliding() )
-		{
-			return;
-		}
-		
-		action_data.m_Player.GetHologramServer().PlaceEntity( entity_for_placing );
-		
-		if ( GetGame().IsMultiplayer() )
-			action_data.m_Player.GetHologramServer().CheckPowerSource();
-		
-		action_data.m_Player.PlacingCompleteServer();
-		entity_for_placing.OnPlacementComplete( action_data.m_Player, position, orientation );		
-		
-		MoveEntityToFinalPosition( action_data, position, orientation );		
-		GetGame().ClearJuncture( action_data.m_Player, entity_for_placing );
-		action_data.m_MainItem.SetIsBeingPlaced( false );
-		action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
-		poActionData.m_AlreadyPlaced = true;	
-		action_data.m_MainItem.SoundSynchRemoteReset();
-	}
-	
 	override void OnEndClient( ActionData action_data  )
 	{
 		PlaceObjectActionData poActionData;
@@ -311,14 +173,12 @@ class ActionDeployObject: ActionContinuousBase
 		{
 			EntityAI entity_for_placing = action_data.m_MainItem;
 			action_data.m_Player.PlacingCancelLocal();
-			//action_data.m_Player.PredictiveTakeEntityToHands( entity_for_placing );
-			//action_data.m_Player.LockHandsUntilItemHeld();
 		}
 	}
 	
 	override void OnEndServer( ActionData action_data  )
 	{
-		if( !action_data || !action_data.m_MainItem )
+		if ( !action_data || !action_data.m_MainItem )
 			return;
 		
 		PlaceObjectActionData poActionData;
@@ -332,7 +192,6 @@ class ActionDeployObject: ActionContinuousBase
 			if ( GetGame().IsMultiplayer() )
 			{	
 				action_data.m_Player.PlacingCancelServer();
-				//action_data.m_Player.ServerTakeEntityToHands( entity_for_placing );
 				action_data.m_MainItem.SoundSynchRemoteReset();
 			}
 			else
@@ -350,8 +209,6 @@ class ActionDeployObject: ActionContinuousBase
 					action_data.m_Player.GetDayZPlayerInventory().RedirectToHandEvent(InventoryMode.LOCAL, source, destination);
 				}
 			}
-			
-			//GetGame().ClearJuncture( action_data.m_Player, action_data.m_MainItem );
 		}
 		else
 		{
@@ -430,38 +287,11 @@ class ActionDeployObject: ActionContinuousBase
 		action_data_po.m_Orientation = recive_data_po.m_Orientation;
 	}
 			
-	void MoveEntityToFinalPosition( ActionData action_data, vector position, vector orientation )
+	override void MoveEntityToFinalPosition( ActionData action_data, vector position, vector orientation )
 	{
 		if ( action_data.m_MainItem.IsBasebuildingKit() ) return;
 		
-		EntityAI entity_for_placing = action_data.m_MainItem;
-		vector rotation_matrix[3];
-		float direction[4];
-		InventoryLocation source = new InventoryLocation;
-		InventoryLocation destination = new InventoryLocation;
-		
-		Math3D.YawPitchRollMatrix( orientation, rotation_matrix );
-		Math3D.MatrixToQuat( rotation_matrix, direction );
-		
-		if ( entity_for_placing.GetInventory().GetCurrentInventoryLocation( source ) )
-		{
-			destination.SetGroundEx( entity_for_placing, position, direction );
-			
-			if ( GetGame().IsMultiplayer() )
-			{
-				action_data.m_Player.ServerTakeToDst(source, destination);
-			}		
-			//local singleplayer
-			else
-			{
-				MoveEntityToFinalPositionSinglePlayer(action_data, source, destination);
-			}			
-		}
-	}
-	
-	void MoveEntityToFinalPositionSinglePlayer(ActionData action_data, InventoryLocation source, InventoryLocation destination)
-	{
-		action_data.m_Player.GetInventory().TakeToDst(InventoryMode.LOCAL, source, destination);
+		super.MoveEntityToFinalPosition( action_data, position, orientation );
 	}
 	
 	void SetupAnimation( ItemBase item )

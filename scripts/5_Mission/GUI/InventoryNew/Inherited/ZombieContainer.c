@@ -263,7 +263,7 @@ class ZombieContainer: CollapsibleContainer
 				
 				if( item.GetSlotsCountCorrect() > 0 )
 				{
-					ContainerWithCargoAndAttachments iwca = new ContainerWithCargoAndAttachments( this );
+					ContainerWithCargoAndAttachments iwca = new ContainerWithCargoAndAttachments( this, false );
 					iwca.SetEntity( item );
 					WidgetEventHandler.GetInstance().RegisterOnMouseButtonUp( icon.GetPanelWidget(),  this, "ToggleWidget" );
 
@@ -274,7 +274,7 @@ class ZombieContainer: CollapsibleContainer
 				}
 				else if( item.GetInventory().GetCargo() )
 				{
-					ContainerWithCargo iwc = new ContainerWithCargo( this );
+					ContainerWithCargo iwc = new ContainerWithCargo( this, false );
 					iwc.SetEntity( item );
 					iwc.UpdateInterval();
 					WidgetEventHandler.GetInstance().RegisterOnMouseButtonUp( icon.GetPanelWidget(),  this, "ToggleWidget" );
@@ -640,7 +640,7 @@ class ZombieContainer: CollapsibleContainer
 			icon.GetRadialIcon().Show( true );
 			
 			WidgetEventHandler.GetInstance().RegisterOnMouseButtonUp( icon.GetGhostSlot(), this, "ToggleWidget" );
-			m_CargoGrid = new ContainerWithCargo( this );
+			m_CargoGrid = new ContainerWithCargo( this, false );
 			m_CargoGrid.SetEntity( m_ZombieEntity );
 			m_CargoGrid.GetHeader().GetMainWidget().ClearFlags( WidgetFlags.DRAGGABLE );
 			m_ShowedItems.Insert( m_ZombieEntity, m_CargoGrid );

@@ -35,10 +35,10 @@ class ActionDisinfectTarget: ActionDisinfectBase
 		{
 			PlayerBase target_player = PlayerBase.Cast(target.GetObject());
 			if(target_player)
-				return (target_player.IsBleeding() || (target_player.m_Agents & eAgents.WOUND_AGENT));
+				return (target_player.IsBleeding() || (player.m_SyncedModifiers & eModifierSyncIDs.MODIFIER_SYNC_WOUND_INFECT_1) || (player.m_SyncedModifiers & eModifierSyncIDs.MODIFIER_SYNC_WOUND_INFECT_2));
+			
 		}
 		return false;
-		
 	}
 
 	override void OnFinishProgressServer( ActionData action_data )

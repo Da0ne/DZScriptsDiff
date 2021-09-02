@@ -105,7 +105,7 @@ class ServerBrowserMenuNew extends UIScriptedMenu
 		sort_text.SetText( "#str_serverbrowserroot_toolbar_bg_consoletoolbar_sort_sorttext0" );
 #endif
 		
-		PPEffects.SetBlurMenu( 0.5 );
+		PPERequesterBank.GetRequester(PPERequester_ServerBrowserBlur).Start(new Param1<float>(0.5));
 		return layoutRoot;
 	}
 	
@@ -117,7 +117,7 @@ class ServerBrowserMenuNew extends UIScriptedMenu
 		OnlineServices.m_ServersAsyncInvoker.Remove( OnLoadServersAsync );
 		OnlineServices.m_ServerModLoadAsyncInvoker.Remove( OnLoadServerModsAsync );
 		m_Tabber.m_OnTabSwitch.Remove( OnTabSwitch );
-		PPEffects.SetBlurMenu( 0.0 );
+		PPERequesterBank.GetRequester(PPERequester_ServerBrowserBlur).Stop();
 	}
 	
 	override bool OnClick( Widget w, int x, int y, int button )
@@ -500,7 +500,7 @@ class ServerBrowserMenuNew extends UIScriptedMenu
 	
 	void CustomizeCharacter()
 	{
-		PPEffects.SetBlurMenu( 0.0 );
+		PPERequesterBank.GetRequester(PPERequester_ServerBrowserBlur).Stop();
 		EnterScriptedMenu(MENU_CHARACTER);
 	}
 	

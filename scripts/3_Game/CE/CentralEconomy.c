@@ -177,6 +177,11 @@ class CEApi
 	proto native int GetCEGlobalInt(string varName);
 	proto native float GetCEGlobalFloat(string varName);
 	proto native string GetCEGlobalString(string varName);
+	
+	//! Avoidance API
+	proto native bool AvoidPlayer(vector vPos, float fDistance); // return false when there is a player
+	proto native bool AvoidVehicle(vector vPos, float fDistance, string sDEName); // returns false when there is a vehicle - Giving an empty string will avoid all vehicles
+	proto native int CountPlayersWithinRange(vector vPos, float fRange);
 };
 
 proto native CEApi GetCEApi();

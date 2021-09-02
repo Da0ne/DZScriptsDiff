@@ -59,7 +59,7 @@ class FatigueSoundEvent extends SymptomSoundEventBase
 	
 	override void OnPlay(PlayerBase player)
 	{
-		
+		super.OnPlay(player);
 	}
 	
 }

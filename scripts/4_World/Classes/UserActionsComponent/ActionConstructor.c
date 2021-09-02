@@ -101,6 +101,7 @@ class ActionConstructor
 		actions.Insert(ActionSkinning);
 		actions.Insert(ActionPlaceObject);
 		actions.Insert(ActionDeployObject);
+		actions.Insert(ActionDeployHuntingTrap);
 		actions.Insert(ActionMineTree);
 		actions.Insert(ActionMineBush);
 		actions.Insert(ActionMineRock);
@@ -337,6 +338,8 @@ class ActionConstructor
 		actions.Insert(FirearmActionLoadMultiBulletRadial);
 
 		actions.Insert(ActionPullBodyFromTransport);
+		
+		actions.Insert(ActionPickupChicken);
 		
 	}
 };

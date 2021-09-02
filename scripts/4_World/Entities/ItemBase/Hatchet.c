@@ -1,10 +1,5 @@
 class Hatchet extends ToolBase
 {
-	override bool IsMeleeFinisher()
-	{
-		return true;
-	}
-	
 	override void SetActions()
 	{
 		super.SetActions();

@@ -8,7 +8,7 @@ class AttachmentCategoriesSlotsContainer: Container
 		m_Body.Insert( m_ItemsCont );
 		m_ItemsCont.GetMainWidget().SetUserID( index );
 		
-		for( int k = 0; k < ITEMS_IN_ROW; k++ )
+		for ( int k = 0; k < ITEMS_IN_ROW; k++ )
 		{
 			//WidgetEventHandler.GetInstance().RegisterOnDropReceived( m_ItemsCont.GetSlotIcon( k ).GetMainWidget(),  m_Parent, "OnDropReceivedFromHeader" );
 			//WidgetEventHandler.GetInstance().RegisterOnDropReceived(  m_ItemsCont.GetSlotIcon( k ).GetPanelWidget(),  m_Parent, "OnDropReceivedFromHeader" );

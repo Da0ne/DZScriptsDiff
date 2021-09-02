@@ -143,7 +143,7 @@ class PluginDeveloperSync extends PluginBase
 			for ( int i = 0; i < m_RegisteredPlayers.Count(); i++ )
 			{
 				PlayerBase player = m_RegisteredPlayers.GetKey( i );
-				if ( !player )
+				if ( !player || !player.IsAlive() )
 				{
 					m_RegisteredPlayers.RemoveElement(i);
 					i--;

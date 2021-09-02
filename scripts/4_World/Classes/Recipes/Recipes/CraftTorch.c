@@ -66,6 +66,7 @@ class CraftTorch extends RecipeBase
 		Debug.Log("Recipe Do method called","recipes");
 		
 		ItemBase rag = ingredients[0];
+		rag.SetCleanness(0);
 		Torch torch = Torch.Cast(results[0]);
 		torch.SetTorchDecraftResult(ingredients[1].GetType());
 		

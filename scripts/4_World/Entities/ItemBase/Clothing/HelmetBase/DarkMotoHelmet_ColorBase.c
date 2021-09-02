@@ -1,16 +1,20 @@
 class DarkMotoHelmet_ColorBase extends HelmetBase
 {	
+	override array<int> GetEffectWidgetTypes()
+	{
+		return {EffectWidgetsTypes.MOTO_OCCLUDER,EffectWidgetsTypes.MOTO_BREATH};
+	}
+	
 	override bool CanPutAsAttachment( EntityAI parent )
 	{
 		if (!super.CanPutAsAttachment(parent)) {return false;}
-		bool is_mask_only = false;
 		
 		if ( parent.FindAttachmentBySlotName( "Mask" ) )
 		{
-			is_mask_only = parent.FindAttachmentBySlotName( "Mask" ).ConfigGetBool( "noHelmet" );
+			return false;
 		}
 		
-		if ( ( GetNumberOfItems() == 0 || !parent || parent.IsMan() ) && !is_mask_only )
+		if ( ( GetNumberOfItems() == 0 || !parent || parent.IsMan() ) )
 		{
 			return true;
 		}
@@ -25,6 +29,11 @@ class DarkMotoHelmet_ColorBase extends HelmetBase
 	override int GetVoiceEffect()
 	{
 		return VoiceEffectObstruction;
+	}
+		
+	override int GetGlassesEffectID()
+	{
+		return PPERequesterBank.REQ_MOTOHELMETBLACK;		
 	}
 }
 

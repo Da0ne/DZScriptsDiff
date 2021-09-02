@@ -18,8 +18,7 @@ class BurlapSackCover extends ClothingBase
 		if ( (GetGame().IsClient() || !GetGame().IsMultiplayer()) && m_Player && m_Player.IsControlledPlayer() && slot_id == InventorySlots.HEADGEAR )
 		{
 			//GetGame().GetWorld().SetAperture(100000);
-			PPEffects.Init();
-			PPEffects.EnableBurlapSackBlindness();
+			PPERequesterBank.GetRequester(PPERequester_BurlapSackEffects).Start();
 			m_Player.SetInventorySoftLock(true);
 			m_Player.SetMasterAttenuation("BurlapSackAttenuation");
 			
@@ -62,9 +61,7 @@ class BurlapSackCover extends ClothingBase
 	{
 		if ( player.IsControlledPlayer() )
 		{
-			PPEffects.Init();
-			PPEffects.DisableBurlapSackBlindness();
-			//GetGame().GetWorld().SetAperture(0);
+			PPERequesterBank.GetRequester(PPERequester_BurlapSackEffects).Stop();
 			player.SetInventorySoftLock(false);
 			player.SetMasterAttenuation("");
 		}

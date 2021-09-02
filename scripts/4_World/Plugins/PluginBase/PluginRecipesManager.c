@@ -493,19 +493,19 @@ class PluginRecipesManager extends PluginRecipesManagerBase
 		}
 		
 		// check validity
-		int check_sum_vectical = 0;
+		int check_sum_vertical = 0;
 		
 		for (int z = 0; z < num_of_ingredients; z++)
 		{
-			check_sum_vectical = check_sum_vectical | m_IngredientBitMask[z];//vertical sum
-			check_sum_vectical = check_sum_vectical | m_BitsResults[z];//vertical sum
+			check_sum_vertical = check_sum_vertical | m_IngredientBitMask[z];//vertical sum
+			check_sum_vertical = check_sum_vertical | m_BitsResults[z];//vertical sum
 			if ((m_IngredientBitMask[z] | m_BitsResults[z]) == 0) 
 			{
 				return false;//horizontal check
 			}
 		}
 		
-		if ( check_sum_vectical != (Math.Pow(2, num_of_ingredients) - 1)) return false;//vertical check
+		if ( check_sum_vertical != (Math.Pow(2, num_of_ingredients) - 1)) return false;//vertical check
 		
 		passes++;
 		

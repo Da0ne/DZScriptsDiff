@@ -210,8 +210,8 @@ class HumanInventory : GameInventory
 				}
 			}
 	
-			if (man_src.GetHumanInventory().HandEvent(mode, new HandEventMoveTo(man_src, src, dst)))
-				return true;
+			man_src.GetHumanInventory().HandEvent(mode, new HandEventMoveTo(man_src, src, dst));
+			return true;
 		}
 		
 		if (dst.GetType() == InventoryLocationType.HANDS)
@@ -219,8 +219,8 @@ class HumanInventory : GameInventory
 			hndDebugPrint("[inv] HI::RedirectToHandEvent - dst location == HANDS, player has to handle this");
 						
 			Man man_dst = Man.Cast(dst.GetParent());
-			if (man_dst.GetHumanInventory().HandEvent(mode, new HandEventTake(man_dst, src)))
-				return true;
+			man_dst.GetHumanInventory().HandEvent(mode, new HandEventTake(man_dst, src));
+			return true;
 		}
 		return false;
 	}
@@ -530,7 +530,7 @@ class HumanInventory : GameInventory
 		return ReplaceItemInHandsWithNewImpl(mode, new HandEventDestroyAndReplaceWithNewElsewhere(GetManOwner(), null, lambda));
 	}
 	
-	bool SwappingToPreviousLocation (EntityAI item1, EntityAI item2, out ref InventoryLocation dst)
+	bool SwappingToPreviousLocation (EntityAI item1, EntityAI item2, out InventoryLocation dst)
 	{
 		bool SwapToPrevious = true;
 		InventoryLocation src1 = new InventoryLocation;

@@ -47,6 +47,8 @@ class ActionForceConsume: ActionContinuousBase
 	
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item ) //condition for action
 	{
+		if (!super.ActionCondition( player, target, item))
+			return false;
 		if( item.GetQuantity() > item.GetQuantityMin() )
 		{
 			return true;

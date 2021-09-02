@@ -5,7 +5,6 @@ enum AnimType
 }
 
 enum SymptomIDs {
-
 	SYMPTOM_COUGH = 1,
 	SYMPTOM_VOMIT,
 	SYMPTOM_BLINDNESS,

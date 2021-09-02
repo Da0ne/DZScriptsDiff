@@ -91,8 +91,8 @@ class RadialMenu : ScriptedWidgetEventHandler
 		#endif				
 			
 		//radial cards
-		m_RadialItemCards = new ref map<Widget, float>;
-		m_UpdateTimer = new ref Timer();
+		m_RadialItemCards = new map<Widget, float>;
+		m_UpdateTimer = new Timer();
 		m_UpdateTimer.Run( 0.01, this, "Update", NULL, true );
 	}
 

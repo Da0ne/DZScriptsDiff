@@ -160,7 +160,7 @@ class TrapBase extends ItemBase
 	
 	bool IsActive()
 	{
-		if ( m_IsActive && m_IsInProgress == false && this.GetHierarchyRootPlayer() == NULL )
+		if ( m_IsActive && m_IsInProgress == false && GetHierarchyRootPlayer() == NULL )
 		{
 			return true;
 		}
@@ -169,7 +169,7 @@ class TrapBase extends ItemBase
 
 	bool IsInactive()
 	{
-		if ( m_IsActive == false && m_IsInProgress == false && this.GetHierarchyRootPlayer() == NULL )
+		if ( !IsActive() && m_IsInProgress == false && GetHierarchyRootPlayer() == NULL )
 		{
 			return true;
 		}
@@ -189,7 +189,7 @@ class TrapBase extends ItemBase
 
 	bool IsActivable()
 	{
-		if ( m_IsActive == false && this.GetHierarchyRootPlayer() == NULL && this.GetHierarchyParent() == NULL && m_IsInProgress == false && !this.IsRuined() && m_NeedActivation )
+		if ( !IsActive() && GetHierarchyRootPlayer() == NULL && GetHierarchyParent() == NULL && m_IsInProgress == false && !IsRuined() && m_NeedActivation )
 		{
 			return true;
 		}
@@ -199,14 +199,14 @@ class TrapBase extends ItemBase
 
 	bool IsPlaceable()
 	{
-		if ( this.GetHierarchyRootPlayer() != NULL && this.GetHierarchyRootPlayer().GetHumanInventory().GetEntityInHands() == this )
+		if ( GetHierarchyRootPlayer() != NULL && GetHierarchyRootPlayer().GetHumanInventory().GetEntityInHands() == this )
 		{
-			PlayerBase player = PlayerBase.Cast( this.GetHierarchyRootPlayer() );
+			PlayerBase player = PlayerBase.Cast( GetHierarchyRootPlayer() );
 			
 			vector player_pos = player.GetPosition();
 			vector aim_pos = player.GetAimPosition();
 							
-			if ( vector.Distance(player_pos, aim_pos) <= 1.5 )
+			if ( vector.DistanceSq( player_pos, aim_pos ) <= ( Math.SqrFloat( 1.5 ) ) )
 			{
 				return IsPlaceableAtPosition( aim_pos );
 			}
@@ -231,40 +231,38 @@ class TrapBase extends ItemBase
 	
 	void SnapOnObject( EntityAI victim )
 	{
-		if ( g_Game.IsServer() )
+		if ( GetGame().IsServer() )
 		{
 			if ( m_Timer )
 			{
 				m_Timer.Stop();
 			}
 			
-			this.RefreshState();
+			RefreshState();
 
-			if (m_DamagePlayers > 0)
+			if ( m_DamagePlayers > 0 )
 			{
-				if (victim)
+				if ( victim )
 				{
-					if ( victim.IsInherited(SurvivorBase) )
+					if ( victim.IsInherited( SurvivorBase ) )
 					{
 						victim.DecreaseHealth( "", "", m_DamagePlayers );
-						//PlayerBase player = PlayerBase.Cast( victim );
-						//player.MessageStatus( m_InfoDamage );
 					}
 					else if (victim.IsInherited(DayZCreatureAI) )
 					{
 						victim.DecreaseHealth( "", "", m_DamageOthers );
 					}
-					else if (victim.IsInherited(ItemBase) )
+					else if ( victim.IsInherited( ItemBase ) )
 					{
 						ItemBase victim_item = ItemBase.Cast( victim );
 						float damage_coef = 1;
 						
-						if ( victim_item.HasQuantity()  &&  victim_item.GetQuantityMax() != 0 && victim_item.GetQuantity() > 0)
+						if ( victim_item.HasQuantity() && victim_item.GetQuantityMax() != 0 && victim_item.GetQuantity() > 0 )
 						{
 							damage_coef = victim_item.GetQuantityMax() / victim_item.GetQuantity(); // Lower quantity increases damage exposure
 						}
 						
-						if (damage_coef > 0)
+						if ( damage_coef > 0 )
 						{
 							int item_size_x = 1;
 							int item_size_y = 1;
@@ -316,7 +314,7 @@ class TrapBase extends ItemBase
 		
 		if ( GetGame().IsClient() || !GetGame().IsMultiplayer() )
 		{
-			switch(rpc_type)
+			switch (rpc_type)
 			{
 				case ERPCs.RPC_TRAP_VICTIM:
 				
@@ -363,42 +361,42 @@ class TrapBase extends ItemBase
 			return;
 		}
 		
-		if ( g_Game.IsServer() )
+		if ( GetGame().IsServer() )
 		{
 			// item is owned by player
-			if ( this.GetHierarchyRootPlayer() != NULL && m_AnimationPhaseGrounded != "" )
+			if ( GetHierarchyRootPlayer() != NULL && m_AnimationPhaseGrounded != "" )
 			{
-				this.SetAnimationPhase( m_AnimationPhaseSet, 1 );
+				SetAnimationPhase( m_AnimationPhaseSet, 1 );
 				if ( m_AnimationPhaseTriggered != m_AnimationPhaseGrounded ) 
 				{
-					this.SetAnimationPhase( m_AnimationPhaseTriggered, 1 );
+					SetAnimationPhase( m_AnimationPhaseTriggered, 1 );
 				}
-				this.SetAnimationPhase( m_AnimationPhaseGrounded, 0 );
+				SetAnimationPhase( m_AnimationPhaseGrounded, 0 );
 			}
 			// item is set active
-			else if ( this.IsActive() )
+			else if ( IsActive() )
 			{
 				if ( m_AnimationPhaseGrounded != "" )
 				{
-					this.SetAnimationPhase( m_AnimationPhaseGrounded, 1 );
+					SetAnimationPhase( m_AnimationPhaseGrounded, 1 );
 				}
 				if ( m_AnimationPhaseSet != "" && m_AnimationPhaseTriggered != "" )
 				{
-					this.SetAnimationPhase( m_AnimationPhaseTriggered, 1 );
-					this.SetAnimationPhase( m_AnimationPhaseSet, 0 );
+					SetAnimationPhase( m_AnimationPhaseTriggered, 1 );
+					SetAnimationPhase( m_AnimationPhaseSet, 0 );
 				}
 			}
 			// item is inactive and not owned by player (on the ground)
-			else if ( this.IsInactive() )
+			else if ( IsInactive() )
 			{
 				if ( m_AnimationPhaseGrounded != "" &&  m_AnimationPhaseTriggered != m_AnimationPhaseGrounded )
 				{
-					this.SetAnimationPhase( m_AnimationPhaseGrounded, 1 );
+					SetAnimationPhase( m_AnimationPhaseGrounded, 1 );
 				}
 				if ( m_AnimationPhaseSet != "" && m_AnimationPhaseTriggered != "" )
 				{
-					this.SetAnimationPhase( m_AnimationPhaseSet, 1 );
-					this.SetAnimationPhase( m_AnimationPhaseTriggered, 0 );
+					SetAnimationPhase( m_AnimationPhaseSet, 1 );
+					SetAnimationPhase( m_AnimationPhaseTriggered, 0 );
 				}
 			}
 		}
@@ -408,9 +406,9 @@ class TrapBase extends ItemBase
 	{ 
 		if ( GetGame().IsServer() )
 		{
-			if ( this.GetHierarchyRootPlayer() && this.GetHierarchyRootPlayer().CanDropEntity( this) )  // kvoli desyncu
+			if ( GetHierarchyRootPlayer() && GetHierarchyRootPlayer().CanDropEntity( this ) )  // kvoli desyncu
 			{
-				SetupTrapPlayer( PlayerBase.Cast( this.GetHierarchyRootPlayer() ) );
+				SetupTrapPlayer( PlayerBase.Cast( GetHierarchyRootPlayer() ) );
 			}
 		}
 	}
@@ -426,12 +424,12 @@ class TrapBase extends ItemBase
 				
 				vector trapPos = ( player.GetDirection() ) * 1.5;
 				trapPos[1] = 0;
-				this.SetPosition( player.GetPosition() + trapPos );
+				SetPosition( player.GetPosition() + trapPos );
 			}
 					
 			if ( m_NeedActivation == false )
 			{
-				this.SetActive();
+				SetActive();
 			}
 			//player.MessageStatus( m_InfoSetup );
 		}
@@ -439,9 +437,9 @@ class TrapBase extends ItemBase
 
 	void AddDefect()
 	{
-		if ( g_Game.IsServer() )
+		if ( GetGame().IsServer() )
 		{
-			this.DecreaseHealth( "", "", m_DefectRate );
+			DecreaseHealth( "", "", m_DefectRate );
 		}
 	}
 	
@@ -454,10 +452,10 @@ class TrapBase extends ItemBase
 	
 		if ( m_AddActivationDefect )
 		{
-			this.AddDefect();
+			AddDefect();
 		}
 			
-		if ( g_Game.IsServer() )
+		if ( GetGame().IsServer() )
 		{
 			RefreshState();
 			CreateTrigger();
@@ -484,7 +482,7 @@ class TrapBase extends ItemBase
 				m_IsInProgress = true;
 				m_Timer.Run( m_InitWaitTime, this, "SetActive" );
 			
-			Synch(NULL);
+				Synch(NULL);
 			}
 			else
 			{
@@ -495,10 +493,10 @@ class TrapBase extends ItemBase
 	
 	void StartDeactivate( PlayerBase player )
 	{
-		if ( g_Game.IsServer() )
+		if ( GetGame().IsServer() )
 		{
 			//player.MessageStatus( m_InfoDeactivated );
-			this.SetInactive();
+			SetInactive();
 		}
 	}
 
@@ -513,36 +511,39 @@ class TrapBase extends ItemBase
 		}
 		//Print("Delete trap trigger");
 		//Print(m_TrapTrigger);
-		g_Game.ObjectDelete( m_TrapTrigger );
+		GetGame().ObjectDelete( m_TrapTrigger );
 		m_TrapTrigger = NULL;
 		
 		if ( m_AddDeactivationDefect )
 		{
-			this.AddDefect();
+			AddDefect();
 		}
 
 		// de-attach attachments after "activating them"
 		int attachments = GetInventory().AttachmentCount();
 		if ( attachments > 0 )
 		{
-			EntityAI attachment = GetInventory().GetAttachmentFromIndex(0);
+			ItemBase attachment = ItemBase.Cast( GetInventory().GetAttachmentFromIndex(0) );
 			if ( attachment )
 			{
-				ItemBase.Cast( attachment ).OnActivatedByTripWire();
-				GetInventory().DropEntity( InventoryMode.LOCAL, this, attachment );
+				if ( attachment.IsLockedInSlot() )
+					attachment.UnlockFromParent();
+				
+				attachment.OnActivatedByTripWire();
+				GetInventory().DropEntity( InventoryMode.SERVER, this, attachment );
 			}
 		}
 
-		this.RefreshState();
+		RefreshState();
 		Synch(NULL);
 	}
 	
 	void CreateTrigger()
 	{
-		m_TrapTrigger = TrapTrigger.Cast( g_Game.CreateObject( "TrapTrigger", this.GetPosition(), false ) );
+		m_TrapTrigger = TrapTrigger.Cast( GetGame().CreateObject( "TrapTrigger", GetPosition(), false ) );
 		vector mins = "-0.01 -0.05 -0.01";
 		vector maxs = "0.01 0.50 0.01";
-		m_TrapTrigger.SetOrientation( this.GetOrientation() );
+		m_TrapTrigger.SetOrientation( GetOrientation() );
 		m_TrapTrigger.SetExtents(mins, maxs);	
 		m_TrapTrigger.SetParentObject( this );
 	}
@@ -551,24 +552,21 @@ class TrapBase extends ItemBase
 	{
 		super.OnItemLocationChanged(old_owner, new_owner);
 		
-		if ( g_Game.IsServer() )
+		if ( GetGame().IsServer() )
 		{
-			this.RefreshState();
+			RefreshState();
 
 			// TAKE ACTIVE TRAP FROM VICINITY 
 			if ( old_owner == NULL && new_owner != NULL && IsActive() )  // !!! lebo nefunguju zlozene podmienky v if-e
 			{
 				// TAKE INTO HANDS
-				if ( new_owner.ClassName() == "PlayerBase" )
+				if ( new_owner.IsPlayer() )
 				{
 					SnapOnObject( new_owner );
 				}
-				else // TAKE INTO BACKPACK, ETC ...  // !!! lebo nefunguje elseif
-				{	
-					if ( new_owner.GetHierarchyRootPlayer().ClassName() == "PlayerBase" )
-					{
-						SnapOnObject( new_owner.GetHierarchyRootPlayer() );
-					}
+				else if ( new_owner.GetHierarchyRootPlayer().IsPlayer() )
+				{
+					SnapOnObject( new_owner.GetHierarchyRootPlayer() );
 				}
 			}
 		}
@@ -579,9 +577,9 @@ class TrapBase extends ItemBase
 	{
 		super.EEItemAttached(item, slot_name);
 		
-		if ( g_Game.IsServer() )
+		if ( GetGame().IsServer() )
 		{
-			this.RefreshState();
+			RefreshState();
 		}
 	}	
 	
@@ -589,15 +587,18 @@ class TrapBase extends ItemBase
 	{
 		super.EEItemDetached(item, slot_name);
 		
-		if ( g_Game.IsServer() )
+		if ( GetGame().IsServer() )
 		{
-			this.RefreshState();
+			RefreshState();
 		}
 	}
 	
 	override bool CanPutInCargo( EntityAI parent )
 	{
-		if ( !super.CanPutInCargo(parent) ) {return false;}
+		if ( !super.CanPutInCargo(parent) )
+		{
+			return false;
+		}
 		return IsTakeable();
 	}
 	

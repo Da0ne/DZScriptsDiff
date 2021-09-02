@@ -47,7 +47,7 @@ class ActionDrinkPondContinuous: ActionContinuousBase
 		
 		if ( item && item.IsHeavyBehaviour() )
 			return false;
-		return true;
+		return player.CanEatAndDrink();
 	}
 
 	override void OnStart(ActionData action_data)

@@ -405,7 +405,7 @@ class ItemManager
 						string name = item_w.GetName();
 						name.Replace("Render", "Temperature");
 						Widget temperature_widget = item_w.GetParent().FindAnyWidget( name );
-						if( color != -1 )
+						if ( color != -1 )
 						{
 							temperature_widget.Show( true );
 							temperature_widget.SetColor( color );

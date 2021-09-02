@@ -12,7 +12,7 @@ class SyncEvents
 	{		
 		if ( rpc_type == ERPCs.RPC_SYNC_EVENT && GetGame() && GetGame().IsMultiplayer() && GetGame().IsClient() )
 		{			
-			ref Param2<ESyncEvent, ref SyncData> event_data = new ref Param2<ESyncEvent, ref SyncData>( -1, null );
+			Param2<ESyncEvent, ref SyncData> event_data = new ref Param2<ESyncEvent, ref SyncData>( -1, null );
 			
 			if ( ctx.Read( event_data ) )
 			{
@@ -45,7 +45,7 @@ class SyncEvents
 	
 	static void SendPlayerList()
 	{
-		ref SyncData data = new SyncData;
+		SyncData data = new SyncData;
 		data.m_ServerPlayerList = new SyncPlayerList;
 		data.m_ServerPlayerList.CreatePlayerList();
 		
@@ -56,7 +56,7 @@ class SyncEvents
 	{
 		if ( (victim && victim.IsPlayer()) || (killer && killer.IsPlayer()) )
 		{
-			ref SyncData data = new SyncData;
+			SyncData data = new SyncData;
 			data.m_EntityKill = new SyncEntityKillInfo;
 			
 			data.m_EntityKill.m_EntityVictim	= victim;
@@ -80,15 +80,15 @@ class SyncEvents
 	
 	static void SendPlayerIgnatedFireplace( Man player, EFireIgniteType ignite_type )
 	{
-		ref SyncData data = new SyncData;
+		SyncData data = new SyncData;
 		data.m_SyncInt = ignite_type;
 		
 		SendSyncEvent( ERPCs.RPC_SYNC_EVENT, ESyncEvent.PlayerIgnateFireplayce, data, true, player.GetIdentity() );
 	}
 	
-	private static void SendSyncEvent( ERPCs rpc_event_id, ESyncEvent sync_event_type, ref SyncData data = null, bool guaranteed = true, PlayerIdentity player_target = null )
+	private static void SendSyncEvent( ERPCs rpc_event_id, ESyncEvent sync_event_type, SyncData data = null, bool guaranteed = true, PlayerIdentity player_target = null )
 	{
-		ref Param2<ESyncEvent, ref SyncData> event_data = new ref Param2<ESyncEvent, ref SyncData>( sync_event_type, data );
+		Param2<ESyncEvent, ref SyncData> event_data = new Param2<ESyncEvent, ref SyncData>( sync_event_type, data );
 		if ( !player_target )
 		{
  			GetGame().RPCSingleParam( null, rpc_event_id, event_data, guaranteed );

@@ -1,3 +1,9 @@
+enum eBleedingSourceType
+{
+	NORMAL,
+	CONTAMINATED,
+}
+
 class BleedingSource
 {
 	vector m_Position;
@@ -16,6 +22,7 @@ class BleedingSource
 	float m_MaxTime;
 	string m_ParticleName;
 	bool m_DeleteRequested;
+	eBleedingSourceType m_Type = eBleedingSourceType.NORMAL;
 	
 	void BleedingSource(PlayerBase player, int bit, string bone, vector orientation, vector offset,int max_time, float flow_modifier, string particle_name)
 	{
@@ -50,7 +57,15 @@ class BleedingSource
 		}
 	}
 	
+	void SetType(eBleedingSourceType type)
+	{
+		m_Type = type;
+	}
 	
+	eBleedingSourceType GetType()
+	{
+		return m_Type;
+	}
 	
 	int GetActiveTime()
 	{
@@ -110,10 +125,22 @@ class BleedingSource
 				m_DeleteRequested = true;
 			}
 		}
-		
 		if( !no_blood_loss )
 		{
-			m_Player.AddHealth("GlobalHealth","Blood", (PlayerConstants.BLEEDING_SOURCE_BLOODLOSS_PER_SEC * blood_scale * deltatime * m_FlowModifier) );
+			float flow = m_FlowModifier;
+			switch( m_Type )
+			{
+				case eBleedingSourceType.NORMAL:
+				{
+					//do nothing
+					break;
+				}
+				case eBleedingSourceType.CONTAMINATED:
+				{
+					flow *= PlayerConstants.BLEEDING_SOURCE_BURN_MODIFIER;
+				}
+			}
+			m_Player.AddHealth("GlobalHealth","Blood", (PlayerConstants.BLEEDING_SOURCE_BLOODLOSS_PER_SEC * blood_scale * deltatime * flow) );
 		}
 	}
 	

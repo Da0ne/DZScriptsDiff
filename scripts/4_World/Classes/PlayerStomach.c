@@ -177,6 +177,8 @@ class PlayerStomach
 	
 	static int GetIDFromClassname(string name)
 	{
+		if(!m_NamesToIDs.Contains(name))
+			return -1;
 		return m_NamesToIDs.Get(name);
 	}
 	
@@ -311,6 +313,8 @@ class PlayerStomach
 	
 	void AddToStomach(string class_name, float amount, int food_stage = 0, int agents = 0)
 	{
+		if (GetIDFromClassname(class_name) == -1)
+			return;
 		bool is_liquid;
 		
 		NutritionalProfile profile = Liquid.GetNutritionalProfileByName(class_name);
@@ -332,7 +336,7 @@ class PlayerStomach
 		{
 			food_stage = FoodStageType.RAW;
 		}
-		// stanity checks end
+		// sanity checks end
 		
 		if(profile)
 		{

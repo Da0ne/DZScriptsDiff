@@ -1,7 +1,7 @@
 int SlotToAnimType (notnull Man player, notnull InventoryLocation src, InventoryLocation dst = null)
 {
 	//Print("src.GetType() " + src.GetType());
-	ref InventoryLocation invloc1 = new InventoryLocation;
+	InventoryLocation invloc1 = new InventoryLocation;
 	//InventoryLocation invloc2 = new InventoryLocation;
 	
 	if ( (dst && dst.GetParent() && !dst.GetParent().GetHierarchyRootPlayer()) || (src && src.GetParent() && !src.GetParent().GetHierarchyRootPlayer()) )

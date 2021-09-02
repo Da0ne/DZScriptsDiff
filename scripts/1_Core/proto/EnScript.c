@@ -33,6 +33,8 @@ class Class
 	*/
 	proto native owned external string ClassName();
 	
+	string GetDebugName() { return ClassName(); }
+	
 	/**
 	\brief Returns typename of object's class
 		\returns \p typename class-type
@@ -417,6 +419,12 @@ class array<Class T>
 	If the `newSize` is higher than current Count missing elements are initialized to zero (null).
 	*/
 	proto native void Resize(int newSize);
+	
+	/*!
+	Resizes the array to given size internally.
+	Is used for optimization purposes when the approx. size is known beforehand
+	*/
+	proto native void Reserve(int newSize);
 
 	/*!
 	Swaps the contents of this and `other` arrays.
@@ -765,7 +773,7 @@ class map<Class TKey,Class TValue>
 	
 	array<TKey> GetKeyArray()
 	{
-		ref array<TKey> keys = new array<TKey>;
+		array<TKey> keys = new array<TKey>;
 		for (int i = 0; i < Count(); i++)
 		{
 			keys.Insert( GetKey( i ) );
@@ -775,7 +783,7 @@ class map<Class TKey,Class TValue>
 	
 	array<TValue> GetValueArray()
 	{
-		ref array<TValue> elements = new array<TValue>;
+		array<TValue> elements = new array<TValue>;
 		for (int i = 0; i < Count(); i++)
 		{
 			elements.Insert( GetElement( i ) );

@@ -280,7 +280,6 @@ class SmokeGrenadeBase extends Grenade_Base
 		SetParticleSmokeLoop(ParticleList.INVALID); //! no effect on base
 		SetParticleSmokeEnd(ParticleList.INVALID); //! no effect on base
 
-		RegisterNetSyncVariableFloat("m_EM.m_Energy");
 		RegisterNetSyncVariableInt("m_SmokeGrenadeState", ESmokeGrenadeState.NO_SMOKE, ESmokeGrenadeState.COUNT);
 	}
 	

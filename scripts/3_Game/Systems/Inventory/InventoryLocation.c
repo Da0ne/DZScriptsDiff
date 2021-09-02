@@ -562,7 +562,7 @@ bool OptionalLocationWriteToContext (InventoryLocation loc, notnull ParamsWriteC
 	return true;
 }
 
-bool OptionalLocationReadFromContext (ref out InventoryLocation loc, notnull ParamsReadContext ctx)
+bool OptionalLocationReadFromContext (out InventoryLocation loc, notnull ParamsReadContext ctx)
 {
 	bool present = false;
 	if (!ctx.Read(present))

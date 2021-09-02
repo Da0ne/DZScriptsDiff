@@ -695,6 +695,7 @@ class Mission
 	UIScriptedMenu GetNoteMenu() {};
 	void SetNoteMenu(UIScriptedMenu menu) {};
 	void SetPlayerRespawning(bool state);
+	void OnPlayerRespawned(Man player);
 	bool IsPlayerRespawning();
 	array<vector> GetActiveRefresherLocations();
 	
@@ -706,6 +707,11 @@ class Mission
 	}
 	//! server-side
 	void SyncRespawnModeInfo(PlayerIdentity identity) {};
+	
+	GameplayEffectWidgets_base GetEffectWidgets()
+	{
+		return null;
+	}
 };
 
 // -------------------------------------------------------------------------
@@ -927,7 +933,7 @@ class MenuDefaultCharacterData
 		return m_ForceRandomCharacter;
 	}
 	
-	ref map<int,string> GetAttachmentMap()
+	map<int,string> GetAttachmentMap()
 	{
 		return m_AttachmentsMap;
 	}
@@ -1004,7 +1010,7 @@ class DefaultCharacterCreationMethods
 	}
 	
 	//! Lists all configured types (if any) for the appropriate attachment
-	static ref array<string> GetConfigAttachmentTypes(int slot_ID)
+	static array<string> GetConfigAttachmentTypes(int slot_ID)
 	{
 		TStringArray types = new TStringArray;
 		GetGame().ConfigGetTextArray(GetPathFromSlotID(slot_ID),types);
@@ -1012,13 +1018,13 @@ class DefaultCharacterCreationMethods
 	}
 	
 	//! Lists all customizable InventorySlots
-	static ref array<int> GetAttachmentSlotsArray()
+	static array<int> GetAttachmentSlotsArray()
 	{
 		return m_AttachmentSlots;
 	}
 	
 	//! for conversion of slot ID to config array's string
-	static ref array<string> GetConfigArrayNames()
+	static array<string> GetConfigArrayNames()
 	{
 		return m_ConfigArrayNames;
 	}

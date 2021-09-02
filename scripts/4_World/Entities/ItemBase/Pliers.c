@@ -10,5 +10,6 @@ class Pliers extends ItemBase
 		AddAction(ActionUnrestrainTarget);
 		AddAction(ActionMountBarbedWire);
 		AddAction(ActionUnmountBarbedWire);
+		AddAction(ActionLockAttachment);
 	}
 }

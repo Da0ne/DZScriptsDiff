@@ -1,6 +1,76 @@
+/**
+ * \defgroup Internally defined enums
+ * \desc Various enums defined in C++
+ * @{
+ */
+enum ChatChannelType
+{
+	System, 				//!< CCSystem
+	Admin, 					//!< CCAdmin
+	Direct, 				//!< CCDirect
+	Megaphone, 				//!< CCMegaphone
+	Transmitter, 			//!< CCTransmitter
+	PublicAddressSystem, 	//!< CCPublicAddressSystem
+	BattlEye, 				//!< CCBattlEye
+}
+
+enum VoiceLevel
+{
+	Whisper, 	//!< VoiceLevelWhisper
+	Talk, 		//!< VoiceLevelTalk
+	Shout 		//!< VoiceLevelShout
+}
+
+enum VoiceEffectType
+{
+	Mumbling, 		//!< VoiceEffectMumbling
+	Extortion, 		//!< VoiceEffectExtortion
+	Obstruction 	//!< VoiceEffectObstruction
+}
+
+enum ObjIntersect
+{
+	Fire, 	//!< ObjIntersectFire: Fire Geometry
+	View, 	//!< ObjIntersectView: View Geometry
+	Geom,	//!< ObjIntersectGeom: Geometry
+	IFire, 	//!< ObjIntersectIFire: (Indirect) Fire Geometry
+	None 	//!< ObjIntersectNone: No Geometry
+}
+
+//! UserID of a parent widget usually matches this value, unless overriden in the 'InitWidgetSet' method
+enum EffectWidgetsTypes
+{
+	ROOT = -2, //used when handling the m_Root widget directly
+	NONE = 0,
+	
+	MASK_OCCLUDER = 1,
+	MASK_BREATH = 2,
+	
+	HELMET_OCCLUDER = 10,
+	HELMET_BREATH = 11,
+	
+	MOTO_OCCLUDER = 20,
+	MOTO_BREATH = 21,
+	
+	COVER_FLASHBANG = 50,
+	NVG_OCCLUDER = 51,
+	PUMPKIN_OCCLUDER = 52,
+}
+
+enum EffectWidgetHandles
+{
+	FLASHBANG,
+}
+
+enum EffectWidgetSuspends
+{
+	BURLAPSACK,
+	UNCON,
+}
+/** @}*/
+
 //! how often virtual hud checks if there is a difference since last sync
 const int VIRTUAL_HUD_UPDATE_INTERVAL = 1000;
-/** @}*/
 
 /**
  * \defgroup UI
@@ -80,6 +150,7 @@ const int MENU_INVITE_TIMER							= 37;
 const int MENU_LOGIN_TIME							= 38;
 const int MENU_WARNING_ITEMDROP						= 39;
 const int MENU_RESPAWN_DIALOGUE						= 40;
+const int MENU_WARNING_TELEPORT						= 41;
 
 const int GUI_WINDOW_MISSION_LOADER = 1;
 
@@ -365,6 +436,7 @@ const int AGT_ITEM_TO_FLESH		= 10;
 const int AGT_AIRBOURNE_CHEMICAL = 11;
 
 const int DEF_BIOLOGICAL		= 1;
+const int DEF_CHEMICAL			= 2;
 /** @}*/
 			
 const int QUANTITY_HIDDEN = 0;
@@ -598,6 +670,16 @@ class GameConstants
 	/** @}*/
 	
 	/**
+	 * \defgroup Cars Contact 
+	 * \desc Constants for car contact event
+	 * @{
+	 */
+	const float CARS_CONTACT_DMG_THRESHOLD = 750.0;
+	const float CARS_CONTACT_DMG_MIN = 150.0;
+	const float CARS_CONTACT_DMG_KILLCREW = 3000.0;
+	/** @}*/
+	
+	/**
 	 * \defgroup Item Health States (ItemBase.GetHealthLevel)
 	 * \desc Constants for Item Health States
 	 * @{
@@ -674,6 +756,8 @@ class GameConstants
 	
 	//! Camera shake
 	const int CAMERA_SHAKE_GRENADE_DISTANCE = 40;
+	const int CAMERA_SHAKE_ARTILLERY_DISTANCE = 200;
+	const int CAMERA_SHAKE_ARTILLERY_DISTANCE2 = 40000; // Square distance used for distance check
 	
 	//! Wood mining GameConstants, scaled by output. Should not be lower than ~1.5s!
 	const float MINING_WOOD_FAST = 2.0;
@@ -701,6 +785,7 @@ class GameConstants
 	 * \desc Constants for decay of various types of food.
 	 */
 	const float DECAY_FOOD_RAW_MEAT = 21600;
+	const float DECAY_FOOD_RAW_CORPSE = 32400;
 	const float DECAY_FOOD_RAW_FRVG = 43200;
 	const float DECAY_FOOD_BOILED_MEAT = 259200;
 	const float DECAY_FOOD_BOILED_FRVG = 172800;
@@ -720,4 +805,12 @@ class GameConstants
 	//----------------------------------------------------------
 	
 	const float AI_ATTACKSPEED = 1.5;
+	const float AI_MAX_BLOCKABLE_ANGLE = 60; // The angle under which an infected must be relative to player to be blockable
+	const float AI_CONTAMINATION_DMG_PER_SEC = 3; // The amount of damage AI agents take per contaminated area damage event
+	
+	//----------------------------------------------------------
+	//						   MELEE
+	//----------------------------------------------------------
+	
+	const float PVP_MAX_BLOCKABLE_ANGLE = 60; // The angle under which a Player must be relative to player to be blockable
 }

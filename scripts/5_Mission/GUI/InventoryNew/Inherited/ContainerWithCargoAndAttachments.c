@@ -15,49 +15,53 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 
 	void ~ContainerWithCargoAndAttachments()
 	{
-		if( m_Entity )
+		if ( m_Entity )
 		{
 			m_Entity.GetOnItemAttached().Remove( AttachmentAdded );
 			m_Entity.GetOnItemDetached().Remove( AttachmentRemoved );
 		}
 		
-		if( m_Atts )
+		if ( m_Atts )
 			delete m_Atts;
 		
-		foreach( EntityAI e, Attachments att : m_AttachmentAttachments )
+		foreach ( EntityAI e, Attachments att : m_AttachmentAttachments )
 		{
 			delete att;
 		}
 		
-		if( m_AttachmentAttachments )
+		if ( m_AttachmentAttachments )
 			m_AttachmentAttachments.Clear();
-		if( m_AttachmentAttachmentsContainers )
+		
+		if ( m_AttachmentAttachmentsContainers )
 			m_AttachmentAttachmentsContainers.Clear();
-		if( m_AttachmentCargos )
+		
+		if ( m_AttachmentCargos )
 			m_AttachmentCargos.Clear();
 	}
 	
-	void AttachmentAdded(EntityAI item, string slot, EntityAI parent)
+	void AttachmentAddedEx(EntityAI item, string slot, EntityAI parent, bool immedUpdate = true)
 	{
 		int slot_id = InventorySlots.GetSlotIdFromString( slot );
 		int att_mod = 1;
-		if( item.GetInventory().GetCargo() )
+		bool updateNeeded = false;
+		
+		if ( item.GetInventory().GetCargo() )
 		{
+			updateNeeded = true;
+			
 			ref CargoContainer cont = new CargoContainer( this, true );
 			cont.GetRootWidget().SetSort( m_AttachmentSlotsSorted.Find( slot_id ) + m_AttachmentCargos.Count() + 1 );
-			cont.SetEntity( item );
+			cont.SetEntity( item, false );
 			Insert( cont, m_Atts.GetAttachmentHeight() + m_AttachmentCargos.Count() + 1 );
 			
 			m_AttachmentCargos.Insert( item, cont );
 			att_mod += m_AttachmentSlotsSorted.Find( slot_id ) + m_AttachmentCargos.Count() + 1;
-			RecomputeOpenedContainers();
-			if( m_Parent )
-				m_Parent.Refresh();
-			Inventory.GetInstance().UpdateConsoleToolbar();
 		}
 		
-		if( item.GetInventory().GetAttachmentSlotsCount() > 0  )
+		if ( item.GetInventory().GetAttachmentSlotsCount() > 0  )
 		{
+			updateNeeded = true;
+			
 			ref Attachments att_cont = new Attachments( this, item );
 			att_cont.InitAttachmentGrid( m_AttachmentSlotsSorted.Find( slot_id ) + m_Atts.GetAttachmentHeight() + att_mod );
 			
@@ -65,11 +69,22 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 			m_AttachmentAttachmentsContainers.Insert( item, att_cont.GetWrapper() );
 			
 			att_cont.UpdateInterval();
-			RecomputeOpenedContainers();
-			if( m_Parent )
-				m_Parent.Refresh();
-			Inventory.GetInstance().UpdateConsoleToolbar();
 		}
+		
+		if (updateNeeded)
+		{
+			RecomputeOpenedContainers();
+			
+			Inventory.GetInstance().UpdateConsoleToolbar();
+			
+			if (m_Parent && immedUpdate)
+				m_Parent.Refresh();
+		}
+	}
+	
+	void AttachmentAdded(EntityAI item, string slot, EntityAI parent)
+	{
+		AttachmentAddedEx(item, slot, parent);
 	}
 	
 	void AttachmentRemoved(EntityAI item, string slot, EntityAI parent)
@@ -105,14 +120,14 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 	override void UpdateInterval()
 	{
 		int i;
-		if( m_Entity )
+		if ( m_Entity )
 		{
-			for( i = 0; i < m_AttachmentCargos.Count(); i++ )
+			for ( i = 0; i < m_AttachmentCargos.Count(); i++ )
 			{
 				m_AttachmentCargos.GetElement( i ).UpdateInterval();
 			}
 			
-			if( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
+			if ( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
 			{
 				HideContent();
 			}
@@ -121,12 +136,12 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 				ShowContent();
 			}
 			
-			if( m_Atts )
+			if ( m_Atts )
 			{
 				m_Atts.UpdateInterval();
 			}
 			
-			if( m_CargoGrid )
+			if ( m_CargoGrid )
 			{
 				m_CargoGrid.UpdateInterval();
 			}
@@ -548,8 +563,8 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		}
 		Inventory.GetInstance().UpdateConsoleToolbar();
 	}
-
-	void SetEntity( EntityAI entity )
+	
+	void SetEntity( EntityAI entity, bool immedUpdate = true )
 	{
 		m_Entity = entity;
 		
@@ -562,13 +577,13 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		
 		m_ClosableHeader.SetItemPreview( entity );
 		
-		if( entity.GetInventory().GetCargo() )
+		if ( entity.GetInventory().GetCargo() )
 		{
-			m_CargoGrid = new CargoContainer( this );
+			m_CargoGrid = new CargoContainer( this, false );
 			m_CargoGrid.GetRootWidget().SetSort( 2 );
-			m_CargoGrid.SetEntity( entity );
-			m_CargoGrid.UpdateHeaderText();
-			this.Insert( m_CargoGrid );
+			m_CargoGrid.SetEntity( entity, 0, immedUpdate );
+			m_CargoGrid.UpdateHeaderText(); // TODO: refresh?
+			Insert( m_CargoGrid );
 		}
 		else
 		{
@@ -581,25 +596,24 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		m_AttachmentAttachmentsContainers	= new map<EntityAI, ref AttachmentsWrapper>;
 		m_AttachmentAttachments				= new map<EntityAI, ref Attachments>;
 		
-		( Container.Cast( m_Parent ) ).Insert( this );
+		(Container.Cast( m_Parent )).Insert( this );
 		
-		foreach( int slot_id : m_AttachmentSlotsSorted )
+		foreach ( int slot_id : m_AttachmentSlotsSorted )
 		{
 			EntityAI item = m_Entity.GetInventory().FindAttachment( slot_id );
-			if( item )
-				AttachmentAdded( item, InventorySlots.GetSlotName( slot_id ), m_Entity );
+			if ( item )
+				AttachmentAddedEx( item, InventorySlots.GetSlotName( slot_id ), m_Entity, false );
 		}
 		
-		if( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
-		{
+		if ( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
 			HideContent();
-		}
 		else
-		{
 			ShowContent();
-		}
+		
 		SetOpenState( ItemManager.GetInstance().GetDefaultOpenState( m_Entity.GetType() ) );
-		m_Parent.m_Parent.Refresh();
+		
+		if (immedUpdate)
+			m_Parent.m_Parent.Refresh();
 		
 		RecomputeOpenedContainers();
 	}
@@ -671,6 +685,8 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		
 			if ( button == MouseState.RIGHT )
 			{
+				if( GetDayZGame().IsLeftCtrlDown() )
+					ShowActionMenu( InventoryItem.Cast(item) );
 				if( reserved )
 				{
 					EntityAI att_parent = slots_icon.GetSlotParent();

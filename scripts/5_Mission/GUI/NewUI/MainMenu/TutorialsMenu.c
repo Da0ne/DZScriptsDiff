@@ -61,7 +61,7 @@ class TutorialsMenu extends UIScriptedMenu
 			toolbar_b2.LoadImageFile( 0, "set:playstation_buttons image:" + back );
 		#endif
 		
-		PPEffects.SetBlurMenu( 0.6 );
+		PPERequesterBank.GetRequester(PPERequester_TutorialMenu).Start(new Param1<float>(0.6));
 		DrawConnectingLines( 0 );
 		return layoutRoot;
 	}
@@ -73,7 +73,7 @@ class TutorialsMenu extends UIScriptedMenu
 	void ~TutorialsMenu()
 	{
 		m_TabScript.m_OnTabSwitch.Remove( DrawConnectingLines );
-		PPEffects.SetBlurMenu( 0 );
+		PPERequesterBank.GetRequester(PPERequester_TutorialMenu).Stop();
 	}
 
 	void Back()

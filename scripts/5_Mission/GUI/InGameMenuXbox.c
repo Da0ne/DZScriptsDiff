@@ -47,7 +47,7 @@ class InGameMenuXbox extends UIScriptedMenu
 				hud.ShowHudUI( true );
 			}
 		}
-		PPEffects.SetBlurMenu( 0 );
+		PPERequesterBank.GetRequester(PPERequester_MenuEffects).Stop();
 		
 		ControlSchemeManager.SetControlScheme( EControlSchemeState.None );
 	}
@@ -179,7 +179,10 @@ class InGameMenuXbox extends UIScriptedMenu
 				hud.ShowHudUI( false );
 			}
 		}
-		PPEffects.SetBlurMenu( 0.6 );
+		
+		PPERequester_MenuEffects requester;
+		Class.CastTo(requester,PPERequesterBank.GetRequester(PPERequester_MenuEffects));
+		requester.SetVignetteIntensity(0.6);
 			
 		#ifdef PLATFORM_PS4
 			string confirm = "cross";

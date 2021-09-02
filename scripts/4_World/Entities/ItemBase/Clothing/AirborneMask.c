@@ -1,4 +1,4 @@
-class AirborneMask extends ClothingBase
+class AirborneMask extends MaskBase
 {
 	override bool CanPutAsAttachment( EntityAI parent )
 	{

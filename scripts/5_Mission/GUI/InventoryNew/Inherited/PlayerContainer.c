@@ -586,20 +586,21 @@ class PlayerContainer: CollapsibleContainer
 		return cont_screen_pos - y + cont_screen_height;
 	}
 	
-	override void Insert( LayoutHolder container, int pos = -1 )
+	override void Insert( LayoutHolder container, int pos = -1, bool immedUpdate = true )
 	{
 		ClosableContainer c_cont = ClosableContainer.Cast( container );
-		if( c_cont && m_Body.Count() > 2 )
+		if ( c_cont && m_Body.Count() > 2 )
 		{
 			ClosableContainer prev	= ClosableContainer.Cast( m_Body.Get( 2 ) );
 			int index				= 2;
 			int curr_sort			= c_cont.GetRootWidget().GetSort();
-			while( prev )
+			while ( prev )
 			{
 				int prev_sort = prev.GetRootWidget().GetSort();
-				if( prev_sort > curr_sort )
+				if ( prev_sort > curr_sort )
 					break;
-				if( ++index < m_Body.Count() )
+				
+				if ( ++index < m_Body.Count() )
 					prev = ClosableContainer.Cast( m_Body.Get( index ) );
 				else
 					break;
@@ -612,7 +613,8 @@ class PlayerContainer: CollapsibleContainer
 			m_Body.Insert( container );
 		}
 		
-		RecomputeOpenedContainers();
+		if ( immedUpdate )
+			RecomputeOpenedContainers();
 	}
 	
 	bool IsItemWithContainerActive()
@@ -1474,27 +1476,27 @@ class PlayerContainer: CollapsibleContainer
 	override void UpdateInterval()
 	{
 		int i;
-		for( i = 0; i < m_InventorySlots.Count(); i++ )
+		for ( i = 0; i < m_InventorySlots.Count(); i++ )
 		{
 			SlotsIcon icon = m_InventorySlots.GetElement( i );
-			if( icon )
+			if ( icon )
 			{
 				icon.UpdateInterval();
 			}
 		}
-		for( i = 0; i < m_ShowedItems.Count(); i++ )
+		for ( i = 0; i < m_ShowedItems.Count(); i++ )
 		{
 			Container cont = m_ShowedItems.GetElement( i );
-			if( cont )
+			if ( cont )
 			{
 				cont.UpdateInterval();
 			}
 		}
 		
 		bool changed_size;
-		if( m_ShouldChangeSize )
+		if ( m_ShouldChangeSize )
 			m_ContentResize.ResizeParentToChild( changed_size );
-		if( changed_size )
+		if ( changed_size )
 		{
 			CheckScrollbarVisibility();
 			m_ShouldChangeSize = false;

@@ -223,11 +223,17 @@ class VicinityItemManager
 		// no filtering for cargo (initial implementation)		
 		for ( int ic = 0; ic < proxyCargos.Count(); ic++ )
 			AddVicinityCargos( proxyCargos[ic] );
-
-		//filter unnecessary objects beforehand
+		
+		//filter unnecessary and duplicate objects beforehand
 		for ( int i = 0; i < objects_in_vicinity.Count(); i++ )
 		{
 			Object actor_in_radius = objects_in_vicinity.Get(i);
+			
+			if ( allFoundObjects.Find( actor_in_radius ) == INDEX_NOT_FOUND )
+			{
+				allFoundObjects.Insert(actor_in_radius);
+			}
+			
 			//Print("---actor in radius: " + actor_in_radius);
 			if (ExcludeFromContainer_Phase1(actor_in_radius))
 				continue;
@@ -241,7 +247,7 @@ class VicinityItemManager
 		
 		if ( objects_in_vicinity ) 
 		{
-			allFoundObjects.InsertAll(objects_in_vicinity);
+			//allFoundObjects.InsertAll(objects_in_vicinity);
 			objects_in_vicinity.Clear();
 		}
 		
@@ -249,10 +255,16 @@ class VicinityItemManager
 		GetGame().GetObjectsAtPosition3D( player.GetPosition(), VICINITY_DISTANCE, objects_in_vicinity, proxyCargos );		
 //		DebugObjectsSphereDraw( VICINITY_DISTANCE );
 		
-		//filter unnecessary objects beforehand
+		//filter unnecessary and duplicate objects beforehand
 		for ( int j = 0; j < objects_in_vicinity.Count(); j++ )
 		{
 			Object object_in_radius = objects_in_vicinity.Get(j);
+			
+			if ( allFoundObjects.Find( object_in_radius ) == INDEX_NOT_FOUND )
+			{
+				allFoundObjects.Insert(object_in_radius);
+			}
+			
 			//Print("---object in radius: " + object_in_radius);
 			if (ExcludeFromContainer_Phase2(object_in_radius))
 				continue;
@@ -266,7 +278,7 @@ class VicinityItemManager
 		
 		if ( objects_in_vicinity ) 
 		{
-			allFoundObjects.InsertAll(objects_in_vicinity);
+			//allFoundObjects.InsertAll(objects_in_vicinity);
 			objects_in_vicinity.Clear();
 		}
 		
@@ -276,10 +288,16 @@ class VicinityItemManager
 
 //		DebugConeDraw( player.GetPosition(), VICINITY_CONE_ANGLE );
 
-		//filter unnecessary objects beforehand
+		//filter unnecessary and duplicate objects beforehand
 		for ( int k = 0; k < objects_in_vicinity.Count(); k++ )
 		{
 			Object object_in_cone = objects_in_vicinity.Get(k);
+			
+			if ( allFoundObjects.Find( object_in_cone ) == INDEX_NOT_FOUND )
+			{
+				allFoundObjects.Insert(object_in_cone);
+			}
+			
 			if (ExcludeFromContainer_Phase3(object_in_cone))
 				continue;
 
@@ -290,10 +308,52 @@ class VicinityItemManager
 			}
 		}
 		
-		allFoundObjects.InsertAll(objects_in_vicinity);
-
-		//4. Filter filtered objects with RayCast from the player ( head bone )
+		//allFoundObjects.InsertAll(objects_in_vicinity);
 		
+		//4. Add large objects - particularly buildings and BaseBuildingBase
+		BoxCollidingParams params = new BoxCollidingParams();
+		vector box = {VICINITY_ACTOR_DISTANCE,VICINITY_ACTOR_DISTANCE,VICINITY_ACTOR_DISTANCE};
+		params.SetParams(player.GetPosition(), headingDirection.VectorToAngles(), box * 2, ObjIntersect.View, ObjIntersect.Fire, true);
+		array<ref BoxCollidingResult> results = new array<ref BoxCollidingResult>;
+		if ( GetGame().IsBoxCollidingGeometryProxy(params, {player}, results) )
+		{
+			//Print("IsBoxCollidingGeometryProxy results:");
+			Object obstruction;
+			foreach (BoxCollidingResult bResult : results)
+			{
+				obstruction = null;
+				
+				if ( bResult.obj && (bResult.obj.CanObstruct() || bResult.obj.CanProxyObstruct()) )
+				{
+					obstruction = bResult.obj;
+					if ( allFoundObjects.Find( obstruction ) == INDEX_NOT_FOUND )
+					{
+						//Print("obstucting obj: " + bResult.obj);
+						allFoundObjects.Insert(obstruction);
+					}
+				}
+				
+				if ( bResult.parent && (bResult.parent.CanObstruct() || bResult.parent.CanProxyObstruct()) )
+				{
+					obstruction = bResult.parent;
+					if ( allFoundObjects.Find( obstruction ) == INDEX_NOT_FOUND )
+					{
+						//Print("obstucting parent: " + bResult.parent);
+						allFoundObjects.Insert(obstruction);
+					}
+				}
+			}
+			//Print("----------");
+		}
+		
+		/*Print("allFoundObjects");
+		foreach (Object oo : allFoundObjects)
+		{
+			Print(oo);
+		}
+		Print("----------");*/
+		
+		//5. Filter filtered objects with RayCast from the player ( head bone )
 		array<Object> obstructingObjects = new array<Object>;
 		MiscGameplayFunctions.FilterObstructingObjects(allFoundObjects, obstructingObjects);
 		

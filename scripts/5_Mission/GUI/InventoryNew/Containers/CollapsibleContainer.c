@@ -7,7 +7,7 @@ class CollapsibleContainer: Container
 	{
 		m_MainWidget.Show( true );
 
-		if( sort > -1 )
+		if ( sort > -1 )
 			m_MainWidget.SetSort( sort + 2 );
 		
 		m_MainWidget = m_MainWidget.FindAnyWidget( "header" );
@@ -43,11 +43,15 @@ class CollapsibleContainer: Container
 		}
 	}
 	
-	override void Insert( LayoutHolder container, int pos = -1 )
+	override void Insert( LayoutHolder container, int pos = -1, bool immedUpdate = true )
 	{
-		super.Insert( container );
-		RecomputeOpenedContainers();
-		UpdateCollapseButtons();
+		super.Insert( container, pos, immedUpdate );
+		
+		if ( immedUpdate )
+		{
+			RecomputeOpenedContainers();
+			UpdateCollapseButtons();
+		}
 	}
 	
 	override void Remove( LayoutHolder container )
@@ -65,7 +69,7 @@ class CollapsibleContainer: Container
 	void UpdateCollapseButtons()
 	{
 		#ifndef PLATFORM_CONSOLE
-		if( m_Body.Count() < 3 )
+		if ( m_Body.Count() < 3 )
 		{
 			m_CollapsibleHeader.GetMainWidget().FindAnyWidget("collapse_button").Show(false);
 		}
@@ -80,7 +84,7 @@ class CollapsibleContainer: Container
 	{
 		m_Hidden = !ItemManager.GetInstance().GetDefaultHeaderOpenState( "VICINITY" );
 		
-		if( m_Hidden )
+		if ( m_Hidden )
 		{
 			OnHide();
 		}

@@ -2,7 +2,7 @@
  *  Game Class provide most "world" or global engine API functions.
  */
 
-static int GAME_STORAGE_VERSION = 121;
+static int GAME_STORAGE_VERSION = 125;
 
 class CGame
 {
@@ -110,6 +110,15 @@ class CGame
 	@param timeslice time elapsed from last call
 	*/
 	void OnUpdate(bool doSim, float timeslice) 
+	{
+	}
+	
+	/**
+  \brief Called on World update after simulation of entities
+  @param doSim False when simulation is paused, True otherwise
+	@param timeslice time elapsed from last call
+	*/
+	void OnPostUpdate(bool doSim, float timeslice) 
 	{
 	}
 
@@ -1035,12 +1044,13 @@ class CGame
 		@endcode
 	*/
 	proto native bool		IsBoxCollidingGeometry(vector center, vector orientation, vector edgeLength, int iPrimaryType, int iSecondaryType, array<Object> excludeObjects, array<Object> collidedObjects = NULL); 
-	
+
+	proto native bool		IsBoxCollidingGeometryProxy(notnull BoxCollidingParams params, array<Object> excludeObjects, array<ref BoxCollidingResult> collidedObjects = NULL); 
 		
 	//! Returns weather controller object.
 	proto native Weather GetWeather();
 
-	//! Sets custom camera camera EV.
+	//! Sets custom camera camera EV. range: -50.0..50.0? //TODO
 	proto native void	SetEVUser(float value);
 
 	proto native void 	OverrideDOF(bool enable, float focusDistance, float focusLength, float focusLengthNear, float blur, float focusDepthOffset);

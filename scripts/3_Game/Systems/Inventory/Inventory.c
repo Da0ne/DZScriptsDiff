@@ -611,9 +611,9 @@ class GameInventory
 			if( player )
 			{
 				if(item)
-					Debug.InventoryMoveLog("" + InventoryLocation.DumpToStringNullSafe(dst), "n/a" , "n/a", "AddInventoryReservation", player.ToString() );
+					Debug.InventoryMoveLog("Reservation result: " + ret_val + " - STS=" + player.GetSimulationTimeStamp() + " / " + item.ToString() + " / " + InventoryLocation.DumpToStringNullSafe(dst), "n/a" , "n/a", "AddInventoryReservation", player.ToString() );
 				else
-					Debug.InventoryMoveLog("" + InventoryLocation.DumpToStringNullSafe(dst), "n/a" , "n/a", "AddInventoryReservation", player.ToString() );
+					Debug.InventoryMoveLog("Reservation result: " + ret_val + " - STS=" + player.GetSimulationTimeStamp() + " / null / " + InventoryLocation.DumpToStringNullSafe(dst), "n/a" , "n/a", "AddInventoryReservation", player.ToString() );
 			}
 		}
 		#endif
@@ -1034,7 +1034,7 @@ class GameInventory
 	}
 
 	/// helper function for swap
-	static bool MakeDstForSwap (notnull ref InventoryLocation src1, notnull ref InventoryLocation src2, out ref InventoryLocation dst1, out ref InventoryLocation dst2)
+	static bool MakeDstForSwap (notnull InventoryLocation src1, notnull InventoryLocation src2, out InventoryLocation dst1, out InventoryLocation dst2)
 	{
 		if (dst1 == null)
 			dst1 = new InventoryLocation;
@@ -1051,7 +1051,7 @@ class GameInventory
 	}
 
 	/// helper function for swap
-	static bool MakeSrcAndDstForSwap (notnull EntityAI item1, notnull EntityAI item2, out ref InventoryLocation src1, out ref InventoryLocation src2, out ref InventoryLocation dst1, out ref InventoryLocation dst2)
+	static bool MakeSrcAndDstForSwap (notnull EntityAI item1, notnull EntityAI item2, out InventoryLocation src1, out InventoryLocation src2, out InventoryLocation dst1, out InventoryLocation dst2)
 	{
 		if (src1 == null)
 			src1 = new InventoryLocation;
@@ -1063,7 +1063,7 @@ class GameInventory
 	}
 
 	/// helper function for ForceSwap
-	static bool MakeSrcAndDstForForceSwap (notnull EntityAI item1, notnull EntityAI item2, out ref InventoryLocation src1, out ref InventoryLocation src2, out ref InventoryLocation dst1, notnull InventoryLocation dst2)
+	static bool MakeSrcAndDstForForceSwap (notnull EntityAI item1, notnull EntityAI item2, out InventoryLocation src1, out InventoryLocation src2, out InventoryLocation dst1, notnull InventoryLocation dst2)
 	{
 		if (src1 == null)
 			src1 = new InventoryLocation;

@@ -59,3 +59,11 @@ class FlareLightBlue extends FlareLight
 		SetAmbientColor( 0.3, 0.3, 1.0 );
 	}
 }
+
+class FlareLightContamination extends FlareLightRed
+{
+	void FlareLightContamination()
+	{
+		SetLifetime(10);
+	}
+}

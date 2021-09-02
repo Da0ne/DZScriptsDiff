@@ -1,4 +1,4 @@
-class GasMask extends ClothingBase
+class GasMask extends MaskBase
 {
 	override bool CanPutAsAttachment( EntityAI parent )
 	{
@@ -25,5 +25,16 @@ class GasMask extends ClothingBase
 	override int GetVoiceEffect()
 	{
 		return VoiceEffectObstruction;
+	}
+	
+	override void EEHealthLevelChanged(int oldLevel, int newLevel, string zone)
+	{
+		if (GetGame().IsServer())
+		{
+			if( newLevel == GameConstants.STATE_RUINED )
+			{
+				SetQuantity(0);
+			}
+		}
 	}
 }

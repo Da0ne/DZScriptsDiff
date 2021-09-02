@@ -8,9 +8,10 @@ class HandsArea: LayoutHolder
 
 	void HandsArea( LayoutHolder parent )
 	{
-		m_HandsContainer	= new HandsContainer( this );
+		m_HandsContainer = new HandsContainer( this );
 		
-		m_MainWidget.Update();
+		if ( m_ImmedUpdate )
+			m_MainWidget.Update();
 		
 		m_ParentWidget.GetScript( m_HandsResizer );
 		m_Scroller = ScrollWidget.Cast( m_ParentWidget );
@@ -49,36 +50,27 @@ class HandsArea: LayoutHolder
 	bool IsSwapActive()
 	{
 		Widget swap_cursor = m_MainWidget.FindAnyWidget("SwapCursor");
-		if( swap_cursor )
-		{
+		
+		if ( swap_cursor )
 			return swap_cursor.IsVisible();
-		}
 		else
-		{
 			return false;
-		}
 	}
 
 	bool IsCombineActive()
 	{
 		Widget combine_cursor = m_MainWidget.FindAnyWidget("CombineCursor");
 
-		if( combine_cursor )
-		{
+		if ( combine_cursor )
 			return combine_cursor.IsVisible();
-		}
 		else
-		{
 			return false;
-		}
 	}
 	
 	void MoveGridCursor( int direction )
 	{
-		if( IsActive() )
-		{
+		if ( IsActive() )
 			m_HandsContainer.MoveGridCursor( direction );
-		}
 	}
 	
 	bool EquipItem()
@@ -135,16 +127,16 @@ class HandsArea: LayoutHolder
 		float x2, y2;
 		m_Scroller.GetScreenSize( x, y );
 		m_MainWidget.GetScreenSize( x2, y2 );
-		if( y2 != y )
+		if ( y2 != y )
 			m_ShouldChangeSize = true;
 		
 		bool changed_size;
-		if( m_ShouldChangeSize && m_HandsResizer.ResizeParentToChild( changed_size, InventoryMenu.GetHeight() * 0.5 ) )
+		if ( m_ShouldChangeSize && m_HandsResizer.ResizeParentToChild( changed_size, InventoryMenu.GetHeight() * 0.5 ) )
 			m_Scroller.SetAlpha( 0.3921 );
 		else
 			m_Scroller.SetAlpha( 0 );
 		
-		if( changed_size )
+		if ( changed_size )
 			m_ShouldChangeSize = false;
 	}
 
@@ -177,7 +169,7 @@ class HandsArea: LayoutHolder
 	
 	void DraggingOverHandsPanel( Widget w, int x, int y, Widget receiver )
 	{
-		if( w == NULL )
+		if ( w == NULL )
 		{
 			return;
 		}

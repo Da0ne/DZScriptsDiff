@@ -77,8 +77,8 @@ class Paper extends ItemBase
 	{
 		super.SetActions();
 		
-		AddAction(ActionReadPaper);
-		AddAction(ActionWritePaper);
+		//AddAction(ActionReadPaper);
+		//AddAction(ActionWritePaper);
 
 		AddAction(ActionCreateIndoorFireplace);
 		AddAction(ActionCreateIndoorOven);

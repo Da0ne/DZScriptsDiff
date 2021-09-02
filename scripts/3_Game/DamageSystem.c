@@ -39,8 +39,8 @@ class DamageSystem
 		else
 		{
 			string zone;
-			ref array<string> zone_names = new array<string>;
-			ref array<string> component_names;
+			array<string> zone_names = new array<string>;
+			array<string> component_names;
 			
 			entity.GetDamageZones(zone_names);
 			for (int i = 0; i < zone_names.Count(); i++)

@@ -6,7 +6,35 @@ class SportGlasses_ColorBase extends Clothing
 		return CanWearUnderMask( parent );
 	}
 };
-class SportGlasses_Black extends SportGlasses_ColorBase {};
-class SportGlasses_Blue extends SportGlasses_ColorBase {};
-class SportGlasses_Green extends SportGlasses_ColorBase {};
-class SportGlasses_Orange extends SportGlasses_ColorBase {};
+
+class SportGlasses_Black extends SportGlasses_ColorBase
+{
+	override int GetGlassesEffectID()
+	{
+		return PPERequesterBank.REQ_GLASSESSPORTBLACK;
+	}
+};
+
+class SportGlasses_Blue extends SportGlasses_ColorBase
+{
+	override int GetGlassesEffectID()
+	{
+		return PPERequesterBank.REQ_GLASSESSPORTBLUE;
+	}
+};
+
+class SportGlasses_Green extends SportGlasses_ColorBase
+{
+	override int GetGlassesEffectID()
+	{
+		return PPERequesterBank.REQ_GLASSESSPORTGREEN;
+	}
+};
+
+class SportGlasses_Orange extends SportGlasses_ColorBase
+{
+	override int GetGlassesEffectID()
+	{
+		return PPERequesterBank.REQ_GLASSESSPORTORANGE;
+	}
+};

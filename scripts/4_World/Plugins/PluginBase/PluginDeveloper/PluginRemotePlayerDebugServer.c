@@ -120,13 +120,14 @@ class PluginRemotePlayerDebugServer extends PluginBase
 			m_ClientList.Insert(player);
 			SetWatching(true);
 		}
-		else
+		else if (index != -1 && m_ClientList.Count() != 0)
 		{
 			m_ClientList.Remove(index);
-			if( m_ClientList.Count() == 0 )
-			{
-				SetWatching(false);
-			}
+		}
+		
+		if( m_ClientList.Count() == 0 )
+		{
+			SetWatching(false);
 		}
 	}
 	

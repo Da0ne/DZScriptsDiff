@@ -68,7 +68,7 @@ class InspectMenuNew extends UIScriptedMenu
 			m_item_widget.SetItem(item);
 			m_item_widget.SetView( item.GetViewIndex() );
 			m_item_widget.SetModelPosition(Vector(0,0,1));
-			PPEffects.SetBlurInventory(1);
+			PPERequesterBank.GetRequester(PPERequester_InventoryBlur).Start();
 		}
 	}
 	
@@ -511,6 +511,7 @@ class InspectMenuNew extends UIScriptedMenu
 				weight=Math.Round( (wetness + 1) * confweight );
 			}
 			*/
+			item_IB.UpdateWeight();
 			int weight = item_IB.GetWeight();
 			
 			if (root_widget.GetName() != "BackPanelWidget")

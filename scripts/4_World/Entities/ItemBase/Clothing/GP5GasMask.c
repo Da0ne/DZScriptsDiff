@@ -1,4 +1,4 @@
-class GP5GasMask extends ClothingBase
+class GP5GasMask extends MaskBase
 {
 	override bool CanPutAsAttachment( EntityAI parent )
 	{
@@ -26,4 +26,5 @@ class GP5GasMask extends ClothingBase
 	{
 		return VoiceEffectObstruction;
 	}
+	
 }

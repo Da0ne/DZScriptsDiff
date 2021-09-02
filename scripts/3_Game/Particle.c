@@ -302,8 +302,11 @@ class Particle extends ScriptedEntity
 			{
 				if ( m_MarkedForDeletion )
 				{
-					GetGame().ObjectDelete( m_ParticleEffect );
-					m_ParticleEffect = NULL;
+					if(m_ParticleEffect)
+					{
+						GetGame().ObjectDelete( m_ParticleEffect );
+						m_ParticleEffect = NULL;
+					}
 					GetGame().ObjectDelete( this );
 				}
 			}

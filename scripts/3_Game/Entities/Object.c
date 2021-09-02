@@ -11,6 +11,12 @@ class Object extends IEntity
 	proto native void AddProxyPhysics(string proxySelectionName);	
 	
 	proto native void RemoveProxyPhysics(string proxySelectionName);	
+	
+	//! Object entered trigger
+	void OnEnterTrigger(ScriptedEntity trigger) {}
+	
+	//! Object left trigger
+	void OnLeaveTrigger(ScriptedEntity trigger) {}
 
 	//! Retrieve all LODS	
 	proto native bool GetLODS(notnull out array<LOD> lods);
@@ -182,6 +188,12 @@ class Object extends IEntity
 	\note object up vector is always y-axis
 	*/
 	proto native void SetDirection(vector vPos);
+	
+	//! Retrieve direction up vector
+	proto native vector GetDirectionUp();
+	
+	//! Retrieve direction aside vector
+	proto native vector GetDirectionAside();
 	
 	//! Calculate local position of other entity to this entity
 	proto native vector GetLocalPos(vector vPos);
@@ -537,10 +549,17 @@ class Object extends IEntity
 		return false;
 	}
 	
+	bool IsBeingBackstabbed()
+	{
+		return false;
+	}
+	
+	void SetBeingBackstabbed(){}
+	
 	//! Returns if this entity if a food item
 	bool IsFood()
 	{
-		return ( IsFruit() || IsMeat() || IsMushroom() );
+		return ( IsFruit() || IsMeat() || IsCorpse() || IsMushroom() );
 	}
 	
 	bool IsFruit()
@@ -549,6 +568,11 @@ class Object extends IEntity
 	}
 	
 	bool IsMeat()
+	{
+		return false;
+	}
+	
+	bool IsCorpse()
 	{
 		return false;
 	}
@@ -633,6 +657,9 @@ class Object extends IEntity
 			return o.GetType() + ":" + o.GetNetworkIDString();
 		return "null";
 	}
+	
+	//! native GetDebugName which is internally overloaded where needed
+	proto string GetDebugNameNative();
 	
 	//! Remote procedure call shortcut, see CGame.RPC / CGame.RPCSingleParam
 	void RPC(int rpc_type, array<ref Param> params, bool guaranteed, PlayerIdentity recipient = NULL)
@@ -766,7 +793,7 @@ class Object extends IEntity
 	
 	// Damage system
 	/**
-  	\brief Checks if object has DamageSystem.
+  	\brief Checks if object's DamageSystem has been initialized(despite the name, does not really reliably answer the question whether the object is configured to have damage system or not)
 	*/
 	proto native bool   HasDamageSystem();
 	
@@ -967,13 +994,14 @@ class Object extends IEntity
 	*/
 	bool IsRuined()
 	{
-		if ( IsDamageDestroyed() )
-		{
-			return true;
-		}
-		
-		return false;
+		return IsDamageDestroyed();
 	}
+	
+	//! Event called from C++ when simulation is enabled
+	void OnSimulationEnabled() {}
+	
+	//! Event called from C++ when simulation is disabled
+	void OnSimulationDisabled() {}
 
 	void GetActions(typename action_input_type, out array<ActionBase_Basic> actions)
 	{

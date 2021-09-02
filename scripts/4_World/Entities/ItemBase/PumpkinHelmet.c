@@ -69,4 +69,24 @@ class PumpkinHelmet : Clothing
 
 		SetPilotLight(do_glow);
 	}
+	
+	override void UpdateNVGStatus(PlayerBase player, bool attaching = false, bool force_disable = false)
+	{
+		if (force_disable)
+		{
+			player.RemoveActiveNV(NVTypes.NV_PUMPKIN);
+			
+		}
+		else
+		{
+			if ( attaching && (!player.IsNVGWorking() || player.GetNVType() != NVTypes.NV_PUMPKIN) )
+			{
+				player.AddActiveNV(NVTypes.NV_PUMPKIN);
+			}
+			else if ( !attaching && player.IsNVGWorking() )
+			{
+				player.RemoveActiveNV(NVTypes.NV_PUMPKIN);
+			}
+		}
+	}
 };

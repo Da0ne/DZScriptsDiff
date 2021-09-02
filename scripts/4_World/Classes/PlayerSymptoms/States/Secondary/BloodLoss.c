@@ -3,6 +3,8 @@ class BloodLoss extends SymptomBase
 	Material m_MatGauss;
 	const int BLUR_DURATION = 3000;
 	float m_BloodSet;
+	PPERequester_BloodLoss m_RequesterBloodLoss;
+	
 	//this is just for the Symptom parameters set-up and is called even if the Symptom doesn't execute, don't put any gameplay code in here
 	override void OnInit()
 	{
@@ -13,6 +15,12 @@ class BloodLoss extends SymptomBase
 		m_IsPersistent = false;
 		m_SyncToClient = true;
 		m_BloodSet = -1;
+		
+		if ( !GetGame().IsMultiplayer() || GetGame().IsClient() )
+		{
+			Class.CastTo(m_RequesterBloodLoss,PPERequester_BloodLoss.Cast(PPERequesterBank.GetRequester(PPERequester_BloodLoss)));
+		}
+		
 	}
 	
 	//!gets called every frame
@@ -25,7 +33,14 @@ class BloodLoss extends SymptomBase
 		if( player.IsPlayerSelected() && player.GetTransferValues() && player.GetTransferValues().GetBlood() != m_BloodSet ) 
 		{
 			m_BloodSet = player.GetTransferValues().GetBlood();
-			PPEffects.SetBloodSaturation(m_BloodSet);	
+			if (m_BloodSet < 1.0)
+			{
+				m_RequesterBloodLoss.SetBloodLossLevel(m_BloodSet);
+			}
+			else
+			{
+				m_RequesterBloodLoss.Stop();
+			}
 		}
 	}
 	

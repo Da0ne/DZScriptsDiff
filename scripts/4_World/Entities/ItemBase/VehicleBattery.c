@@ -196,8 +196,8 @@ class VehicleBattery : ItemBase
 			if ( energy_coef < m_EfficiencyDecayStart  &&  m_EfficiencyDecayStart > 0 )			
 			{
 				m_Efficiency0To10 = Math.Round(  (energy_coef / m_EfficiencyDecayStart) * 10  );
-				SetSynchDirty();
 			}
+			SetSynchDirty();
 		}
 	}
 		

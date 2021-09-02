@@ -15,6 +15,11 @@ class ActionDropItemSimple: ActionDropItem
 	{
 		return false;
 	}
+	
+	override bool CanBeUsedOnBack()
+	{
+		return true;
+	}
 		
 	override void Start( ActionData action_data )
 	{

@@ -48,7 +48,7 @@ class ActionDisinfectSelf: ActionDisinfectBase
 	
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
 	{
-		return (player.IsBleeding() || (player.m_Agents & eAgents.WOUND_AGENT));
+		return (player.IsBleeding() || (player.m_SyncedModifiers & eModifierSyncIDs.MODIFIER_SYNC_WOUND_INFECT_1) || (player.m_SyncedModifiers & eModifierSyncIDs.MODIFIER_SYNC_WOUND_INFECT_2));
 	}
 	
 

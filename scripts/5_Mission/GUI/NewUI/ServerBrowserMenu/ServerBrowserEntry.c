@@ -249,7 +249,7 @@ class ServerBrowserEntry extends ScriptedWidgetEventHandler
 	}
 	
 	void FillInfo( GetServersResultRow server_info )
-	{
+	{	
 		m_ServerData = server_info;
 		m_FirstExpand = true;
 		
@@ -288,6 +288,13 @@ class ServerBrowserEntry extends ScriptedWidgetEventHandler
 		SetBattleye( server_info.m_AntiCheat );
 		SetIP( server_info.m_Id );
 		SetAcceleration( server_info.m_EnvironmentTimeMul );
+		
+		if (server_info.m_IsSelected)
+		{
+			Darken(m_Root, 0, 0);
+			Select();
+			SetFocus( m_Root );
+		}
 #endif
 #endif
 	}

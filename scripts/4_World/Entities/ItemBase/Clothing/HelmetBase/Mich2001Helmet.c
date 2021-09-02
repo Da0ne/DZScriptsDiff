@@ -31,37 +31,7 @@ class Mich2001Helmet extends HelmetBase
 		AddAction(ActionTurnOffHelmetFlashlight);
 		AddAction(ActionToggleNVG);
 	}
-	
-	/*override void UpdateNVGStatus(PlayerBase player, bool attaching = false)
-	{
-		NVGoggles NVGAttachment;
-		NVGAttachment = NVGoggles.Cast(FindAttachmentBySlotName("NVG"));
 		
-		if ( player )
-		{
-			if ( NVGAttachment )
-			{
-				NVGAttachment.LoweredCheck();
-				
-				if ( attaching && NVGAttachment.IsWorking() && NVGAttachment.m_Strap && NVGAttachment.m_IsLowered && !player.IsNVGWorking() )
-				{
-					NVGAttachment.SetPlayer(player);
-					player.SetNVGWorking(true);
-				}
-				else if ( player.IsNVGWorking() )
-				{
-					NVGAttachment.SetPlayer(null);
-					player.SetNVGWorking(false);
-				}
-			}
-			else if ( player.IsNVGWorking() )
-			{
-				player.SetNVGWorking(false);
-			}
-		}
-	}*/
-	
-			
 	//Debug menu Spawn Ground Special
 	override void OnDebugSpawn()
 	{

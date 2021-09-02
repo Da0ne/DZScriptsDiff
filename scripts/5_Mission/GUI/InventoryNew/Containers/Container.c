@@ -183,7 +183,7 @@ class Container extends LayoutHolder
 	{
 		for ( int i = 0; i < m_Body.Count(); i++ )
 		{
-			if( m_Body.Get( i ) )
+			if ( m_Body.Get( i ) )
 				m_Body.Get( i ).UpdateInterval();
 		}
 	}
@@ -488,18 +488,19 @@ class Container extends LayoutHolder
 		m_LayoutName = WidgetLayoutName.Container;
 	}
 
-	void Insert( LayoutHolder container, int pos = -1 )
+	void Insert( LayoutHolder container, int pos = -1, bool immedUpdate = true )
 	{
-		if( pos > -1 && pos < m_Body.Count() )
+		if ( pos > -1 && pos < m_Body.Count() )
 		{
-			if( pos <= m_ActiveIndex )
+			if ( pos <= m_ActiveIndex )
 				m_ActiveIndex++;
 			m_Body.InsertAt( container, pos );
 		}
 		else
 			m_Body.Insert( container );
 		
-		Refresh();
+		if ( immedUpdate )
+			Refresh();
 	}
 
 	void Remove( LayoutHolder container )

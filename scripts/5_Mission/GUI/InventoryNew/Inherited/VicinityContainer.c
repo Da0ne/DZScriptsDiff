@@ -5,6 +5,7 @@ class VicinityContainer: CollapsibleContainer
 	ref map<int, ref Container>			m_ShowedItemsIDs			= new ref map<int, ref Container>;
 	ref array<EntityAI>					m_ShowedItemIcons			= new array<EntityAI>;
 	ref map<CargoBase, ref Container>	m_ShowedCargos				= new ref map<CargoBase, ref Container>;
+	protected bool						m_IsProcessing = false; // Prevents refreshing every time a child is added while it is still processing
 	
 	const float DISTANCE_TO_ENTITIES 	= 1.0;
 	const float DISTANCE_TO_THE_REST 	= 0.5;
@@ -50,7 +51,7 @@ class VicinityContainer: CollapsibleContainer
 
 	override void MoveGridCursor( int direction )
 	{
-		if( !GetFocusedContainer() || !GetFocusedContainer().IsActive() )
+		if ( !GetFocusedContainer() || !GetFocusedContainer().IsActive() )
 		{
 			return;
 		}
@@ -59,7 +60,7 @@ class VicinityContainer: CollapsibleContainer
 		ContainerWithCargoAndAttachments iwca = ContainerWithCargoAndAttachments.Cast( GetFocusedContainer() );
 		ZombieContainer zmbc = ZombieContainer.Cast( GetFocusedContainer() );
 		PlayerContainer plc = PlayerContainer.Cast( GetFocusedContainer() );
-		if( iwc )
+		if ( iwc )
 		{
 			iwc.MoveGridCursor(direction);
 		}
@@ -89,9 +90,9 @@ class VicinityContainer: CollapsibleContainer
 			EntityAI entity = m_ShowedItems.GetKey( i );
 			Container container = m_ShowedItems.GetElement( i );
 			string type = entity.GetType();
-			if( container.IsInherited( ContainerWithCargo ) )
+			if ( container.IsInherited( ContainerWithCargo ) )
 			{
-				if( !serialized_types.Contains( type ) )
+				if ( !serialized_types.Contains( type ) )
 				{
 					ContainerWithCargo item_with_cargo = ContainerWithCargo.Cast( container );
 					serialized_types.Insert( type, item_with_cargo.IsOpened() );
@@ -99,7 +100,7 @@ class VicinityContainer: CollapsibleContainer
 			}
 		}
 
-		if( serialized_types.Count() > 0 )
+		if ( serialized_types.Count() > 0 )
 		{
 			FileSerializer file = new FileSerializer();
 			if ( file.Open( "inventory_state.save", FileMode.APPEND ) )
@@ -118,30 +119,30 @@ class VicinityContainer: CollapsibleContainer
 
 	override void DraggingOverHeader( Widget w, int x, int y, Widget receiver )
 	{
-		if( w == null )
+		if ( w == null )
 		{
 			return;
 		}
 		
 		ItemPreviewWidget ipw = ItemPreviewWidget.Cast( w.FindAnyWidget( "Render" ) );
-		if( !ipw )
+		if ( !ipw )
 		{
 			string name = w.GetName();
 			name.Replace( "PanelWidget", "Render" );
 			ipw = ItemPreviewWidget.Cast( w.FindAnyWidget( name ) );
 		}
 		
-		if( !ipw && ItemPreviewWidget.Cast( w ) )
+		if ( !ipw && ItemPreviewWidget.Cast( w ) )
 		{
 			ipw = ItemPreviewWidget.Cast( w );
 		}
 
-		if( !ipw || !ipw.GetItem() )
+		if ( !ipw || !ipw.GetItem() )
 		{
 			return;
 		}
 
-		if( ipw.GetItem() && GetGame().GetPlayer().CanDropEntity( ipw.GetItem() ) && ipw.GetItem().GetInventory().CanRemoveEntity() && m_ShowedItemIcons.Find( ipw.GetItem() ) == -1 )
+		if ( ipw.GetItem() && GetGame().GetPlayer().CanDropEntity( ipw.GetItem() ) && ipw.GetItem().GetInventory().CanRemoveEntity() && m_ShowedItemIcons.Find( ipw.GetItem() ) == -1 )
 		{
 			ColorManager.GetInstance().SetColor( w, ColorManager.GREEN_COLOR );
 			ItemManager.GetInstance().HideDropzones();
@@ -162,29 +163,29 @@ class VicinityContainer: CollapsibleContainer
 		EntityAI receiver_item = receiver_iw.GetItem();
 
 		ItemPreviewWidget ipw = ItemPreviewWidget.Cast( w.FindAnyWidget( "Render" ) );
-		if( !ipw )
+		if ( !ipw )
 		{
 			name = w.GetName();
 			name.Replace( "PanelWidget", "Render" );
 			ipw = ItemPreviewWidget.Cast( w.FindAnyWidget( name ) );
 		}
 		
-		if( !ipw && ItemPreviewWidget.Cast( w ) )
+		if ( !ipw && ItemPreviewWidget.Cast( w ) )
 		{
 			ipw = ItemPreviewWidget.Cast( w );
 		}
 		
-		if(!ipw)
+		if (!ipw)
 		{
 			return;
 		}
 
-		if( !ItemBase.Cast( receiver_item ) || !ipw.GetItem() )
+		if ( !ItemBase.Cast( receiver_item ) || !ipw.GetItem() )
 		{
 			return;
 		}
 
-		if( ipw.GetItem().GetInventory().CanRemoveEntity() || m_ShowedItemIcons.Find( ipw.GetItem() ) > -1 )
+		if ( ipw.GetItem().GetInventory().CanRemoveEntity() || m_ShowedItemIcons.Find( ipw.GetItem() ) > -1 )
 		{
 			if ( ( ItemBase.Cast( receiver_item ) ).CanBeCombined( ItemBase.Cast( ipw.GetItem() ) ) )
 			{
@@ -193,7 +194,7 @@ class VicinityContainer: CollapsibleContainer
 				ItemManager.GetInstance().GetLeftDropzone().SetAlpha( 1 );
 				return;
 			}
-			else if( GameInventory.CanSwapEntitiesEx( receiver_item, ipw.GetItem() ) )
+			else if ( GameInventory.CanSwapEntitiesEx( receiver_item, ipw.GetItem() ) )
 			{
 				ColorManager.GetInstance().SetColor( w, ColorManager.SWAP_COLOR );
 				ItemManager.GetInstance().HideDropzones();
@@ -221,28 +222,28 @@ class VicinityContainer: CollapsibleContainer
 		EntityAI receiver_item = receiver_iw.GetItem();
 
 		ItemPreviewWidget ipw = ItemPreviewWidget.Cast( w.FindAnyWidget( "Render" ) );
-		if( !ipw )
+		if ( !ipw )
 		{
 			name = w.GetName();
 			name.Replace( "PanelWidget", "Render" );
 			ipw = ItemPreviewWidget.Cast( w.FindAnyWidget( name ) );
 		}
 
-		if( !ItemBase.Cast( receiver_item ) || !ipw.GetItem() )
+		if ( !ItemBase.Cast( receiver_item ) || !ipw.GetItem() )
 		{
 			return;
 		}
 		
 		EntityAI item = ipw.GetItem();
 		bool equal_typed = item.GetType() == receiver_item.GetType();
-		if( !receiver_item.IsInherited( ItemBase ) || item == null )
+		if ( !receiver_item.IsInherited( ItemBase ) || item == null )
 		{
 			return;
 		}
 		
 		PlayerBase player = PlayerBase.Cast( GetGame().GetPlayer() );
 
-		if( !item.GetInventory().CanRemoveEntity() )
+		if ( !item.GetInventory().CanRemoveEntity() )
 			return;
 		
 		if ( ( ItemBase.Cast( receiver_item ) ).CanBeCombined( ItemBase.Cast( item ) ) )
@@ -279,7 +280,7 @@ class VicinityContainer: CollapsibleContainer
 	override void SetNextActive()
 	{
 		super.SetNextActive();
-		if( m_IsActive && m_ActiveIndex == 1 )
+		if ( m_IsActive && m_ActiveIndex == 1 )
 			m_CollapsibleHeader.SetActive( true );
 		else
 			m_CollapsibleHeader.SetActive( false );
@@ -288,7 +289,7 @@ class VicinityContainer: CollapsibleContainer
 	override void SetPreviousActive( bool force = false )
 	{
 		super.SetPreviousActive( force );
-		if( m_ActiveIndex == 1 )
+		if ( m_ActiveIndex == 1 )
 			m_CollapsibleHeader.SetActive( true );
 		else
 			m_CollapsibleHeader.SetActive( false );
@@ -301,7 +302,7 @@ class VicinityContainer: CollapsibleContainer
 
 	override void OnDropReceivedFromHeader( Widget w, int x, int y, Widget receiver )
 	{
-		if( !w )
+		if ( !w )
 			return;
 		
 		ItemManager.GetInstance().HideDropzones();
@@ -309,37 +310,37 @@ class VicinityContainer: CollapsibleContainer
 		
 		ItemPreviewWidget ipw = ItemPreviewWidget.Cast( w.FindAnyWidget( "Render" ) );
 		
-		if( !ipw )
+		if ( !ipw )
 		{
 			string name = w.GetName();
 			name.Replace( "PanelWidget", "Render" );
 			ipw = ItemPreviewWidget.Cast( w.FindAnyWidget( name ) );
 		}
 		
-		if( !ipw )
+		if ( !ipw )
 		{
 			ipw = ItemPreviewWidget.Cast( w );
 		}
-		if( !ipw )
+		if ( !ipw )
 			return;
 		
 		EntityAI item = ipw.GetItem();
-		if( !ipw.IsInherited( ItemPreviewWidget ) || !item )
+		if ( !ipw.IsInherited( ItemPreviewWidget ) || !item )
 		{
 			return;
 		}
 		
 		PlayerBase player = PlayerBase.Cast( GetGame().GetPlayer() );
 		
-		if( !item.GetInventory().CanRemoveEntity() || m_ShowedItemIcons.Find( item ) > -1 )
+		if ( !item.GetInventory().CanRemoveEntity() || m_ShowedItemIcons.Find( item ) > -1 )
 			return;
 		
-		if( player.CanDropEntity( item ) )
+		if ( player.CanDropEntity( item ) )
 		{
 			ItemBase item_base = ItemBase.Cast( item );
-			if( item_base )
+			if ( item_base )
 			{
-				if( item_base.GetTargetQuantityMax() < item_base.GetQuantity() )
+				if ( item_base.GetTargetQuantityMax() < item_base.GetQuantity() )
 					item_base.SplitIntoStackMaxClient( null, -1 );
 				else
 					player.PhysicalPredictiveDropItem( item_base );
@@ -362,7 +363,7 @@ class VicinityContainer: CollapsibleContainer
 	{
 		PlayerBase player = PlayerBase.Cast( GetGame().GetPlayer() );
 		
-		if(!player)
+		if (!player)
 			return;
 		
 		EntityAI eai;
@@ -378,21 +379,21 @@ class VicinityContainer: CollapsibleContainer
 		m_ShowedItemIcons.Clear();
 		
 		GameInventory game_inventory = player.GetInventory();
-		for( int i = 0; i < objects.Count(); i++ )
+		for ( int i = 0; i < objects.Count(); i++ )
 		{
 			eai = objects.Get( i );			
 			if ( eai == null || game_inventory.IsPlaceholderEntity( eai ) )
 				continue; // noproxy: ignore body placeholder
 			
 			BaseBuildingBase base_building = BaseBuildingBase.Cast(eai);
-			if(base_building && !base_building.IsPlayerInside(player,""))
+			if (base_building && !base_building.IsPlayerInside(player,""))
 				continue;
 
-			if( eai.IsInventoryVisible() )
+			if ( eai.IsInventoryVisible() )
 			{
 				showable_items.Insert( eai );
 
-				if( !eai.IsInherited( DayZInfected ) && !eai.IsInherited( PlayerBase ) && !eai.IsInherited( AnimalBase ) && !eai.DisableVicinityIcon() )
+				if ( !eai.IsInherited( DayZInfected ) && !eai.IsInherited( PlayerBase ) && !eai.IsInherited( AnimalBase ) && !eai.DisableVicinityIcon() )
 				{
 					m_ShowedItemIcons.Insert( eai );
 				}
@@ -404,13 +405,13 @@ class VicinityContainer: CollapsibleContainer
 		for ( i = 0; i < showable_items.Count(); i++ )
 		{
 			EntityAI entity = showable_items.Get( i );
-			if( entity )
+			if ( entity )
 			{
-				if( game_inventory && !m_ShowedItems.Contains( entity ) )
+				if ( game_inventory && !m_ShowedItems.Contains( entity ) )
 				{
 					string config = "CfgVehicles " + entity.GetType() + " GUIInventoryAttachmentsProps";
 
-					if( GetGame().ConfigIsExisting( config ) )
+					if ( GetGame().ConfigIsExisting( config ) )
 					{
 						AttachmentCategoriesContainer ac = new AttachmentCategoriesContainer( m_Parent, -1 );
 						ac.SetEntity( entity );
@@ -419,9 +420,9 @@ class VicinityContainer: CollapsibleContainer
 					}
 					else if ( entity.GetSlotsCountCorrect() > 0 && entity.GetInventory().GetCargo() )
 					{
-						if( entity.IsInherited( DayZInfected ) )
+						if ( entity.IsInherited( DayZInfected ) )
 						{
-							if( entity.IsAlive() )
+							if ( entity.IsAlive() )
 							{
 								continue;
 							}
@@ -434,25 +435,25 @@ class VicinityContainer: CollapsibleContainer
 						else
 						{
 							ContainerWithCargoAndAttachments iwca = new ContainerWithCargoAndAttachments( this, -1 );
-							iwca.SetEntity( entity );
+							iwca.SetEntity( entity, false );
 							new_showed_items.Insert( entity, iwca );
 							showed_items_IDs.Insert( entity.GetID(), iwca );
 						}
 					}
-					else if( entity.GetInventory().GetCargo() )
+					else if ( entity.GetInventory().GetCargo() )
 					{
 						ContainerWithCargo iwc = new ContainerWithCargo( this, -1 );
-						iwc.SetEntity( entity, 0 );
+						iwc.SetEntity( entity, 0, false );
 						new_showed_items.Insert( entity, iwc );
 						showed_items_IDs.Insert( entity.GetID(), iwc );
 						iwc.UpdateInterval();
 					}
-					else if( entity.GetSlotsCountCorrect() > 0 )
+					else if ( entity.GetSlotsCountCorrect() > 0 )
 					{
-						if( entity.HasEnergyManager() )
+						if ( entity.HasEnergyManager() )
 						{
 							ContainerWithElectricManager iwem = new ContainerWithElectricManager( this, -1 );
-							iwem.SetEntity( entity );
+							iwem.SetEntity( entity, false );
 							new_showed_items.Insert( entity, iwem );
 							showed_items_IDs.Insert( entity.GetID(), iwem );
 						}
@@ -460,13 +461,12 @@ class VicinityContainer: CollapsibleContainer
 						{
 							if ( entity.IsInherited( PlayerBase ) )
 							{
-								
-								if( !PlayerBase.DEBUG_INVENTORY_ACCESS && entity.IsAlive() && ( !PlayerBase.Cast( entity ).IsUnconscious() && !PlayerBase.Cast( entity ).IsRestrained() ) )
+								if ( !PlayerBase.DEBUG_INVENTORY_ACCESS && entity.IsAlive() && ( !PlayerBase.Cast( entity ).IsUnconscious() && !PlayerBase.Cast( entity ).IsRestrained() ) )
 								{
 									continue;
 								}
 								
-								PlayerContainer plyr_cnt = new PlayerContainer( m_Parent );
+								PlayerContainer plyr_cnt = new PlayerContainer( m_Parent, false );
 								plyr_cnt.SetPlayer( PlayerBase.Cast( entity ) );
 								Container.Cast( GetParent() ).Insert( plyr_cnt );
 								( Container.Cast( m_Parent ) ).Refresh();
@@ -476,7 +476,7 @@ class VicinityContainer: CollapsibleContainer
 							else
 							{
 								ContainerWithCargoAndAttachments iwcas = new ContainerWithCargoAndAttachments( this, -1 );
-								iwcas.SetEntity( entity );
+								iwcas.SetEntity( entity, false );
 								new_showed_items.Insert( entity, iwcas );
 								showed_items_IDs.Insert( entity.GetID(), iwcas );
 							}
@@ -485,12 +485,11 @@ class VicinityContainer: CollapsibleContainer
 				}
 				else
 				{
-					if( m_ShowedItems.Get( entity ) )
+					if ( m_ShowedItems.Get( entity ) )
 					{
 						if ( entity.IsInherited( PlayerBase ) )
 						{
-							
-							if( !PlayerBase.DEBUG_INVENTORY_ACCESS && entity.IsAlive() && ( !PlayerBase.Cast( entity ).IsUnconscious() && !PlayerBase.Cast( entity ).IsRestrained() ) )
+							if ( !PlayerBase.DEBUG_INVENTORY_ACCESS && entity.IsAlive() && ( !PlayerBase.Cast( entity ).IsUnconscious() && !PlayerBase.Cast( entity ).IsRestrained() ) )
 							{
 								continue;
 							}
@@ -515,18 +514,18 @@ class VicinityContainer: CollapsibleContainer
 		for ( i = 0; i < cargoes.Count(); i++ )
 		{
 			CargoBase cgo = cargoes.Get( i );
-			if( cgo)
+			if ( cgo )
 			{
 				if (game_inventory && !m_ShowedCargos.Contains( cgo ) )
 				{
 					ContainerWithCargo pxc = new ContainerWithCargo( this, -1 );
-					pxc.SetEntity( cgo.GetCargoOwner(), cgo.GetOwnerCargoIndex() );
+					pxc.SetEntity( cgo.GetCargoOwner(), cgo.GetOwnerCargoIndex(), false );
 					new_showed_cargos.Insert( cgo, pxc );
 					pxc.UpdateInterval();
 				}
 				else
 				{
-					if( m_ShowedCargos.Get( cgo ) )
+					if ( m_ShowedCargos.Get( cgo ) )
 					{
 						new_showed_cargos.Insert( cgo, m_ShowedCargos.Get( cgo ) );
 					}
@@ -541,7 +540,7 @@ class VicinityContainer: CollapsibleContainer
 		{
 			EntityAI ent = m_ShowedItems.GetKey( i );
 			m_ShowedItems.GetElement( i ).UpdateInterval();
-			if( !new_showed_items.Contains( ent ) )
+			if ( !new_showed_items.Contains( ent ) )
 			{
 				Container con = m_ShowedItems.GetElement( i );
 				GetMainWidget().Update();
@@ -554,7 +553,7 @@ class VicinityContainer: CollapsibleContainer
 		{
 			CargoBase cgo2 = m_ShowedCargos.GetKey( ic );
 			m_ShowedCargos.GetElement( ic ).UpdateInterval();
-			if( !new_showed_cargos.Contains( cgo2 ) )
+			if ( !new_showed_cargos.Contains( cgo2 ) )
 			{
 				Container con2 = m_ShowedCargos.GetElement( ic );
 				GetMainWidget().Update();
@@ -570,10 +569,10 @@ class VicinityContainer: CollapsibleContainer
 		UpdateCollapseButtons();
 		m_VicinityIconsContainer.ShowItemsInContainers( m_ShowedItemIcons );
 		
-		if( m_ShowedItemIcons.Count() < m_OldShowedItemIconsCount )
+		if ( m_ShowedItemIcons.Count() < m_OldShowedItemIconsCount )
 		{
 			Inventory in = Inventory.Cast( GetRoot() );
-			if( in )
+			if ( in )
 				in.UpdateConsoleToolbar();	
 		}
 	}
@@ -582,12 +581,12 @@ class VicinityContainer: CollapsibleContainer
 	{
 		Container cont = conta;
 		ClosableContainer c;
-		if( cont )
+		if ( cont )
 		{
-			if( cont.IsInherited( ClosableContainer ) )
+			if ( cont.IsInherited( ClosableContainer ) )
 			{
 				c = ClosableContainer.Cast( cont );
-				if( c.IsOpened() )
+				if ( c.IsOpened() )
 				{
 					c.Close();
 				}
@@ -596,16 +595,16 @@ class VicinityContainer: CollapsibleContainer
 					c.Open();
 				}
 			}
-			else if( cont.IsInherited( VicinitySlotsContainer ) )
+			else if ( cont.IsInherited( VicinitySlotsContainer ) )
 			{
 				VicinitySlotsContainer c2 = VicinitySlotsContainer.Cast( cont );
-				if( m_VicinityIconsContainer == c2 )
+				if ( m_VicinityIconsContainer == c2 )
 				{
 					EntityAI e = c2.GetFocusedItem();
 					c = ClosableContainer.Cast( m_ShowedItems.Get( e ) );
-					if( c )
+					if ( c )
 					{
-						if( c.IsOpened() )
+						if ( c.IsOpened() )
 						{
 							c.Close();
 						}
@@ -616,7 +615,7 @@ class VicinityContainer: CollapsibleContainer
 					}
 				}
 			}
-			else if( cont.IsInherited( CollapsibleContainer ) )
+			else if ( cont.IsInherited( CollapsibleContainer ) )
 			{
 				CollapsibleContainer c3 = CollapsibleContainer.Cast( cont );
 				c3.CollapseButtonOnMouseButtonDown( null );
@@ -634,7 +633,7 @@ class VicinityContainer: CollapsibleContainer
 		w.Update();
 		float x, y;
 		w.GetScreenSize( x, y );
-		if( w == GetMainWidget() )
+		if ( w == GetMainWidget() )
 		{
 			GetMainWidget().Update();
 			m_Parent.OnChildRemove( w, child );
@@ -644,7 +643,7 @@ class VicinityContainer: CollapsibleContainer
 	
 	override bool OnChildAdd( Widget w, Widget child )
 	{
-		if( w == GetMainWidget() )
+		if ( w == GetMainWidget() )
 		{
 			GetMainWidget().Update();
 			m_Parent.OnChildAdd( w, child );

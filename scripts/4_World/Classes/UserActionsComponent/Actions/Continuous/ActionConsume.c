@@ -48,7 +48,7 @@ class ActionConsume: ActionContinuousBase
 		PluginTransmissionAgents plugin = PluginTransmissionAgents.Cast( GetPlugin(PluginTransmissionAgents) );
 		plugin.TransmitAgents(player, item, AGT_UACTION_TO_ITEM);
 		
-		if ( action_data.m_Player.HasBloodyHands() && !action_data.m_Player.GetInventory().FindAttachment( InventorySlots.GLOVES ) )
+		if ( action_data.m_Player.HasBloodyHandsEx() == eBloodyHandsTypes.SALMONELA && !action_data.m_Player.GetInventory().FindAttachment( InventorySlots.GLOVES ) )
 		{
 			action_data.m_Player.SetBloodyHandsPenalty();
 		}

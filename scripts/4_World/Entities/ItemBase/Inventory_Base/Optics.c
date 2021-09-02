@@ -11,3 +11,4 @@ class GrozaOptic : ItemOptics {};
 class KobraOptic : ItemOptics {};
 class KazuarOptic: ItemOptics {};
 class ACOGOptic_6x : ItemOptics {};
+class StarlightOptic: ItemOptics {};

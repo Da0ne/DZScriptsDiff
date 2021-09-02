@@ -165,7 +165,7 @@ class DayZPlayerUtils
 	 * @param[out]	mags	\p	array filled with suitable magazines
 	 * @returns		true if found at least one
 	 **/
-	static proto native bool FindMagazinesForAmmo (DayZPlayer player, string ammoTypeName, out array<Magazine> mags);
+	static proto native bool FindMagazinesForAmmo(DayZPlayer player, string ammoTypeName, out array<Magazine> mags);
 	
 	/*static bool HandleEjectMagazine (DayZPlayer player, Weapon weapon, int muzzleIndex)
 	{
@@ -182,7 +182,7 @@ class DayZPlayerUtils
 		return false;
 	}*/
 
-	static Magazine SelectStoreCartridge (DayZPlayer player, Weapon_Base weapon, int muzzleIndex, Magazine exclude_mag, float damage, string magTypeName)
+	static Magazine SelectStoreCartridge(DayZPlayer player, Weapon_Base weapon, int muzzleIndex, Magazine exclude_mag, float damage, string magTypeName)
 	{
 		if (damage < 1.0)
 		{
@@ -233,7 +233,7 @@ class DayZPlayerUtils
 		return NULL;
 	}
 
-	static bool HandleDropMagazine (DayZPlayer player, Magazine mag)
+	static bool HandleDropMagazine(DayZPlayer player, Magazine mag)
 	{
 		vector m4[4];
 		Math3D.MatrixIdentity4(m4);
@@ -252,7 +252,7 @@ class DayZPlayerUtils
 		}
 	}
 	
-	static bool HandleDropCartridge (DayZPlayer player, float damage, string cartTypeName, string magTypeName)
+	static bool HandleDropCartridge(DayZPlayer player, float damage, string cartTypeName, string magTypeName)
 	{
 		vector pos = player.GetPosition();
 		EntityAI eai_gnd = player.SpawnEntityOnGroundPos(magTypeName, pos);
@@ -344,20 +344,20 @@ class DayZPlayerUtils
 	 * @param[in]	capsules	\p	array filled with capsules @see ComponentCollisionCapsule
 	 * @returns		true if success
 	 **/
-	static proto native bool InitComponentCollisions (Human player, array<ref ComponentCollisionBox> boxes, array<ref ComponentCollisionCapsule> capsules);
+	static proto native bool InitComponentCollisions(Human player, array<ref ComponentCollisionBox> boxes, array<ref ComponentCollisionCapsule> capsules);
 
 	/**@fn		IsComponentCollisionInitialized
 	 * @returns		true if already initialized
 	 **/
-	static proto native bool IsComponentCollisionInitialized ();
+	static proto native bool IsComponentCollisionInitialized();
 
 	/**@fn		ClearComponentCollisions
 	 **/
-	static proto native void ClearComponentCollisions ();
+	static proto native void ClearComponentCollisions();
 
 	static proto native vector GetMemoryPointPositionBoneRelative(DayZPlayer pPlayer, int pBoneIndex, int pPointIndex);
 	
-	static void InitPlayerComponentCollisions (Human player)
+	static void InitPlayerComponentCollisions(Human player)
 	{
 		if (IsComponentCollisionInitialized())
 			Error("DayZPlayerUtils.InitComponentCollisions: already initialized!");
@@ -435,7 +435,7 @@ class ComponentCollisionBox
 	string m_BoneName0;
 	string m_BoneName1;
 
-	void ComponentCollisionBox (float x, float y, float z, string b0, string b1)
+	void ComponentCollisionBox(float x, float y, float z, string b0, string b1)
 	{
 		m_Offset[0] = x;
 		m_Offset[1] = y;
@@ -451,12 +451,10 @@ class ComponentCollisionCapsule
 	string m_BoneName0;
 	string m_BoneName1;
 
-	void ComponentCollisionCapsule (float r, string b0, string b1)
+	void ComponentCollisionCapsule(float r, string b0, string b1)
 	{
 		m_Radius = r;
 		m_BoneName0 = b0;
 		m_BoneName1 = b1;
 	}
 };
-
-

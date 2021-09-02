@@ -24,6 +24,25 @@ class GrenadeLight extends PointLightBase
 	}
 }
 
+class FlashGrenadeLight extends PointLightBase
+{
+	protected static float m_DefaultBrightness = 50;
+	protected static float m_DefaultRadius = 20;
+	
+	void FlashGrenadeLight()
+	{
+		SetVisibleDuringDaylight( true );
+		SetRadiusTo( m_DefaultRadius );
+		SetBrightnessTo( m_DefaultBrightness );
+		SetFlareVisible( false );
+		SetAmbientColor( 1.0, 1.0, 1.0 );
+		SetDiffuseColor( 1.0, 1.0, 1.0 );
+		SetLifetime( 0.35 );
+		SetDisableShadowsWithinRadius( -1 );
+	}
+}
+
+
 class Grenade_Base extends InventoryItemSuper
 {
 	protected const float DEFAULT_FUSE_DELAY 	= 10;
@@ -316,6 +335,8 @@ class Grenade_Base extends InventoryItemSuper
 	override void SetActions()
 	{
 		super.SetActions();
+		AddAction(ActionAttach);
+		AddAction(ActionDetach);
 		AddAction(ActionUnpin);
 		AddAction(ActionPin);
 	}

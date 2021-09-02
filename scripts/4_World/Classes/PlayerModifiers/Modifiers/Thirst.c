@@ -9,6 +9,7 @@ class ThirstMdfr: ModifierBase
 		m_ID 					= eModifiers.MDF_THIRST;
 		m_TickIntervalInactive 	= DEFAULT_TICK_TIME_INACTIVE;
 		m_TickIntervalActive 	= 1;
+		DisableDeactivateCheck();
 	}		
 
 	override bool ActivateCondition(PlayerBase player)

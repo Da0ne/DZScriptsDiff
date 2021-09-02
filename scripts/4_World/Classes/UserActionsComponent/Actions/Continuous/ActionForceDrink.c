@@ -26,6 +26,20 @@ class ActionForceDrink: ActionForceConsume
 	{
 		return "#give_drink";
 	}
+	
+	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
+	{
+		if (!super.ActionCondition( player, target, item))
+			return false;
+		
+		PlayerBase target_player = PlayerBase.Cast(target.GetObject());
+		
+		if (target_player)
+			return target_player.CanEatAndDrink();
+		else
+			return false;
+	}
+	
 };
 	
 	

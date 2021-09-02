@@ -141,7 +141,7 @@ class HandEventBase
 	bool ReserveInventory()
 	{
 		InventoryLocation dst = GetDst();
-		if( !m_Player.GetHumanInventory().AddInventoryReservationEx(dst.GetItem(), dst, GameInventory.c_InventoryReservationTimeoutShortMS) )
+		if( dst && !m_Player.GetHumanInventory().AddInventoryReservationEx(dst.GetItem(), dst, GameInventory.c_InventoryReservationTimeoutShortMS) )
 		{
 			return false;
 		}
@@ -151,7 +151,10 @@ class HandEventBase
 	void ClearInventoryReservation()
 	{
 		InventoryLocation dst = GetDst();
-		m_Player.GetHumanInventory().ClearInventoryReservationEx(dst.GetItem(), dst);
+		if(dst)
+		{
+			m_Player.GetHumanInventory().ClearInventoryReservationEx(dst.GetItem(), dst);
+		}
 	}
 };
 

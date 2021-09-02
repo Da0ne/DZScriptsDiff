@@ -1,6 +1,6 @@
 const int MAX_NUMBER_OF_INGREDIENTS = 2;
 const int MAXIMUM_RESULTS = 10;
-
+const float DEFAULT_SPAWN_DISTANCE = 0.5;
 class RecipeBase
 {
 	string m_ItemsToCreate[MAXIMUM_RESULTS];
@@ -40,13 +40,14 @@ class RecipeBase
 	bool m_ResultSetFullQuantity[MAXIMUM_RESULTS];
 	float m_ResultSetQuantity[MAXIMUM_RESULTS];
 	float m_ResultSetHealth[MAXIMUM_RESULTS];
+	float m_ResultSpawnDistance[MAXIMUM_RESULTS];
 	int m_ResultToInventory[MAXIMUM_RESULTS];
 	int m_ResultInheritsHealth[MAXIMUM_RESULTS];
 	int m_ResultInheritsColor[MAXIMUM_RESULTS];
 	int	m_ResultReplacesIngredient[MAXIMUM_RESULTS];
 	bool m_ResultUseSoftSkills[MAXIMUM_RESULTS];
 	
-
+	
 
 	void RecipeBase()
 	{
@@ -55,6 +56,11 @@ class RecipeBase
 		{
 			m_Ingredients[i] = new array<string>;
 			m_IngredientsSorted[i] = NULL;
+		}
+		
+		for(i = 0; i < MAXIMUM_RESULTS; i++)
+		{
+			m_ResultSpawnDistance[i] = DEFAULT_SPAWN_DISTANCE;
 		}
 
 		m_NumberOfResults = 0;
@@ -159,6 +165,8 @@ class RecipeBase
 	{
 		return m_IsInstaRecipe;
 	}
+	
+	
 
 	//spawns results in the world
 	void SpawnItems(ItemBase ingredients[], PlayerBase player, array<ItemBase> spawned_objects/*out*/)
@@ -209,7 +217,7 @@ class RecipeBase
 			if( !object )
 			{
 				//spawning in inventory failed, spawning on the ground instead.....
-				object = player.SpawnEntityOnGroundOnCursorDir(item_to_spawn, 0.5);
+				object = player.SpawnEntityOnGroundOnCursorDir(item_to_spawn, m_ResultSpawnDistance[i]);
 				if( !object)
 				{
 					Error("failed to spawn entity "+item_to_spawn+" , make sure the classname exists and item can be spawned");

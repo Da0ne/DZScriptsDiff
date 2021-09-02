@@ -9,12 +9,29 @@ enum EPlayerSoundEventType
 	//HEAT_COMFORT	= 0x00000040,
 }
 
+enum EPlayerSoundEventParam
+{
+	SKIP_CONTROLLED_PLAYER 	= 0x00000001,
+	HIGHEST_PRIORITY		= 0x00000002,
+	
+	// ONLY COUNT BELLOW
+	ENUM_COUNT,
+	/*
+	STAMINA 	= 0x00000004,
+	DAMAGE 		= 0x00000008,
+	DUMMY 		= 0x00000010,
+	INJURY 		= 0x00000020,
+	HEAT_COMFORT	= 0x00000040,
+	*/
+}
+
 class PlayerSoundEventBase extends SoundEventBase
 {
 	PlayerBase 	m_Player;
 	float		m_DummySoundLength;
 	float 		m_DummyStartTime;
 	bool		m_IsDummyType;
+	
 	float 		m_PlayTime;
 	ref HumanMovementState m_Hms = new HumanMovementState();
 	EPlayerSoundEventType m_HasPriorityOverTypes;
@@ -36,7 +53,8 @@ class PlayerSoundEventBase extends SoundEventBase
 	
 	void ~PlayerSoundEventBase()
 	{
-		if(m_SoundSetCallback) m_SoundSetCallback.Stop();
+		if(!m_SoundSetCallback) 
+			OnEnd();
 	}
 	
 	int GetSoundVoiceAnimEventClassID()
@@ -85,22 +103,34 @@ class PlayerSoundEventBase extends SoundEventBase
 	
 	void Init(PlayerBase player)
 	{
+		InitEx(player,0);
+	}
+	
+	void InitEx(PlayerBase player, int param)
+	{
 		m_Player = player;
+		m_Param = param;
+		if (param & EPlayerSoundEventParam.HIGHEST_PRIORITY)
+		{
+			m_HasPriorityOverTypes = -1;
+		}
 	}
 	
 	void OnEnd()
 	{
-		//PrintString("OnEnd - " + this.ToString());
+
 	}
 	
 	void OnInterupt()
 	{
-		//PrintString("OnInterupt - " + this.ToString());
+
 	}
 	
 	override void OnPlay(PlayerBase player)
 	{
-
+		super.OnPlay(player);
+		//Print("start playing -------------------->" + m_Type);
+		player.OnVoiceEvent();
 	}
 
 	override bool Play()

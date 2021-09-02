@@ -184,10 +184,10 @@ class PluginDeveloper extends PluginBase
 	}
 	void OnRPCSpawnEntity(PlayerBase player, ParamsReadContext ctx)
 	{
-		ref Param3<string, float, float> p = new Param3<string, float, float>("", 0, 0);
+		ref Param4<string, float, float,bool> p = new Param4<string, float, float, bool>("", 0, 0, false);
 		if ( ctx.Read(p) )
 		{
-			SpawnEntityInInventory(player, p.param1, p.param2,  p.param3);
+			SpawnEntityInInventory(player, p.param1, p.param2,  p.param3, p.param4);
 		}
 	}
 
@@ -200,7 +200,7 @@ class PluginDeveloper extends PluginBase
 	void OnSpawnErrorReport (string name)
 	{
 		PrintString("PluginDeveloper.SpawnEntity() Warning- Cant spawn object: " + name);
-		DumpStack();
+		//DumpStack();
 		PrintString("PluginDeveloper.SpawnEntity() Warning END");
 	}
 
@@ -264,7 +264,7 @@ class PluginDeveloper extends PluginBase
 			
 			if ( entity )
 			{
-				if ( health < 0 && entity.HasDamageSystem() )//check for default (-1)
+				if ( health < 0 && entity.GetMaxHealth() > 0)//check for default (-1)
 				{
 					health = entity.GetMaxHealth();
 				}
@@ -293,14 +293,14 @@ class PluginDeveloper extends PluginBase
 	 * @param[in]	quantity	\p	quantity to set if item.HasQuantity() (-1 == set to max)
 	 * @return	entity if ok, null otherwise
 	 **/
-	EntityAI SpawnEntityInInventory( PlayerBase player, string item_name, float health, float quantity)
+	EntityAI SpawnEntityInInventory( PlayerBase player, string item_name, float health, float quantity, bool special = false)
 	{
 		if ( player )
 		{
 			if ( GetGame().IsServer() )
 			{		
 				InventoryLocation il = new InventoryLocation;
-				if (player.GetInventory().FindFirstFreeLocationForNewEntity(item_name, FindInventoryLocationType.ANY, il))
+				if (player.GetInventory() && player.GetInventory().FindFirstFreeLocationForNewEntity(item_name, FindInventoryLocationType.ANY, il))
 				{
 					Weapon_Base wpn = Weapon_Base.Cast(il.GetParent());
 					bool is_mag = il.GetSlot() == InventorySlots.MAGAZINE || il.GetSlot() == InventorySlots.MAGAZINE2 || il.GetSlot() == InventorySlots.MAGAZINE3;
@@ -326,6 +326,8 @@ class PluginDeveloper extends PluginBase
 							}
 							ItemBase i = ItemBase.Cast( eai );
 							SetupSpawnedItem(i, health, quantity);
+							if ( special )
+								eai.OnDebugSpawn();
 						}
 						return eai;
 					}
@@ -337,7 +339,7 @@ class PluginDeveloper extends PluginBase
 			else
 			{		
 				// Client -> Server Spawning: Client Side
-				ref Param3<string, float, float> params = new Param3<string, float, float>(item_name, health, quantity);
+				ref Param4<string, float, float, bool> params = new Param4<string, float, float, bool>(item_name, health, quantity, special);
 				player.RPCSingleParam(ERPCs.DEV_RPC_SPAWN_ITEM_IN_INVENTORY, params, true);
 			}
 		}

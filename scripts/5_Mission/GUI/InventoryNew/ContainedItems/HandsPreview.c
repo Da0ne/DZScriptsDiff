@@ -21,7 +21,7 @@ class HandsPreview: LayoutHolder
 
 	void RefreshQuantity( EntityAI m_Item_to_refresh )
 	{
-		if( m_Icon )
+		if ( m_Icon )
 		{
 			m_Icon.SetQuantity();
 		}
@@ -52,9 +52,9 @@ class HandsPreview: LayoutHolder
 		bool show_combine_swap = ItemManager.GetInstance().IsDragging();
 
 		#ifdef PLATFORM_CONSOLE
-		if( m_Icon && !m_Icon.IsDragged() && GetGame().GetInput().IsEnabledMouseAndKeyboardEvenOnServer() )
+		if ( m_Icon && !m_Icon.IsDragged() && GetGame().GetInput().IsEnabledMouseAndKeyboardEvenOnServer() )
 		#else
-		if( m_Icon && !m_Icon.IsDragged() )
+		if ( m_Icon && !m_Icon.IsDragged() )
 		#endif
 		{
 			m_Icon.GetMainWidget().FindAnyWidget( "Combine" ).Show(  show_combine_swap );
@@ -75,7 +75,7 @@ class HandsPreview: LayoutHolder
 		
 		m_Icon = new Icon( this, true );
 		m_Icon.Refresh();
-		if( m_Icon )
+		if ( m_Icon )
 		{
 			m_Item = item;
 			m_Icon.Init( m_Item );

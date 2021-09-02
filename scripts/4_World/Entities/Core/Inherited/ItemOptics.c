@@ -12,12 +12,13 @@ class ItemOptics extends InventoryItemSuper
 	string 				m_2D_preload_type;
 	ref array<float> 	m_mask_array;
 	ref array<float> 	m_lens_array;
-	ref array<float> 	m_OpticsDOFProperties = new array<float>;
+	ref array<float> 	m_OpticsDOFProperties;
 		
 	void ItemOptics()
 	{
 		m_mask_array = new array<float>;
 		m_lens_array = new array<float>;
+		m_OpticsDOFProperties = new array<float>;
 		InitReddotData();
 		InitOpticsPPInfo();
 		InitCameraOverrideProperties();
@@ -333,7 +334,7 @@ class ItemOptics extends InventoryItemSuper
 		string path = "cfgVehicles " + GetType() + " OpticsInfo";
 		if ( GetGame().ConfigIsExisting(path + " nearPlaneDistanceOverride") )
 		{
-			m_nearplane_override = GetGame().ConfigGetFloat(path + " nearPlaneDistanceOverride");
+			m_nearplane_override = Math.Max(GetGame().ConfigGetFloat(path + " nearPlaneDistanceOverride"),DayZPlayerCameraBase.CONST_NEARPLANE_OPTICS_MIN);
 		}
 		else
 		{
@@ -368,7 +369,7 @@ class ItemOptics extends InventoryItemSuper
 		return m_isNVOptic;
 	}
 	
-	ref array<float> GetOpticsDOF ()
+	ref array<float> GetOpticsDOF()
 	{
 		return m_OpticsDOFProperties;
 	}

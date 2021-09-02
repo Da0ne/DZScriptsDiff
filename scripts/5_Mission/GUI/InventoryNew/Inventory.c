@@ -11,6 +11,7 @@ enum ConsoleToolbarType
 	//Local Player
 	PLAYER_EQUIPMENT_SLOTS_ITEM,
 	PLAYER_EQUIPMENT_SLOTS_ITEM_WITH_CARGO,
+	PLAYER_EQUIPMENT_SLOTS_ITEM_WITH_QUANTITY,
 	PLAYER_EQUIPMENT_SLOTS_ITEM_WITH_ATTACHMENTS,
 	PLAYER_EQUIPMENT_SLOTS_ITEM_FREE,
 	
@@ -119,7 +120,6 @@ class Inventory: LayoutHolder
 		m_RightArea = new RightArea( this );
 		m_HandsArea = new HandsArea( this );
 		m_PlayerPreview = new PlayerPreview( this );
-		
 
 		m_QuickbarWidget = GetMainWidget().FindAnyWidget( "QuickbarGrid" );
 		m_Quickbar = new InventoryQuickbar( m_QuickbarWidget );
@@ -1317,6 +1317,8 @@ class Inventory: LayoutHolder
 				return to_hands_swap + to_inventory + drop + micromanagment + quickslot;
 			case ConsoleToolbarType.PLAYER_EQUIPMENT_SLOTS_ITEM_WITH_CARGO:
 				return open_close_container + to_hands_swap + drop + micromanagment + quickslot;
+			case ConsoleToolbarType.PLAYER_EQUIPMENT_SLOTS_ITEM_WITH_QUANTITY:
+				return to_hands_swap + to_inventory + drop + micromanagment + quickslot;
 			case ConsoleToolbarType.PLAYER_EQUIPMENT_SLOTS_ITEM_WITH_ATTACHMENTS:
 				return open_close_container + to_hands_swap + drop + micromanagment + quickslot;
 			case ConsoleToolbarType.PLAYER_EQUIPMENT_SLOTS_ITEM_FREE:
@@ -1730,6 +1732,10 @@ class Inventory: LayoutHolder
 				else if( player_container.IsItemWithContainerActive() )
 				{
 					context_text = ConsoleToolbarTypeToString( ConsoleToolbarType.PLAYER_EQUIPMENT_SLOTS_ITEM_WITH_CARGO );
+				}
+				else if( player_container.IsItemWithQuantityActive() )
+				{
+					context_text = ConsoleToolbarTypeToString( ConsoleToolbarType.PLAYER_EQUIPMENT_SLOTS_ITEM_WITH_QUANTITY );
 				}
 				else if( player_container.IsEmptyItemActive() )
 				{

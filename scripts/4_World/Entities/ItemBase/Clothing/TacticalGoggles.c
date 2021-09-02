@@ -5,5 +5,9 @@ class TacticalGoggles extends Clothing
 		if(!super.CanPutAsAttachment(parent)) {return false;}
 		return CanWearUnderMask( parent );
 	}
-
+	
+	override int GetGlassesEffectID()
+	{
+		return PPERequesterBank.REQ_GLASSESTACTICAL;
+	}
 };

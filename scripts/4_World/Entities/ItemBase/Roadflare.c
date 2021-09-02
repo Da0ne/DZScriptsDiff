@@ -471,6 +471,8 @@ class Roadflare : ItemBase
 	{
 		super.SetActions();
 		
+		AddAction(ActionAttach);
+		AddAction(ActionDetach);
 		AddAction(ActionLightItemOnFire);
 		AddAction(ActionTurnOnWhileInHands);
 	}

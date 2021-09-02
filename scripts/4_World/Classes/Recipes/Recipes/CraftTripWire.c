@@ -35,6 +35,7 @@ class CraftTripWire extends RecipeBase
 		//ingredient 2
 		InsertIngredient(1,"MetalWire");//you can insert multiple ingredients this way
 		InsertIngredient(1,"BarbedWire");//you can insert multiple ingredients this way
+		InsertIngredient(1,"Rope");//you can insert multiple ingredients this way
 		
 		m_IngredientAddHealth[1] = 0;// 0 = do nothing
 		m_IngredientSetHealth[1] = -1; // -1 = do nothing
@@ -58,11 +59,23 @@ class CraftTripWire extends RecipeBase
 
 	override bool CanDo(ItemBase ingredients[], PlayerBase player)//final check for recipe's validity
 	{
-		return false;
+		return true;
 	}
 
 	override void Do(ItemBase ingredients[], PlayerBase player,array<ItemBase> results, float specialty_weight)//gets called upon recipe's completion
 	{
 		Debug.Log("Recipe Do method called","recipes");
+		
+		// We will save the wire type for decrafting
+		TripwireTrap tripWire = TripwireTrap.Cast( results[0] );
+		if ( tripWire )
+		{
+			if ( ingredients[1].IsInherited( MetalWire ) )
+				tripWire.SetWireType( eWireMaterial.WIRE );
+			else if ( ingredients[1].IsInherited( BarbedWire ) )
+				tripWire.SetWireType( eWireMaterial.BARBED_WIRE );
+			else if ( ingredients[1].IsInherited( Rope ) )
+				tripWire.SetWireType( eWireMaterial.ROPE );
+		}
 	}
 };

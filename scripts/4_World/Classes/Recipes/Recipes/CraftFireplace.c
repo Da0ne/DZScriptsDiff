@@ -116,6 +116,7 @@ class CraftFireplace extends RecipeBase
 			ItemBase attachment1 = ItemBase.Cast( result.GetInventory().CreateAttachment( ingredient1_classname ) );
 			MiscGameplayFunctions.TransferItemProperties( ingredient1, attachment1 );
 			attachment1.SetQuantity( 1 );
+			attachment1.SetCleanness(0);
 			
 			//set quantity to ingredient
 			ingredient1.AddQuantity( -1 );
@@ -139,7 +140,7 @@ class CraftFireplace extends RecipeBase
 			ItemBase attachment2 = ItemBase.Cast( result.GetInventory().CreateAttachment( ingredient2_classname ) );
 			MiscGameplayFunctions.TransferItemProperties( ingredient2, attachment2 );
 			attachment2.SetQuantity( 1 );
-			
+			attachment2.SetCleanness(0);
 			//set quantity to ingredient
 			ingredient2.AddQuantity( -1 );
 		}

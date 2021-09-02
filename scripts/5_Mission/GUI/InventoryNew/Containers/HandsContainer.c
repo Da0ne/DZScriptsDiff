@@ -14,7 +14,6 @@ class HandsContainer: Container
 	protected ref array<int>								m_AttachmentSlotsSorted;
 	
 	protected int											m_StaticAttCount = 0;
-	EntityAI m_am_entity1, m_am_entity2;
 	
 	protected ScrollWidget									m_ScrollWidget;
 
@@ -34,7 +33,7 @@ class HandsContainer: Container
 		m_Body.Insert( m_HandsPreview );
 		
 		ItemBase hands_item = ItemBase.Cast( GetGame().GetPlayer().GetHumanInventory().GetEntityInHands() );
-		if( hands_item )
+		if ( hands_item )
 			m_HandsPreview.CreateNewIcon( hands_item );
 		
 		m_ScrollWidget						= ScrollWidget.Cast( m_RootWidget.GetParent().GetParent() );
@@ -42,11 +41,12 @@ class HandsContainer: Container
 	
 	void ~HandsContainer()
 	{
-		if( m_Entity )
+		if ( m_Entity )
 		{
 			m_Entity.GetOnItemAttached().Remove( AttachmentAdded );
 			m_Entity.GetOnItemDetached().Remove( AttachmentRemoved );
 		}
+		
 		m_AttachmentCargos.Clear();
 		m_AttachmentAttachmentsContainers.Clear();
 		m_AttachmentAttachments.Clear();
@@ -76,12 +76,14 @@ class HandsContainer: Container
 	{
 		ItemManager.GetInstance().HideTooltip( );
 		
-		if( !IsLastIndex() )
+		if ( !IsLastIndex() )
 		{
-			if( GetFocusedContainer() )
+			if ( GetFocusedContainer() )
 				GetFocusedContainer().SetActive( false );
+			
 			++m_ActiveIndex;
-			if( GetFocusedContainer() )
+			
+			if ( GetFocusedContainer() )
 				GetFocusedContainer().SetActive( true );
 		}
 		
@@ -90,12 +92,14 @@ class HandsContainer: Container
 
 	override void SetPreviousActive( bool force = false )
 	{
-		if( !IsFirstIndex() )
+		if ( !IsFirstIndex() )
 		{
-			if( GetFocusedContainer() )
+			if ( GetFocusedContainer() )
 				GetFocusedContainer().SetActive( false );
+			
 			m_ActiveIndex--;
-			if( GetFocusedContainer() )
+			
+			if ( GetFocusedContainer() )
 				GetFocusedContainer().SetActive( true );
 		}
 		
@@ -110,31 +114,31 @@ class HandsContainer: Container
 		int attachment_end_index = -1;
 		int cargo_end_index = -1;
 		
-		if( m_Atts || m_AttachmentAttachments.Count() > 0 )
+		if ( m_Atts || m_AttachmentAttachments.Count() > 0 )
 		{
 			attachment_start_index = 0;
-			if( m_Atts )
+			if ( m_Atts )
 				attachment_end_index++;
 			attachment_end_index += m_AttachmentAttachments.Count();
 		}
 		
-		if( m_CargoGrid || m_AttachmentCargos.Count() > 0 )
+		if ( m_CargoGrid || m_AttachmentCargos.Count() > 0 )
 		{
 			cargo_start_index = attachment_end_index + 1;
-			if( m_CargoGrid )
+			if ( m_CargoGrid )
 				cargo_end_index++;
 			cargo_end_index += cargo_start_index + m_AttachmentCargos.Count();
 		}
 		
-		if( index == -1 )
+		if ( index == -1 )
 		{
 			
 		}
-		else if( index.InRange( 0, attachment_end_index ) )
+		else if ( index.InRange( 0, attachment_end_index ) )
 		{
-			if( m_Atts )
+			if ( m_Atts )
 			{
-				if( index == 0 )
+				if ( index == 0 )
 				{
 					return m_Atts.GetWrapper();
 				}
@@ -148,11 +152,11 @@ class HandsContainer: Container
 				return m_AttachmentAttachments.GetElement( index ).GetWrapper();
 			}
 		}
-		else if( index.InRange( cargo_start_index, cargo_end_index ) )
+		else if ( index.InRange( cargo_start_index, cargo_end_index ) )
 		{
-			if( m_CargoGrid )
+			if ( m_CargoGrid )
 			{
-				if( index == cargo_start_index )
+				if ( index == cargo_start_index )
 				{
 					return m_CargoGrid;
 				}
@@ -177,31 +181,31 @@ class HandsContainer: Container
 		int attachment_end_index = -1;
 		int cargo_end_index = -1;
 		
-		if( m_Atts || m_AttachmentAttachments.Count() > 0 )
+		if ( m_Atts || m_AttachmentAttachments.Count() > 0 )
 		{
 			attachment_start_index = 0;
-			if( m_Atts )
+			if ( m_Atts )
 				attachment_end_index++;
 			attachment_end_index += m_AttachmentAttachments.Count();
 		}
 		
-		if( m_CargoGrid || m_AttachmentCargos.Count() > 0 )
+		if ( m_CargoGrid || m_AttachmentCargos.Count() > 0 )
 		{
 			cargo_start_index = attachment_end_index + 1;
-			if( m_CargoGrid )
+			if ( m_CargoGrid )
 				cargo_end_index++;
 			cargo_end_index += cargo_start_index + m_AttachmentCargos.Count();
 		}
 		
-		if( m_ActiveIndex > m_Body.Count() )
+		if ( m_ActiveIndex > m_Body.Count() )
 		{
 			m_ActiveIndex = m_Body.Count();
 		}
 		
-		if( index == -1 )
+		if ( index == -1 )
 		{
 			#ifdef PLATFORM_CONSOLE
-			if( m_MainWidget.FindAnyWidget("Selected") )
+			if ( m_MainWidget.FindAnyWidget("Selected") )
 				m_MainWidget.FindAnyWidget("Selected").Show( true );
 			#endif
 			m_ScrollWidget.VScrollToPos01( 0 );
@@ -279,9 +283,9 @@ class HandsContainer: Container
 		}
 	}
 	
-	override void Insert( LayoutHolder container, int pos = -1 )
+	override void Insert( LayoutHolder container, int pos = -1, bool immedUpdate = true )
 	{
-		super.Insert( container, pos );
+		super.Insert( container, pos, immedUpdate );
 	}
 
 	void MouseClick2( Widget w, int x, int y, int button )
@@ -1472,7 +1476,7 @@ class HandsContainer: Container
 		
 		if( entity.GetInventory().GetCargo() )
 		{
-			m_CargoGrid = new CargoContainer( this );
+			m_CargoGrid = new CargoContainer( this, false );
 			m_CargoGrid.SetEntity( entity );
 			m_CargoGrid.GetRootWidget().SetSort( 1 );
 			Insert( m_CargoGrid );

@@ -87,28 +87,18 @@ class SplitLongWoodenStick extends RecipeBase
 	{
 		ItemBase ingredient1 = ingredients[0];
 		
-		if( ingredient1.IsEmpty() )
+		if ( ingredient1.IsEmpty() )
 		{
 			return true;
 		}
 		else
 		{
-			return false;
+			return false;	
 		}
 	}
 
 	override void Do(ItemBase ingredients[], PlayerBase player,array<ItemBase> results, float specialty_weight)//gets called upon recipe's completion
 	{
-		ItemBase ingredient = ingredients[0];
-	
-		for (int i=0; i < results.Count(); i++)
-		{
-			ItemBase item_result;
-			Class.CastTo(item_result, results.Get(i));
-			
-			MiscGameplayFunctions.TransferItemProperties(ingredient, item_result);
-		}	
 		
-		super.Do( ingredients, player, results, specialty_weight);
 	}
 };

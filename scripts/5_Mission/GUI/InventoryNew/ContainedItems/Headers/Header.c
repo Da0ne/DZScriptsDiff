@@ -44,10 +44,9 @@ class Header: LayoutHolder
 	
 	void DraggingOverHeader( Widget w, int x, int y, Widget receiver )
 	{
-		if( w == NULL )
-		{
+		if ( w == null )
 			return;
-		}
+
 		Container parent_container = Container.Cast( m_Parent );
 		parent_container.DraggingOverHeader( w, x, y, receiver );
 	}
@@ -61,13 +60,10 @@ class Header: LayoutHolder
 	override void SetActive( bool active )
 	{
 		super.SetActive( active );
-		if( active )
-		{
+		
+		if ( active )
 			GetMainWidget().SetColor( ARGBF( 1, 1, 0, 0 ) );
-		}
 		else
-		{
 			GetMainWidget().SetColor( m_DefaultColor );
-		}
 	}
 }

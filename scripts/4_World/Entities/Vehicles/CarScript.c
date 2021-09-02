@@ -21,6 +21,22 @@ enum CarRearLightType
 	BRAKES_AND_REVERSE
 }
 
+class CarContactData
+{
+	vector localPos;
+	IEntity other;
+	float impulse;
+	
+	void CarContactData(vector _localPos, IEntity _other, float _impulse)
+	{
+		localPos = _localPos;
+		other = _other;
+		impulse = _impulse;
+	}
+}
+
+typedef map<string, ref array<ref CarContactData>> CarContactCache
+
 /*!
 	Base script class for all motorized wheeled vehicles.
 */
@@ -29,6 +45,8 @@ class CarScript extends Car
 	static ref map<typename, ref TInputActionMap> m_CarTypeActionsMap = new map<typename, ref TInputActionMap>;
 	TInputActionMap m_InputActionMap;
 	bool	m_ActionsInitialize;
+	
+	ref CarContactCache m_ContactCache;
 
 	protected float m_Time;
 
@@ -96,6 +114,11 @@ class CarScript extends Car
 	string m_CarDoorOpenSound = "";
 	string m_CarDoorCloseSound = "";
 	
+	ref EffectSound m_CrashSoundLight;
+	ref EffectSound m_CrashSoundHeavy;
+	ref EffectSound m_WindowSmall;
+	ref EffectSound m_WindowLarge;
+	
 	protected bool m_PlayCrashSoundLight;
 	protected bool m_PlayCrashSoundHeavy;
 	
@@ -132,7 +155,9 @@ class CarScript extends Car
 	void CarScript()
 	{
 		SetEventMask(/*EntityEvent.CONTACT |*/ EntityEvent.POSTSIMULATE);
-
+		
+		m_ContactCache = new CarContactCache;
+		
 		m_Time = 0;
 
 		// sets max health for all components at init
@@ -335,7 +360,17 @@ class CarScript extends Car
 			if ( m_RearLight )
 				m_RearLight.Destroy();
 			
+			CleanupSound( m_CrashSoundLight );			
+			CleanupSound( m_CrashSoundHeavy );			
+			CleanupSound( m_WindowSmall );			
+			CleanupSound( m_WindowLarge );
 		}
+	}
+	
+	void CleanupSound(EffectSound sound)
+	{
+		if ( sound )
+			GetGame().GetCallQueue( CALL_CATEGORY_GAMEPLAY ).CallLater( SEffectManager.DestroySound, 100, false, sound );
 	}
 	
 	override void OnVariablesSynchronized()
@@ -473,6 +508,9 @@ class CarScript extends Car
 	override void EOnPostSimulate(IEntity other, float timeSlice)
 	{
 		m_Time += timeSlice;
+		
+		if ( GetGame().IsServer() )
+			CheckContactCache();
 
 		//! move it to constants.c const float CAR_UPDATE_INTERVAL = 1.0
 		if ( m_Time >= GameConstants.CARS_FLUIDS_TICK )
@@ -751,87 +789,102 @@ class CarScript extends Car
 		}
     }
 	
-	
+	//! WARNING: Can be called very frequently in one frame, use with caution
 	override void OnContact( string zoneName, vector localPos, IEntity other, Contact data )
 	{
-
-		if ( zoneName == "" )
+		if ( GetGame().IsServer() )
 		{
-			Print("CarScript >> ERROR >> OnContact dmg zone not defined!");
-			return;
-		}
-		
-		switch ( zoneName )
-		{
-/*
-			case "dmgZone_lightsLF":
-				//Print("dmgZone_lightsLF");
-			break;
+			array<ref CarContactData> ccd;
+			if (!m_ContactCache.Find(zoneName, ccd))
+			{
+				ccd = new array<ref CarContactData>;
+				m_ContactCache.Insert(zoneName, ccd);
+			}
 			
-			case "dmgZone_lightsRF":
-				//Print("dmgZone_lightsRF");
-			break;
-*/
-			default:
-				if ( GetGame().IsServer() && zoneName != "")
-				{
-					float dmgMin = 150.0;	
-					float dmgThreshold = 750.0;
-					float dmgKillCrew = 3000.0;
-					float dmg = data.Impulse * m_dmgContactCoef;
+			ccd.Insert(new CarContactData(localPos, other, data.Impulse));
+		}
+	}
+	
+	//! Responsible for damaging the car according to contact events from OnContact
+	void CheckContactCache()
+	{
+		int contactZonesCount = m_ContactCache.Count();
+		
+		if ( contactZonesCount == 0 )
+			return;
+		
+		bool playLightSound = false;
+		bool playHeavySound = false;
+		
+		for ( int i = 0; i < contactZonesCount; ++i)
+		{
+			string zoneName = m_ContactCache.GetKey(i);
+			array<ref CarContactData> data = m_ContactCache[zoneName];
 
-					if ( dmg < dmgThreshold )
-					{					
-						if ( dmg > dmgMin )
-						{
-							//Print( GetType() + " >>> " + " smlHit >>> " + "zoneName: "  + zoneName + " >>> - " + dmg.ToString() + " HP >>> in " + GetSpeedometer() + " km/h");
-							AddHealth( zoneName, "Health", -dmg);
-							//m_PlayCrashSoundLight = true;
-							SynchCrashLightSound( true );
-						}
-					}
-					else
-					{
-						//Print( GetType() + " >>> " + " BIGHit >>> " + "zoneName: " + zoneName + " >>> - " + dmg.ToString() + " HP >>> in " + GetSpeedometer() + " km/h" );
-						for ( int i =0; i < CrewSize(); i++ )
-						{
-							Human crew = CrewMember( i );
-							if ( !crew )
-								continue;
+			float dmg;
+			
+			int contactCount = data.Count();
+			for ( int j = 0; j < contactCount; ++j )
+				dmg = data[j].impulse * m_dmgContactCoef;
+			
+			if ( dmg < GameConstants.CARS_CONTACT_DMG_MIN )
+				continue;
 
-							PlayerBase player;
-							if ( Class.CastTo(player, crew ) )
-							{
-								if ( dmg > dmgKillCrew )
-								{		
-									player.SetHealth(0.0);
-								}
-								else
-								{
-									//deal shock to player
-									float shockTemp = Math.InverseLerp(dmgThreshold, dmgKillCrew, dmg);
-									float shock = Math.Lerp( 50, 100, shockTemp );
-									float hp = Math.Lerp( 2, 60, shockTemp );
-
-									player.AddHealth("", "Shock", -shock );
-									player.AddHealth("", "Health", -hp );
-									//Print( "SHOCK..........." + shock );
-									//Print( "HEALTH..........." + hp );
-								}
-							}
-						}
-
-						//m_PlayCrashSoundHeavy = true;
-						SynchCrashHeavySound( true );
-						ProcessDirectDamage( DT_CUSTOM, null, zoneName, "EnviroDmg", "0 0 0", dmg );
-					}
-				}
-			break;
+			if ( dmg < GameConstants.CARS_CONTACT_DMG_THRESHOLD )
+			{				
+				playLightSound = true;
+			}
+			else
+			{		
+				DamageCrew(dmg);
+				playHeavySound = true;			
+			}
+			
+			ProcessDirectDamage( DT_CUSTOM, null, zoneName, "EnviroDmg", "0 0 0", dmg );
 		}
 		
+		if (playLightSound)
+			SynchCrashLightSound( true );
+		
+		if (playHeavySound)
+			SynchCrashHeavySound( true );
 		
 		UpdateHeadlightState();
 		UpdateLights();
+		
+		m_ContactCache.Clear();
+	}
+	
+	//! Responsible for damaging crew in a car crash
+	void DamageCrew(float dmg)
+	{
+		for ( int c = 0; c < CrewSize(); ++c )
+		{
+			Human crew = CrewMember( c );
+			if ( !crew )
+				continue;
+
+			PlayerBase player;
+			if ( Class.CastTo(player, crew ) )
+			{
+				if ( dmg > GameConstants.CARS_CONTACT_DMG_KILLCREW )
+				{		
+					player.SetHealth(0.0);
+				}
+				else
+				{
+					float shockTemp = Math.InverseLerp(GameConstants.CARS_CONTACT_DMG_THRESHOLD, GameConstants.CARS_CONTACT_DMG_KILLCREW, dmg);
+					float shock = Math.Lerp( 50, 100, shockTemp );
+					float hp = Math.Lerp( 2, 60, shockTemp );
+
+					// These should ideally be ProcessDirectDamage...
+					player.AddHealth("", "Shock", -shock );
+					player.AddHealth("", "Health", -hp );
+					//Print( "SHOCK..........." + shock );
+					//Print( "HEALTH..........." + hp );
+				}
+			}
+		}
 	}
 
 	/*!
@@ -1502,18 +1555,16 @@ class CarScript extends Car
 	
 	void SynchCrashLightSound( bool play )
 	{
-		m_PlayCrashSoundLight = play;
-		SetSynchDirty();
+		if (m_PlayCrashSoundLight != play)
+		{
+			m_PlayCrashSoundLight = play;
+			SetSynchDirty();
+		}
 	}
 
 	void PlayCrashLightSound()
 	{
-		if ( !GetGame().IsMultiplayer() || GetGame().IsClient() )
-		{		
-			EffectSound sound =	SEffectManager.PlaySound("offroad_hit_light_SoundSet", GetPosition() );
-			sound.SetSoundAutodestroy( true );
-			m_PlayCrashSoundLight = false;
-		}
+		PlaySound("offroad_hit_light_SoundSet", m_CrashSoundLight, m_PlayCrashSoundLight);
 	}
 
 	bool GetCrashHeavySound()
@@ -1523,17 +1574,34 @@ class CarScript extends Car
 
 	void SynchCrashHeavySound( bool play )
 	{
-		m_PlayCrashSoundHeavy = play;
-		SetSynchDirty();
+		if (m_PlayCrashSoundHeavy != play)
+		{
+			m_PlayCrashSoundHeavy = play;
+			SetSynchDirty();
+		}
 	}
 	
 	void PlayCrashHeavySound()
 	{
+		PlaySound("offroad_hit_heavy_SoundSet", m_CrashSoundHeavy, m_PlayCrashSoundHeavy);
+	}
+	
+	void PlaySound(string soundset, ref EffectSound sound, out bool soundbool)
+	{
 		if ( !GetGame().IsMultiplayer() || GetGame().IsClient() )
-		{		
-			EffectSound sound =	SEffectManager.PlaySound("offroad_hit_heavy_SoundSet", GetPosition() );
-			sound.SetSoundAutodestroy( true );
-			m_PlayCrashSoundHeavy = false;
+		{
+			if (!sound)
+				sound =	SEffectManager.PlaySoundParams(SEffectManager.GetCachedSoundParam(soundset), GetPosition());
+			else
+			{
+				if (!sound.IsSoundPlaying())
+				{
+					sound.SetPosition(GetPosition());
+					sound.SoundPlay();
+				}
+			}
+			
+			soundbool = false;
 		}
 	}
 	
@@ -1779,21 +1847,21 @@ class CarScript extends Car
 	{
 		super.EEHealthLevelChanged(oldLevel,newLevel,zone);
 		
-		if ( newLevel ==  GameConstants.STATE_RUINED )
+		if ( newLevel ==  GameConstants.STATE_RUINED && m_Initialized )
 		{
-			EffectSound sound_plug;
+			bool dummy;
 			switch ( zone )
 			{
 				case "WindowLR":
 				case "WindowRR":
-					PlaySoundSet( sound_plug, "offroad_hit_window_small_SoundSet", 0, 0 );
+					PlaySound("offroad_hit_window_small_SoundSet", m_WindowSmall, dummy);
 				break;
 				
 				case "WindowFront":
 				case "WindowBack":
 				case "WindowFrontLeft":
 				case "WindowFrontRight":
-					PlaySoundSet( sound_plug, "offroad_hit_window_large_SoundSet", 0, 0 );
+					PlaySound("offroad_hit_window_large_SoundSet", m_WindowLarge, dummy);
 				break;
 			}
 		}
@@ -1810,14 +1878,20 @@ class CarScript extends Car
 	
 	void ForceUpdateLightsStart()
 	{
-		m_ForceUpdateLights = true;
-		SetSynchDirty();
+		if (!m_ForceUpdateLights)
+		{
+			m_ForceUpdateLights = true;
+			SetSynchDirty();
+		}
 	}
 	
 	void ForceUpdateLightsEnd()
 	{
-		m_ForceUpdateLights = false;
-		SetSynchDirty();
+		if (m_ForceUpdateLights)
+		{
+			m_ForceUpdateLights = false;
+			SetSynchDirty();
+		}
 	}
 	
 	//Get the engine start battery consumption

@@ -23,6 +23,8 @@ class ZombieBase extends DayZInfected
 
 	protected ref array<Object> 			m_AllTargetObjects;
 	protected ref array<typename>			m_TargetableObjects;
+	
+	protected bool 							m_IsCrawling; //'DayZInfectedCommandCrawl' is transition to crawl only, 'DayZInfectedCommandMove' used after that, hence this variable
 
 	//-------------------------------------------------------------
 	void ZombieBase()
@@ -34,8 +36,11 @@ class ZombieBase extends DayZInfected
 	{
 		SetEventMask(EntityEvent.INIT);
 		
+		m_IsCrawling = false;
+		
 		RegisterNetSyncVariableInt("m_MindState", -1, 4);
 		RegisterNetSyncVariableFloat("m_MovementSpeed", -1, 3);
+		RegisterNetSyncVariableBool("m_IsCrawling");
 		
 		//! sets default hit position and cache it here (mainly for impact particles)
 		m_DefaultHitPosition = SetDefaultHitPosition(GetDayZInfectedType().GetDefaultHitPositionComponent());
@@ -97,6 +102,11 @@ class ZombieBase extends DayZInfected
 		return true;
 	}
 	
+	override bool CanBeBackstabbed()
+	{
+		return true;
+	}
+	
 	//-------------------------------------------------------------
 	override AnimBootsType GetBootsType()
 	{
@@ -144,6 +154,11 @@ class ZombieBase extends DayZInfected
 	override array<string> GetSuitableFinisherHitComponents()
 	{
 		return GetDayZInfectedType().GetSuitableFinisherHitComponents();
+	}
+	
+	int GetMindStateSynced()
+	{
+		return m_MindState;
 	}
 
 	//-------------------------------------------------------------
@@ -308,9 +323,15 @@ class ZombieBase extends DayZInfected
 		
 		//! anim type
 		pAnimType = doPhxImpulse;
-				
+		
 		//! direction
 		pAnimHitDir = ComputeHitDirectionAngle(pSource);
+		
+		if (pAmmoType == "FinisherHit")
+		{
+			pAnimType = DayZInfectedDeathAnims.ANIM_DEATH_BACKSTAB;
+			return true;
+		}
 		
 		//! add some impulse if needed
 		if ( doPhxImpulse )
@@ -569,6 +590,7 @@ class ZombieBase extends DayZInfected
 					bool playerInBlockStance = false;
 					vector targetPos = m_ActualTarget.GetPosition();
 					vector hitPosWS = targetPos;
+					vector zombiePos = GetPosition();
 
 					PlayerBase playerTarget = PlayerBase.Cast(m_ActualTarget);
 					if ( playerTarget )
@@ -576,10 +598,10 @@ class ZombieBase extends DayZInfected
 						playerInBlockStance = playerTarget.GetMeleeFightLogic() && playerTarget.GetMeleeFightLogic().IsInBlock();
 					}
 
-					if ( vector.DistanceSq(targetPos, this.GetPosition()) <= m_ActualAttackType.m_Distance * m_ActualAttackType.m_Distance )
+					if ( vector.DistanceSq(targetPos, zombiePos) <= m_ActualAttackType.m_Distance * m_ActualAttackType.m_Distance )
 					{
-						//! player is in block stance
-						if ( playerInBlockStance )
+						//! player is in block stance and facing the infected
+						if ( playerInBlockStance && (Math.RAD2DEG * Math.AbsFloat(Math3D.AngleFromPosition(targetPos, MiscGameplayFunctions.GetHeadingVector(playerTarget), zombiePos))) <= GameConstants.AI_MAX_BLOCKABLE_ANGLE )
 						{
 							//! infected is playing heavy attack - decrease the dmg to light
 							if ( m_ActualAttackType.m_IsHeavy != 0 )
@@ -744,6 +766,8 @@ class ZombieBase extends DayZInfected
 			StartCommand_Crawl(m_CrawlTransition);
 			
 			m_CrawlTransition = -1;
+			m_IsCrawling = true;
+			SetSynchDirty();
 			return true;
 		}
 
@@ -817,8 +841,11 @@ class ZombieBase extends DayZInfected
 	//! selects animation type and direction based on damage system data
 	bool EvaluateDamageHitAnimation(EntityAI pSource, string pComponent, string pAmmoType, out bool pHeavyHit, out int pAnimType, out float pAnimHitDir)
 	{
+		int invertHitDir = 0; //Used to flip the heavy hit animation direction
+		
 		//! heavy hit
 		pHeavyHit = ((GetGame().ConfigGetInt("cfgAmmo " + pAmmoType + " hitAnimation") > 0) || m_HeavyHitOverride);
+		invertHitDir = GetGame().ConfigGetInt("cfgAmmo " + pAmmoType + " invertHitDir");
 		
 		//! anim type
 		pAnimType = 0; // belly
@@ -832,7 +859,8 @@ class ZombieBase extends DayZInfected
 		}
 		
 		//! direction
-		pAnimHitDir = ComputeHitDirectionAngle(pSource);
+		//pAnimHitDir = ComputeHitDirectionAngle(pSource);
+		pAnimHitDir = ComputeHitDirectionAngleEx(pSource, invertHitDir);
 		//! shock GetDamage
 		//m_ShockDamage = GetGame().ConfigGetFloat( "CfgAmmo " + pAmmoType + " DamageApplied " + "Shock " + "damage");
 		return true;
@@ -851,8 +879,34 @@ class ZombieBase extends DayZInfected
 
 		float cosFi = vector.Dot(targetDirection, toSourceDirection);
 		vector cross = targetDirection * toSourceDirection;
-
+		
 		float dirAngle = Math.Acos(cosFi) * Math.RAD2DEG;
+		if ( cross[1] < 0 )
+			dirAngle = -dirAngle;
+		
+		return dirAngle;
+	}
+	
+	float ComputeHitDirectionAngleEx(EntityAI pSource, int invertHitDir = 0)
+	{
+		vector targetDirection = GetDirection();
+		vector toSourceDirection = (pSource.GetPosition() - GetPosition());
+
+		targetDirection[1] = 0;
+		toSourceDirection[1] = 0;
+
+		targetDirection.Normalize();
+		toSourceDirection.Normalize();
+
+		float cosFi = vector.Dot(targetDirection, toSourceDirection);
+		vector cross = targetDirection * toSourceDirection;
+		
+		float dirAngle = Math.Acos(cosFi) * Math.RAD2DEG;
+		
+		// We will invert direction of the hit
+		if ( invertHitDir > 0 )
+			dirAngle -= 180;
+
 		if ( cross[1] < 0 )
 			dirAngle = -dirAngle;
 		
@@ -942,5 +996,34 @@ class ZombieBase extends DayZInfected
 	override vector GetCenter()
 	{
 		return GetBonePositionWS( GetBoneIndexByName( "spine3" ) );
+	}
+	
+	override void SetBeingBackstabbed()
+	{
+		DayZInfectedInputController ic = GetInputController();
+		if( ic )
+		{
+			ic.OverrideMovementSpeed(true,0.0); //TODO - figure out better way to limit AI movement?
+		}
+		//Print("DbgZombies | SlowZombie on: " + GetGame().GetTime());
+		
+		super.SetBeingBackstabbed();
+	}
+	
+	protected override void ResetBackstabbedState()
+	{
+		DayZInfectedInputController ic = GetInputController();
+		if( ic )
+		{
+			ic.OverrideMovementSpeed(false,1.0);
+		}
+		//Print("DbgZombies | SlowZombie off: " + GetGame().GetTime());
+		
+		super.ResetBackstabbedState();
+	}
+	
+	bool IsCrawling()
+	{
+		return m_IsCrawling;
 	}
 }

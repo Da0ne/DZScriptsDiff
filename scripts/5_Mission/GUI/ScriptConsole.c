@@ -3,6 +3,9 @@ typedef Param5<bool, string, int, string, int> ConfigParams; // param1 - isColla
 
 class ScriptConsole extends UIScriptedMenu
 {
+	const string  DEFAULT_POS_XYZ = "<1,2,3>";
+	vector m_MapPos;
+	bool m_PlayerPosRefreshBlocked;
 	const string CONST_DEFAULT_PRESET_PREFIX = "[Default]";
 	static float DEBUG_MAP_ZOOM = 1;
 	static int ITEMS_SELECTED_ROW = -1;
@@ -10,6 +13,7 @@ class ScriptConsole extends UIScriptedMenu
 	static int ITEMS_IN_PRESET_SELECTED_ROW;
 	static int m_ObjectsScope = 2;
 	static bool SHOW_OTHERS = 0;
+	static bool CLEAR_IVN;
 	static float DRAW_DISTANCE = 1000;
 	static ref array<ref Shape> m_DebugShapes = new array<ref Shape>;
 	
@@ -34,6 +38,10 @@ class ScriptConsole extends UIScriptedMenu
 		ITEMS_IN_PRESET_SELECTED_ROW = m_PresetItemsTextListbox.GetSelectedRow();
 				
 		m_PresetsTextListbox.ClearItems();
+		
+		PluginRemotePlayerDebugClient plugin_remote_client = PluginRemotePlayerDebugClient.Cast( GetPlugin(PluginRemotePlayerDebugClient) );
+		if (SHOW_OTHERS && plugin_remote_client)
+			plugin_remote_client.RequestPlayerInfo( PlayerBase.Cast(GetGame().GetPlayer()), 0 );
 	}
 	
 #ifdef X1_TODO_TEMP_GUI
@@ -81,7 +89,9 @@ class ScriptConsole extends UIScriptedMenu
 		m_ButtonCopyPos		= ButtonWidget.Cast( layoutRoot.FindAnyWidget("Button_CopyPos") );
 		m_TeleportX			= EditBoxWidget.Cast( layoutRoot.FindAnyWidget("TeleportX") );
 		m_TeleportY			= EditBoxWidget.Cast( layoutRoot.FindAnyWidget("TeleportY") );
+		m_TeleportXYZ		= EditBoxWidget.Cast( layoutRoot.FindAnyWidget("TeleportXYZ") );
 		m_PlayerCurPos		= TextWidget.Cast( layoutRoot.FindAnyWidget("PlayerPosLabel") );
+		m_MouseCurPos		= TextWidget.Cast( layoutRoot.FindAnyWidget("MousePosLabel") );
 		m_LogsEnabled		= CheckBoxWidget.Cast( layoutRoot.FindAnyWidget("cbx_LogsEnabled") );
 		m_HudDCharStats		= CheckBoxWidget.Cast( layoutRoot.FindAnyWidget("cbx_CharacterStats") );
 		m_HudDCharLevels	= CheckBoxWidget.Cast( layoutRoot.FindAnyWidget("cbx_CharacterLevels") );
@@ -94,6 +104,8 @@ class ScriptConsole extends UIScriptedMenu
 		
 		m_ShowProtected		= CheckBoxWidget.Cast( layoutRoot.FindAnyWidget("ShowProtectedCheckbox") );
 		m_ShowOthers		= CheckBoxWidget.Cast( layoutRoot.FindAnyWidget("ShowOthersCheckbox") );
+		
+		m_ClearInventory		= CheckBoxWidget.Cast( layoutRoot.FindAnyWidget("ForceClearCheckbox") );
 
 
 		
@@ -209,15 +221,9 @@ class ScriptConsole extends UIScriptedMenu
 
 		UpdateHudDebugSetting();
 
-		m_TimerRefreshPlayerPosEditBoxes = new Timer( CALL_CATEGORY_GAMEPLAY );
-		m_TimerRefreshPlayerPosEditBoxes.Run( 1, this, "RefreshPlayerPosEditBoxes", NULL, true );
-		RefreshPlayerPosEditBoxes();
-
 		m_DebugMapWidget.SetScale(DEBUG_MAP_ZOOM);
 		m_DebugMapWidget.SetMapPos(GetGame().GetPlayer().GetWorldPosition());
-		
-		
-		
+		m_TeleportXYZ.SetText(DEFAULT_POS_XYZ);
 		
 		m_LateInit.Run(0.05, this, "LateInit", null, false);
 		
@@ -252,15 +258,7 @@ class ScriptConsole extends UIScriptedMenu
 		else
 			m_ShowProtected.SetChecked(false);
 		
-		if(SHOW_OTHERS)
-		{
-			m_ShowOthers.SetChecked(true);
-		}
-		else
-		{
-			m_ShowOthers.SetChecked(false);
-		}
-		
+		m_ShowOthers.SetChecked(SHOW_OTHERS);
 		m_DrawDistanceWidget.SetText(DRAW_DISTANCE.ToString());
 		
 		RenderPresetItems();
@@ -604,12 +602,40 @@ class ScriptConsole extends UIScriptedMenu
 			foreach(RemotePlayerStatDebug rpd: m_PlayerDebugStats)
 			{
 				if(rpd.m_Player != GetGame().GetPlayer())
-					m_DebugMapWidget.AddUserMark(rpd.m_Pos,rpd.m_Name, COLOR_BLUE,"\\dz\\gear\\navigation\\data\\map_tree_ca.paa");
+				{
+					vector dir = rpd.m_Pos - GetGame().GetPlayer().GetWorldPosition();
+					dir[1] = 0;
+					string dist = ((int)dir.Length()).ToString();
+					string text = rpd.m_Name + " " +dist +"m.";
+					m_DebugMapWidget.AddUserMark(rpd.m_Pos, text , COLOR_BLUE,"\\dz\\gear\\navigation\\data\\map_tree_ca.paa");
+				}
 			}
 		}
-		m_DebugMapWidget.AddUserMark(GetGame().GetPlayer().GetWorldPosition(),"You", COLOR_RED,"\\dz\\gear\\navigation\\data\\map_tree_ca.paa");
+		vector player_pos = GetGame().GetPlayer().GetWorldPosition();
+		m_DebugMapWidget.AddUserMark(player_pos,"You", COLOR_RED,"\\dz\\gear\\navigation\\data\\map_tree_ca.paa");
+		if(player_pos != GetMapPos())
+			m_DebugMapWidget.AddUserMark(GetMapPos(),"Pos", COLOR_BLUE,"\\dz\\gear\\navigation\\data\\map_tree_ca.paa");
+		UpdateMousePos();
+		if(!m_PlayerPosRefreshBlocked)
+			RefreshPlayerPosEditBoxes();
 	}
-	
+
+	void UpdateMousePos()
+	{
+		int x,y;
+		GetMousePos(x,y);
+		vector mouse_pos, world_pos;
+		mouse_pos[0] = x;
+		mouse_pos[1] = y;
+		world_pos = m_DebugMapWidget.ScreenToMap(mouse_pos);
+		world_pos[1] = GetGame().SurfaceY(world_pos[0], world_pos[2]);
+		vector player_pos = GetGame().GetPlayer().GetWorldPosition();
+		//player_pos[1] = 0;
+		float dst = (world_pos - player_pos).Length();
+		if(m_MouseCurPos)
+			m_MouseCurPos.SetText( "Mouse: "+ world_pos[0] +", "+ world_pos[1] +", "+ world_pos[2] + "|" + "(distance:"+dst.ToString()+")");
+	}
+		
 	override bool OnController(Widget w, int control, int value)
 	{
 		super.OnController(w, control, value);
@@ -639,7 +665,46 @@ class ScriptConsole extends UIScriptedMenu
 		m_LastSelectedObject = m_SelectedObject;
 		m_SelectedObjectIsPreset = false;
 	}
-
+		
+	void SetMapPos(vector pos)
+	{
+		m_MapPos = pos;
+		m_PlayerCurPos.SetText( "Pos: "+  pos[0].ToString() +", "+ pos[1].ToString() +", "+ pos[2].ToString() );
+	}
+	
+	vector GetMapPos()
+	{
+		return m_MapPos;
+	}
+	
+	override bool OnMouseButtonDown(Widget w, int x, int y, int button)
+	{
+		super.OnMouseButtonDown(w,x,y,button);
+		
+		if ( w ==  m_DebugMapWidget )
+		{
+			if(button == 0)
+			{
+				m_PlayerPosRefreshBlocked = true;
+				int mouse_x,mouse_y;
+				GetMousePos(mouse_x,mouse_y);
+				vector mouse_pos, world_pos;
+				mouse_pos[0] = mouse_x;
+				mouse_pos[1] = mouse_y;
+				world_pos = m_DebugMapWidget.ScreenToMap(mouse_pos);
+				world_pos[1] = GetGame().SurfaceY(world_pos[0], world_pos[2]);
+				
+				SetMapPos(world_pos);
+			}
+			else if(button == 1)
+			{
+				SetMapPos(GetGame().GetPlayer().GetWorldPosition());
+			}
+		}
+		return true;
+	}
+	
+	
 	override bool OnClick(Widget w, int x, int y, int button)
 	{
 		super.OnClick(w, x, y, button);
@@ -691,12 +756,21 @@ class ScriptConsole extends UIScriptedMenu
 			float pos_z = m_TeleportY.GetText().ToFloat();
 			float pos_y = GetGame().SurfaceY(pos_x, pos_z);
 			vector v = Vector(pos_x, pos_y, pos_z);
+			string txt = m_TeleportXYZ.GetText();
+			if(m_TeleportXYZ.GetText() != "" && m_TeleportXYZ.GetText() != DEFAULT_POS_XYZ)
+			{
+				string pos = m_TeleportXYZ.GetText();
+				pos.Replace("<", "");
+				pos.Replace(">", "");
+				pos.Replace(",", "");
+				v = pos.ToVector();
+			}
 			m_Developer.Teleport(player, v);
 			return true;
 		}
 		else if ( w == m_ButtonCopyPos )
 		{
-			GetGame().CopyToClipboard( GetGame().GetPlayer().GetPosition().ToString() );
+			GetGame().CopyToClipboard( GetMapPos().ToString() );
 		}
 		else if ( w == m_LogsEnabled )
 		{
@@ -839,6 +913,7 @@ class ScriptConsole extends UIScriptedMenu
 			if ( m_SelectedObject != "" )
 			{
 				// @NOTE: duplicate code in PluginDeveloper.c
+				float distance = m_SpawnDistanceEditBox.GetText().ToFloat();
 				if ( m_SelectedObjectIsPreset )
 				{
 					switch ( w )
@@ -848,24 +923,30 @@ class ScriptConsole extends UIScriptedMenu
 							if ( target != NULL && target.IsInherited(EntityAI) )
 							{
 								EntityAI att_parent = EntityAI.Cast( target ) ;
-								SetPreset(att_parent, true, m_SelectedObject);
+								SpawnPreset(att_parent, CLEAR_IVN, m_SelectedObject);
 							}
 							else
 							{
-								SetPreset(player, true, m_SelectedObject);
+								SpawnPreset(player, false, m_SelectedObject);
 							}
 							break;
 						}
+						case m_SpawnGroundButton:
+						{
+							SpawnPreset(player, false, m_SelectedObject, InventoryLocationType.GROUND, distance);
+							break;
+						}
+						
 						default:
 						{
-							SetPreset(player, true, m_SelectedObject);
+							SpawnPreset(player, CLEAR_IVN, m_SelectedObject);
 							break;
 						}
 					}
 				}
 				else
 				{
-					float distance = m_SpawnDistanceEditBox.GetText().ToFloat();
+					
 					float health = m_DamageEditBox.GetText().ToFloat() * MiscGameplayFunctions.GetTypeMaxGlobalHealth( m_SelectedObject );
 					float quantity = -1;
 					int cfgQuantity = GetGame().ConfigGetInt("CfgVehicles " + m_SelectedObject + " varQuantityMax");
@@ -938,12 +1019,7 @@ class ScriptConsole extends UIScriptedMenu
 		}
 		else if ( w == m_PresetsTextListbox )
 		{
-			RenderPresetItems();
-			ShowPresetButtons();
-			ShowItemTransferButtons();
-			m_SelectedObjectText.SetText( "Preset : " + GetCurrentPresetName() );
-			m_SelectedObject = GetCurrentPresetName();
-			m_SelectedObjectIsPreset = true;
+			SelectPreset();
 			return true;
 		}
 		else if ( w == m_PresetItemsTextListbox )
@@ -1120,8 +1196,36 @@ class ScriptConsole extends UIScriptedMenu
 		
 
 		return false;
-	}	
+	}
 	
+	override bool OnMouseLeave(Widget w, Widget enterW, int x, int y)
+	{
+		super.OnMouseLeave(w, enterW, x, y);
+		
+		if(w == m_TeleportXYZ/* || w == m_TeleportX ||w == m_TeleportY*/)
+		{
+			if(m_TeleportXYZ.GetText() == "")
+				EditBoxWidget.Cast(w).SetText(DEFAULT_POS_XYZ);
+			return false;
+		}
+		return false;
+	}
+	
+	override bool OnMouseEnter(Widget w, int x, int y)
+	{
+		super.OnMouseEnter(w, x, y);
+		
+		if(w == m_TeleportXYZ/* || w == m_TeleportX ||w == m_TeleportY*/)
+		{
+			EditBoxWidget.Cast(w).SetText("");
+			return false;
+		}
+		
+		return false;
+	}
+	
+
+
 	override bool OnChange(Widget w, int x, int y, bool finished)
 	{
 		super.OnChange(w, x, y, finished);
@@ -1181,6 +1285,11 @@ class ScriptConsole extends UIScriptedMenu
 			}
 			return true;
 		}
+		else if ( w == m_ClearInventory )
+		{
+			CLEAR_IVN = m_ClearInventory.IsChecked();
+			return true;
+		}
 		
 		
 
@@ -1190,6 +1299,7 @@ class ScriptConsole extends UIScriptedMenu
 	override bool OnItemSelected(Widget w, int x, int y, int row, int  column,	int  oldRow, int  oldColumn)
 	{
 		super.OnItemSelected(w, x, y, row, column, oldRow, oldColumn);
+		
 		if ( w == m_PositionsListbox )
 		{
 			vector position = m_ConfigDebugProfileFixed.GetPositionByName( GetCurrentPositionName() );
@@ -1214,9 +1324,40 @@ class ScriptConsole extends UIScriptedMenu
 			}
 			return true;
 		}
-		return true;
+		else if ( w == m_PresetsTextListbox )
+		{
+			if(m_PresetsTextListbox.GetSelectedRow() != -1)
+			{
+				SelectPreset();
+				return true;
+			}
+		}
+		return false;
 	}
 
+	void SelectPreset()
+	{
+		RenderPresetItems();
+		ShowPresetButtons();
+		ShowItemTransferButtons();
+		m_SelectedObject = GetCurrentPresetName();
+		m_SelectedObjectText.SetText( "Preset : " + m_SelectedObject );
+		m_SelectedObjectIsPreset = true;
+		
+		TStringArray command_array = new TStringArray;
+		
+		m_ConfigDebugProfileFixed.GetPresetItems( m_SelectedObject, command_array, "cmd" );
+				
+		bool clear = false;
+		if(command_array.IsValidIndex(0))
+		{
+			string first_line = command_array.Get(0);
+			first_line.ToLower();
+			clear = (first_line == "clear_inv");
+		}
+		m_ClearInventory.SetChecked(clear);
+	}
+	
 	void RefreshLists()
 	{
 		RenderPresets();
@@ -1325,7 +1466,8 @@ class ScriptConsole extends UIScriptedMenu
 		}
 	}
 	
-	void SetPreset(EntityAI target, bool clear_inventory, string preset_name)
+	
+	void SpawnPreset(EntityAI target, bool clear_inventory, string preset_name, InventoryLocationType location = InventoryLocationType.ATTACHMENT, float distance = 0)
 	{
 		// spawn preset items into inventory
 		int i;
@@ -1333,16 +1475,17 @@ class ScriptConsole extends UIScriptedMenu
 		{
 			bool is_preset_fixed = IsCurrentPresetFixed();
 			TStringArray preset_array = new TStringArray;
-
+			
 			if ( is_preset_fixed )
 			{
 				m_ConfigDebugProfileFixed.GetPresetItems( preset_name, preset_array );
+				
 			}
 			else
 			{
 				m_ConfigDebugProfile.GetPresetItems( preset_name, preset_array );
 			}
-
+			
 			if ( clear_inventory )
 			{
 				PlayerBase player = PlayerBase.Cast( GetGame().GetPlayer() );
@@ -1363,7 +1506,10 @@ class ScriptConsole extends UIScriptedMenu
 					health = m_ConfigDebugProfile.GetItemHealth( preset_name, i );
 					quantity = m_ConfigDebugProfile.GetItemQuantity( preset_name, i );
 				}
-				m_Developer.SpawnEntityInInventory(PlayerBase.Cast( target ), preset_array.Get(i), -1, quantity);
+				if(location == InventoryLocationType.ATTACHMENT)
+					EntityAI ent = m_Developer.SpawnEntityInInventory(PlayerBase.Cast( target ), preset_array.Get(i), -1, quantity, true);
+				else if(location == InventoryLocationType.GROUND)
+					m_Developer.SpawnEntityOnCursorDir(PlayerBase.Cast( target ), preset_array.Get(i), quantity, distance, health );
 			}
 		}
 	}
@@ -1432,6 +1578,7 @@ class ScriptConsole extends UIScriptedMenu
 		m_PresetRenameButton.Show( show );
 
 		HideItemButtons();
+		
 	}
 
 	void AddItemToClipboard( TextListboxWidget text_listbox_widget )
@@ -1839,8 +1986,8 @@ class ScriptConsole extends UIScriptedMenu
 		//if ( GetGame() != NULL && GetGame().GetPlayer() != NULL )
 		{
 			vector player_pos = GetGame().GetPlayer().GetPosition();
-			
-			m_PlayerCurPos.SetText( "Pos: "+ player_pos[0] +", "+ player_pos[1] +", "+ player_pos[2] );
+			SetMapPos(player_pos);
+			//m_PlayerCurPos.SetText( "Pos: "+ player_pos[0] +", "+ player_pos[1] +", "+ player_pos[2] );
 		}
 	}
 
@@ -1850,7 +1997,7 @@ class ScriptConsole extends UIScriptedMenu
 		return m_LastSelectedObject;
 	}
 
-	private ref Timer m_TimerRefreshPlayerPosEditBoxes = NULL;
+	//private ref Timer m_TimerRefreshPlayerPosEditBoxes = NULL;
 
 	int m_selected_tab;
 	int m_Rows;
@@ -1884,7 +2031,9 @@ class ScriptConsole extends UIScriptedMenu
 	ButtonWidget 		m_ButtonCopyPos;
 	EditBoxWidget 		m_TeleportX;
 	EditBoxWidget 		m_TeleportY;
+	EditBoxWidget 		m_TeleportXYZ;
 	TextWidget	 		m_PlayerCurPos;
+	TextWidget	 		m_MouseCurPos;
 	TextListboxWidget	m_PositionsListbox;
 	CheckBoxWidget		m_LogsEnabled;
 	CheckBoxWidget		m_HudDCharStats;
@@ -1897,6 +2046,7 @@ class ScriptConsole extends UIScriptedMenu
 	CheckBoxWidget		m_HudDVersion;
 	CheckBoxWidget		m_ShowProtected;
 	CheckBoxWidget		m_ShowOthers;
+	CheckBoxWidget		m_ClearInventory;
 	
 	EditBoxWidget m_ObjectFilter;
 	EditBoxWidget m_SpawnDistanceEditBox;

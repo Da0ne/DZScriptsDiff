@@ -1,3 +1,11 @@
+enum EStaminaMultiplierTypes
+{
+	MASK = 1,
+	FATIGUE,
+	EPINEPHRINE,
+}
+
+
 /**@class	Defines Stamina Consumer
  * @brief	Holds information about Stamina Consumer
  *
@@ -241,8 +249,14 @@ class StaminaHandler
 	protected bool 							m_Debug;
 	protected bool							m_StaminaDepleted;
 
-	//protected ref Timer						m_CooldownTimer;
-	protected ref map<int,ref Timer> 			m_TimerMap;
+	//protected ref Timer					m_CooldownTimer;
+	protected ref map<int,ref Timer> 		m_TimerMap;
+	ref map<EStaminaMultiplierTypes, float>	m_RegisteredDepletionModifiers;
+	ref set<EStaminaMultiplierTypes>		m_ActiveDepletionModifiers;
+	
+	ref map<EStaminaMultiplierTypes, float>	m_RegisteredRecoveryModifiers;
+	ref set<EStaminaMultiplierTypes>		m_ActiveRecoveryModifiers;
+	
 	protected bool							m_IsInCooldown;
 	
 	protected ref StaminaConsumers			m_StaminaConsumers;
@@ -271,8 +285,105 @@ class StaminaHandler
 		RegisterStaminaModifiers();
 		
 		m_TimerMap = new map<int,ref Timer>;
+		
+		//----------------- depletion --------------------
+		m_RegisteredDepletionModifiers = new map<EStaminaMultiplierTypes, float>;
+		m_ActiveDepletionModifiers = new set<EStaminaMultiplierTypes>;
+
+		//----------------- recovery --------------------
+		m_RegisteredRecoveryModifiers = new map<EStaminaMultiplierTypes, float>;
+		m_ActiveRecoveryModifiers = new set<EStaminaMultiplierTypes>;
+		
+		Init();
+	}
+	
+	
+	void Init()
+	{
+		//----------------- depletion --------------------
+		m_RegisteredDepletionModifiers.Insert(EStaminaMultiplierTypes.MASK, MaskMdfr.STAMINA_DEPLETION_MODIFIER);
+		m_RegisteredDepletionModifiers.Insert(EStaminaMultiplierTypes.FATIGUE, FatigueMdfr.STAMINA_DEPLETION_MULTIPLIER);
+		m_RegisteredDepletionModifiers.Insert(EStaminaMultiplierTypes.EPINEPHRINE, EpinephrineMdfr.STAMINA_DEPLETION_MULTIPLIER);
+		
+		//----------------- recovery --------------------
+		m_RegisteredRecoveryModifiers.Insert(EStaminaMultiplierTypes.MASK, MaskMdfr.STAMINA_RECOVERY_MODIFIER);
+		m_RegisteredRecoveryModifiers.Insert(EStaminaMultiplierTypes.FATIGUE, FatigueMdfr.STAMINA_RECOVERY_MULTIPLIER);
+		
+	}
+	
+	void ActivateDepletionModifier(EStaminaMultiplierTypes type)
+	{
+		if( m_RegisteredDepletionModifiers.Contains(type))
+		{
+			m_ActiveDepletionModifiers.Insert(type);
+			RecalculateDepletionMultiplier();
+		}
+		else
+		{
+			Error("attempting to activate unregistered depletion modifier");
+		}
+	}	
+	
+	void DeactivateDepletionModifier(EStaminaMultiplierTypes type)
+	{
+		int index = m_ActiveDepletionModifiers.Find(type);
+		if( index != -1 )
+		{
+			m_ActiveDepletionModifiers.Remove(index);
+			RecalculateDepletionMultiplier();
+		}
+	}
+	
+	void RecalculateDepletionMultiplier()
+	{
+		float value = 1;
+		
+		foreach(int multiplier: m_ActiveDepletionModifiers)
+		{
+			value *= m_RegisteredDepletionModifiers.Get(multiplier);
+		}
+		if (value != m_StaminaDepletionMultiplier)
+			SetDepletionMultiplier(value);
+		//Print("m_StaminaDepletionMultiplier = " + m_StaminaDepletionMultiplier);
+	}
+	
+	void ActivateRecoveryModifier(EStaminaMultiplierTypes type)
+	{
+		if( m_RegisteredRecoveryModifiers.Contains(type))
+		{
+			m_ActiveRecoveryModifiers.Insert(type);
+			RecalculateRecoveryMultiplier();
+		}
+		else
+		{
+			Error("attempting to activate unregistered recovery modifier");
+		}
 	}
 
+	
+	void DeactivateRecoveryModifier(EStaminaMultiplierTypes type)
+	{
+		int index = m_ActiveRecoveryModifiers.Find(type);
+		if( index != -1 )
+		{
+			m_ActiveRecoveryModifiers.Remove(index);
+			RecalculateRecoveryMultiplier();
+		}
+	}
+	
+	void RecalculateRecoveryMultiplier()
+	{
+		float value = 1;
+		
+		foreach(int multiplier: m_ActiveRecoveryModifiers)
+		{
+			value *= m_RegisteredRecoveryModifiers.Get(multiplier);
+		}
+		if (value != m_StaminaRecoveryMultiplier)
+			SetRecoveryMultiplier(value);
+		//Print("m_StaminaRecoveryMultiplier = " + m_StaminaRecoveryMultiplier);
+	}
+	
 	void Update(float deltaT, int pCurrentCommandID)
 	{
 #ifdef DEVELOPER
@@ -379,6 +490,7 @@ class StaminaHandler
 
 			m_StaminaDelta = 0;
 			m_StaminaDepletion = 0; // resets depletion modifier
+			
 		}
 	}
 	
@@ -414,7 +526,6 @@ class StaminaHandler
 				}
 				
 				m_IsInCooldown = cooldown;
-				
 				m_Player.SetStamina(m_Stamina, m_StaminaCap);
 			break;
 			
@@ -799,6 +910,7 @@ class StaminaHandler
 		//! run cooldown right after depletion
 		SetCooldown(sm.GetCooldown(),modifier);
 		m_StaminaDepletion = Math.Clamp(m_StaminaDepletion, 0, GameConstants.STAMINA_MAX);
+
 		m_StaminaDepletion = m_StaminaDepletion * m_StaminaDepletionMultiplier;
 	}
 };

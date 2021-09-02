@@ -3,7 +3,6 @@ class HoldBreathSoundEventBase extends PlayerSoundEventBase
 	void HoldBreathSoundEventBase()
 	{
 		m_HasPriorityOverTypes = -1;
-		m_SkipForControlledCharacter = true;
 	}
 	
 	override bool CanPlay(PlayerBase player)

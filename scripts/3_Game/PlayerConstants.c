@@ -147,11 +147,13 @@ class PlayerConstants
 	static const float BLEEDING_SOURCE_BLOODLOSS_PER_SEC 	= -20; 		// amount of blood loss per second from one bleeding source 
 	static const float BLEEDING_SOURCE_FLOW_MODIFIER_MEDIUM = 0.6; 		// modifier of the bloodloss given by BLEEDING_SOURCE_BLOODLOSS_PER_SEC, multiplying these two will give the resulting bloodloss
 	static const float BLEEDING_SOURCE_FLOW_MODIFIER_LOW	= 0.1; 		// modifier of the bloodloss given by BLEEDING_SOURCE_BLOODLOSS_PER_SEC, multiplying these two will give the resulting bloodloss
+	static const float BLEEDING_SOURCE_FLOW_MODIFIER_HIGH	= 1; 		// modifier of the bloodloss given by BLEEDING_SOURCE_BLOODLOSS_PER_SEC, multiplying these two will give the resulting bloodloss
 	static const int BLEEDING_SOURCE_DURATION_NORMAL = 300; 			// in seconds, how long will bleeding source exist until disapearing
 	static const float BLEEDING_LOW_PRESSURE_BLOOD = 4000.0;			// from which blood level we start lowering BLEEDING_SOURCE_BLOODLOSS_PER_SEC
 	static const float BLEEDING_LOW_PRESSURE_MIN_MOD = 0.3;				// minimal value for low pressure bleeding (lowest possible multiplier of BLEEDING_SOURCE_BLOODLOSS_PER_SEC)
 	
-	static const float BLEEDING_SOURCE_CLOSE_INFECTION_CHANCE = 0.40;
+	static const float BLEEDING_SOURCE_CLOSE_INFECTION_CHANCE = 0.40;	// a chance for wound infection when the wound is self-closing
+	static const float BLEEDING_SOURCE_BURN_MODIFIER = 0.65;			// modifies a bloodflow for any bleeding source obtained through skin burn from contaminated area
 
 	 
 	//----------------------------------------------------------
@@ -209,6 +211,7 @@ class PlayerConstants
 	//----------------------------------------------------------
 	//						AI SENSOR MULTIPLIER
 	//----------------------------------------------------------
+	static const float AI_NOISE_ROLL 			= 2;				//Multiplier for the noise generated while prone rolling
 	static const float AI_NOISE_SPRINT 			= 1;				//Multiplier for the noise generated while sprinting
 	static const float AI_NOISE_RUN 			= 0.8;				//Multiplier for the noise generated while jogging
 	static const float AI_NOISE_CROUCH_RUN 		= 0.6;				//Multiplier for the noise generated while Sprint crouch
@@ -223,4 +226,9 @@ class PlayerConstants
 	static const float AI_VISIBILITY_STANDING	= 1.5;				//Multiplier for the visibility of the player while standing
 	static const float AI_VISIBILITY_CROUCH		= 0.6;				//Multiplier for the visibility of the player while crouched
 	static const float AI_VISIBILITY_PRONE 		= 0.15;				//Multiplier for the visibility of the player while prone
+	
+	//----------------------------------------------------------
+	//						MISC AI CONSTANTS
+	//----------------------------------------------------------
+	static const float AI_BACKSTAB_HIT_TIME 	= 1.0; 				//How long will the AI be considered time in seconds 
 }

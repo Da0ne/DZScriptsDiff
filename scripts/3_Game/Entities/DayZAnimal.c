@@ -69,10 +69,24 @@ class DayZCreatureAI extends DayZCreature
 	proto native void InitAIAgent(AIGroup group);
 	proto native void DestroyAIAgent();
 	
+	int m_EffectTriggerCount;//how many effect triggers is this AI inside of(overlapping triggers)
+	
+
 	void DayZCreatureAI()
 	{
 		RegisterAnimEvents();
 		SetFlags(EntityFlags.TOUCHTRIGGERS, false);
+	}
+	
+	
+	void IncreaseEffectTriggerCount()
+	{
+		m_EffectTriggerCount++;
+	}
+	
+	void DecreaseEffectTriggerCount()
+	{
+		m_EffectTriggerCount--;
 	}
 	
 	void AddDamageSphere(AnimDamageParams damage_params)
@@ -235,6 +249,11 @@ class DayZCreatureAI extends DayZCreature
 		{
 			soundObject.SetKind(WaveKind.WAVEEFFECTEX);
 		}
+	}
+	
+	bool ResistContaminatedEffect()
+	{
+		return false;
 	}
 	
 	// ================
@@ -597,7 +616,7 @@ class DayZAnimal extends DayZCreatureAI
 		vector cross = targetDirection * toSourceDirection;
 
 		float dirAngleDeg = Math.Acos(cosFi) * Math.RAD2DEG;
-		if( cross[1] < 0 )
+		if ( cross[1] < 0 )
 			dirAngleDeg = -dirAngleDeg;
 		
 		return dirAngleDeg;

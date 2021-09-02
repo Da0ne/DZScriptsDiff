@@ -258,6 +258,15 @@ class ParticleList
 	static const int BONFIRE_FIRE 					= RegisterParticle("fire_bonfire");
 	static const int BONFIRE_SMOKE		 			= RegisterParticle("smoke_bonfire");
 	
+	static const int VOMIT_BLOOD					= RegisterParticle("character_vomitBlood_01");
+
+	// CONTAMINATED AREAS
+	static const int CONTAMINATED_AREA_GAS_TINY		= RegisterParticle("contaminated_area_gas_around_tiny");
+	static const int CONTAMINATED_AREA_GAS_AROUND	= RegisterParticle("contaminated_area_gas_around");
+	static const int CONTAMINATED_AREA_GAS_BIGASS	= RegisterParticle("contaminated_area_gas_bigass");
+	static const int CONTAMINATED_AREA_GAS_GROUND	= RegisterParticle("contaminated_area_gas_ground");
+	static const int CONTAMINATED_AREA_GAS_SHELL	= RegisterParticle("contaminated_area_gas_shell");
+	
 	static int RegisterParticle (string file_name)
 	{
 		return RegisterParticle( GetPathToParticles() , file_name);

@@ -27,6 +27,11 @@ class ActionConsumeSingle: ActionSingleUseBase
 		m_ConditionTarget = new CCTSelf;
 	}
 	
+	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
+	{	
+		return super.ActionCondition(player, target, item) && player.CanEatAndDrink();
+	}
+	
 	override bool HasProneException()
 	{
 		return true;
@@ -59,7 +64,7 @@ class ActionConsumeSingle: ActionSingleUseBase
 			action_data.m_MainItem.SetQuantity( 0 );
 		}
 		
-		if ( action_data.m_Player.HasBloodyHands() && !action_data.m_Player.GetInventory().FindAttachment( InventorySlots.GLOVES ) )
+		if ( action_data.m_Player.HasBloodyHandsEx() == eBloodyHandsTypes.SALMONELA && !action_data.m_Player.GetInventory().FindAttachment( InventorySlots.GLOVES ) )
 		{
 			action_data.m_Player.SetBloodyHandsPenalty();
 		}

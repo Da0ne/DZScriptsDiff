@@ -1139,9 +1139,11 @@ class BaseBuildingBase extends ItemBase
 	{
 		super.SetActions();
 		
-		AddAction(ActionTakeHybridAttachment);
-		AddAction(ActionTakeHybridAttachmentToHands);
+		AddAction(ActionDetachFromTarget);
+		//AddAction(ActionTakeHybridAttachment);
+		//AddAction(ActionTakeHybridAttachmentToHands);
 		RemoveAction(ActionTakeItem);
+		RemoveAction(ActionTakeItemToHands);
 	}
 	
 	//================================================================

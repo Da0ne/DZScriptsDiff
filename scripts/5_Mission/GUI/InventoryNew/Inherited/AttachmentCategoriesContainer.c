@@ -274,10 +274,12 @@ class AttachmentCategoriesContainer: CollapsibleContainer
 			ref AttachmentCategoriesSlotsContainer items_cont = new AttachmentCategoriesSlotsContainer( this, i );
 			m_Body.Insert( items_cont );
 			m_OpenedContainers.Insert( items_cont );
-			if( i < ( attachments_categories_count / ITEMS_IN_ROW ) )
+			
+			if ( i < ( attachments_categories_count / ITEMS_IN_ROW ) )
 				items_cont.GetSlotsContainer().SetColumnCount( ITEMS_IN_ROW );
 			else
 				items_cont.GetSlotsContainer().SetColumnCount( attachments_categories_count % ITEMS_IN_ROW );
+			
 			m_SlotsCount++;
 		}
 	}
@@ -299,7 +301,7 @@ class AttachmentCategoriesContainer: CollapsibleContainer
 			attachment_category = GetAttachmentCategory( config_path_attachment_categories, i );
 			icon_name = GetIconName( config_path_attachment_categories, attachment_category );
 
-			if( items_cont )
+			if ( items_cont )
 			{
 				int slot_number = i % ITEMS_IN_ROW;
 				m_CategorySlotIndex.Insert( attachment_category, i );
@@ -315,7 +317,7 @@ class AttachmentCategoriesContainer: CollapsibleContainer
 				icon.SetSlotDisplayName(name);
 
 				int num = i + 2 + attachments_categories_count / ITEMS_IN_ROW;
-				if( m_Body.Count() > num )
+				if ( m_Body.Count() > num )
 				{
 					ClosableContainer c = ClosableContainer.Cast( m_Body.Get( num ) );
 					icon.GetRadialIconPanel().Show( true );
@@ -326,7 +328,7 @@ class AttachmentCategoriesContainer: CollapsibleContainer
 				
 				AttachmentCategoriesRow ar;
 				int count = attachments_categories_count + 2 + attachments_categories_count / ITEMS_IN_ROW;
-				if( m_Body.Count() < count )
+				if ( m_Body.Count() < count )
 				{
 					ar = new AttachmentCategoriesRow( this, -1 );
 				}
@@ -335,21 +337,21 @@ class AttachmentCategoriesContainer: CollapsibleContainer
 					ar = AttachmentCategoriesRow.Cast( m_Body.Get( i + 2 + attachments_categories_count / ITEMS_IN_ROW ) );
 				}
 				
-				ar.Init(attachments_categories_count, i, attachment_category, config_path_attachment_categories, entity,m_Body.Count() );
+				ar.Init(attachments_categories_count, i, attachment_category, config_path_attachment_categories, entity, m_Body.Count() );
 				
-				if( m_Body.Count() < count )
+				if ( m_Body.Count() < count )
 				{
-					this.Insert(ar);
+					Insert(ar);
 				}
 			}
 		}
 		
-		if( m_Body.Count() < attachments_categories_count + 3 + attachments_categories_count / ITEMS_IN_ROW )
+		if ( m_Body.Count() < attachments_categories_count + 3 + attachments_categories_count / ITEMS_IN_ROW )
 		{
-			if( entity.GetInventory().GetCargo() )
+			if ( entity.GetInventory().GetCargo() )
 			{
 				items_cont = GetSlotsContainer( attachments_categories_count / ITEMS_IN_ROW );
-				if( items_cont )
+				if ( items_cont )
 				{
 					icon = items_cont.GetSlotIcon( attachments_categories_count );
 					icon.GetGhostSlot().Show( true );
@@ -363,7 +365,7 @@ class AttachmentCategoriesContainer: CollapsibleContainer
 				
 				ContainerWithCargo iwc = new ContainerWithCargo( this, -1 );
 				iwc.Get( 0 ).GetRootWidget().ClearFlags( WidgetFlags.DRAGGABLE );
-				iwc.SetEntity( entity );
+				iwc.SetEntity( entity, 0, false );
 				Insert( iwc );
 			}
 		}
@@ -375,7 +377,7 @@ class AttachmentCategoriesContainer: CollapsibleContainer
 			icon = items_cont.GetSlotIcon( attachments_categories_count );
 			icon.GetMainWidget().Show( true );
 			icon.GetRadialIconPanel().Show( true );
-			if( iwc2.IsOpened() )
+			if ( iwc2.IsOpened() )
 			{
 				icon.GetRadialIcon().Show( false );
 				icon.GetRadialIconClosed().Show( true );

@@ -27,6 +27,18 @@ class EnochData extends WorldData
 
 	protected int m_choosenWeather = 1;
 	protected int m_lastWeather = 0;
+	
+	protected static const ref array<vector> LIVONIA_ARTY_STRIKE_POS = 
+	{ 
+		"7440.00 417.00 -500.00",
+		"-500.00 276.00 5473.00",
+		"-500.00 265.00 9852.00",
+		"4953.00 240.00 13300.00",
+		"9620.00 188.00 13300.00",
+		"13300.00 204.00 10322.00",
+		"13300.00 288.00 6204.00",
+		"13300.00 296.00 -500.00"
+	};
 
 	override void Init()
 	{
@@ -39,6 +51,7 @@ class EnochData extends WorldData
 		m_Sunset_Jul = 20.35;
 		m_MaxTemps = {-2.5,-2.1,2.3,9,15.5,19.4,20.9,20.4,16,10.5,4.2,0.1};
 		m_MinTemps = {-7,-7.4,-4.1,1.5,7,11.3,13.4,13.1,9.3,5.3,0.8,-3.6};
+		m_FiringPos = LIVONIA_ARTY_STRIKE_POS;
 	}
 	
 	override bool WeatherOnBeforeChange( EWeatherPhenomenon type, float actual, float change, float time )

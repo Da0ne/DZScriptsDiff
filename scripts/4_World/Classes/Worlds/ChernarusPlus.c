@@ -27,6 +27,16 @@ class ChernarusPlusData extends WorldData
 
 	protected int m_choosenWeather = 1;
 	protected int m_lastWeather = 0;
+	
+	//All Chernarus firing coordinates 
+	protected static const ref array<vector> CHERNARUS_ARTY_STRIKE_POS = 
+	{
+		"-500.00 165.00 5231.69",
+		"-500.00 300.00 9934.41",
+		"10406.86 192.00 15860.00",
+		"4811.75 370.00 15860.00",
+		"-500.00 453.00 15860.00"
+	};
 
 	override void Init()
 	{
@@ -39,6 +49,7 @@ class ChernarusPlusData extends WorldData
 		m_Sunset_Jul = 20.73;
 		m_MaxTemps = {3,5,7,14,19,24,26,25,21,16,10,5};
 		m_MinTemps = {-3,-2,0,4,9,14,18,17,12,7,4,0};
+		m_FiringPos = CHERNARUS_ARTY_STRIKE_POS;
 	}
 	
 	override bool WeatherOnBeforeChange( EWeatherPhenomenon type, float actual, float change, float time )

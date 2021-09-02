@@ -17,6 +17,7 @@ class Hologram
 	protected vector			m_Rotation;
 	protected vector			m_y_p_r_previous;
 	protected vector 			m_ContactDir;
+	protected vector 			m_FromAdjusted;
 	protected const string 		ANIMATION_PLACING 				= "Placing";
 	protected const string 		ANIMATION_INVENTORY 			= "Inventory";
 	protected const string 		SELECTION_PLACING 				= "placing";
@@ -61,6 +62,7 @@ class Hologram
 		m_UpdatePosition = true;
 		m_Rotation = "0 0 0";
 		m_ContactComponent = -1;
+		m_FromAdjusted = "0 0 0";
 		
 		// If the static names are empty, generate the needed names
 		// Refer to their definitions to see why these are required
@@ -616,19 +618,19 @@ class Hologram
 		Object obj_right_far;
 
 		//Not sure what the intention here was before, but it boiled down to a very bloated version of what you see here right now
-		DayZPhysics.RaycastRV( from_left_close, to_left_close_down, contact_pos_left_close, contact_dir_left_close, contact_component_left_close, results_left_close, m_Projection, m_Projection, false, false, ObjIntersectView );
+		DayZPhysics.RaycastRV( from_left_close, to_left_close_down, contact_pos_left_close, contact_dir_left_close, contact_component_left_close, results_left_close, null, m_Projection, false, false, ObjIntersectView );
 		if (results_left_close.Count() > 0)
 			obj_left_close = results_left_close[results_left_close.Count() - 1];
 
-		DayZPhysics.RaycastRV( from_right_close, to_right_close_down, contact_pos_right_close, contact_dir_right_close, contact_component_right_close, results_right_close,m_Projection, m_Projection, false, false, ObjIntersectView );
+		DayZPhysics.RaycastRV( from_right_close, to_right_close_down, contact_pos_right_close, contact_dir_right_close, contact_component_right_close, results_right_close, null, m_Projection, false, false, ObjIntersectView );
 		if (results_right_close.Count() > 0)	
 			obj_right_close = results_right_close[results_right_close.Count() - 1];
 
-		DayZPhysics.RaycastRV( from_left_far, to_left_far_down, contact_pos_left_far, contact_dir_left_far, contact_component_left_far, results_left_far, m_Projection, m_Projection, false, false, ObjIntersectView );
+		DayZPhysics.RaycastRV( from_left_far, to_left_far_down, contact_pos_left_far, contact_dir_left_far, contact_component_left_far, results_left_far, null, m_Projection, false, false, ObjIntersectView );
 		if (results_left_far.Count() > 0) 
 			obj_left_far = results_left_far[results_left_far.Count() - 1];
 
-		DayZPhysics.RaycastRV( from_right_far, to_right_far_down, contact_pos_right_far, contact_dir_right_far, contact_component_right_far, results_right_far, m_Projection, m_Projection, false, false, ObjIntersectView );
+		DayZPhysics.RaycastRV( from_right_far, to_right_far_down, contact_pos_right_far, contact_dir_right_far, contact_component_right_far, results_right_far, null, m_Projection, false, false, ObjIntersectView );
 		if (results_right_far.Count() > 0)
 			obj_right_far = results_right_far[results_right_far.Count() - 1];
 		
@@ -1160,6 +1162,11 @@ class Hologram
 		{
 			Class.CastTo(entity_for_placing, GetGame().CreateObjectEx( "GardenPlot", m_Projection.GetPosition(), ECE_OBJECT_SWAP )); //garden plot
 			return entity_for_placing;
+			/*
+			EntityAI ent = EntityAI.Cast(GetGame().CreateObjectEx( "GardenPlot", m_Projection.GetPosition(), ECE_OBJECT_SWAP ));
+			//Class.CastTo(entity_for_placing, GetGame().CreateObjectEx( "GardenPlot", m_Projection.GetPosition(), ECE_OBJECT_SWAP )); //garden plot
+			return ent;
+			*/
 		}
 		
 		//inheritance comparison
@@ -1270,6 +1277,15 @@ class Hologram
 		}
 		
 		vector from = GetGame().GetCurrentCameraPosition();
+		//adjusts raycast origin to player head approx. level (limits results behind the character)
+		if ( DayZPlayerCamera3rdPerson.Cast(player.GetCurrentCamera()) )
+		{
+			vector head_pos;
+			MiscGameplayFunctions.GetHeadBonePos(player,head_pos);
+			float dist = vector.Distance(head_pos,from);
+			from = from + GetGame().GetCurrentCameraDirection() * dist;
+		}
+		
 		vector to = from + ( GetGame().GetCurrentCameraDirection() * ( max_projection_dist + camera_to_player_distance ) );
 		vector contact_pos;
 		set<Object> hit_object = new set<Object>;
@@ -1288,7 +1304,6 @@ class Hologram
 		if ((hit_object.Count() > 0) && hit_object[0].IsInherited(Watchtower))
 			contact_pos = CorrectForWatchtower( m_ContactComponent, contact_pos, player, hit_object[0] );
 
-
 		float player_to_projection_distance = vector.Distance( player.GetPosition(), contact_pos );
 		vector player_to_projection_vector;
 
@@ -1300,16 +1315,16 @@ class Hologram
 			//prevents the hologram to go underground/floor while hologram exceeds min_projection_dist
 			player_to_projection_vector[1] = player_to_projection_vector[1] + PROJECTION_TRANSITION_MIN;
 			
-			contact_pos = player.GetPosition() + (player_to_projection_vector * min_projection_dist);			
+			contact_pos = player.GetPosition() + (player_to_projection_vector * min_projection_dist);
 			SetIsFloating( true );
 		}
 		//hologram is at max distance from player
 		else if ( player_to_projection_distance >= max_projection_dist )
 		{
-			player_to_projection_vector = contact_pos - player.GetPosition();	
+			player_to_projection_vector = contact_pos - player.GetPosition();
 			player_to_projection_vector.Normalize();
 			//prevents the hologram to go underground/floor while hologram exceeds max_projection_dist
-			player_to_projection_vector[1] = player_to_projection_vector[1] + PROJECTION_TRANSITION_MAX;		
+			player_to_projection_vector[1] = player_to_projection_vector[1] + PROJECTION_TRANSITION_MAX;
 			
 			contact_pos = player.GetPosition() + (player_to_projection_vector * max_projection_dist);
 			SetIsFloating( true );
@@ -1318,8 +1333,9 @@ class Hologram
 		else
 		{
 			SetIsFloating( false );
-		}			
-			
+		}
+		m_FromAdjusted = from;
+		
 		return contact_pos;
 	}
 	
@@ -1467,8 +1483,8 @@ class Hologram
 	}
 
 	void SetProjectionPosition( vector position )
-	{	
-		m_Projection.SetPosition( position );			
+	{
+		m_Projection.SetPosition( position );
 		
 		if ( IsFloating() )
 		{
@@ -1506,13 +1522,56 @@ class Hologram
 		ground = Vector(0, - Math.Max( projection_diameter, SMALL_PROJECTION_GROUND ), 0);
 		
 		vector to = from + ground;
-		vector contact_pos;
+		vector contact_pos = "0 0 0";
 		
-		DayZPhysics.RaycastRV( from, to, contact_pos, m_ContactDir, m_ContactComponent, NULL, NULL, m_Projection, false, false, ObjIntersectView );
-		/*if (!DayZPhysics.RayCastBullet( from,to,PhxInteractionLayers.ROADWAY|PhxInteractionLayers.TERRAIN,m_Projection,null,contact_pos,null,null))
+		//DayZPhysics.RaycastRV( from, to, contact_pos, m_ContactDir, m_ContactComponent, null, null, m_Projection, false, false, ObjIntersectView );
+		
+		RaycastRVParams rayInput = new RaycastRVParams(from, to, m_Projection);
+		rayInput.flags = CollisionFlags.ALLOBJECTS;
+		array<ref RaycastRVResult> results = new array<ref RaycastRVResult>;
+		
+		if ( DayZPhysics.RaycastRVProxy(rayInput, results) )
 		{
-			DayZPhysics.RayCastBullet( from,to,PhxInteractionLayers.TERRAIN,m_Projection,null,contact_pos,null,null);
-		}*/
+			RaycastRVResult res;
+			for (int i = 0; i < results.Count(); i++)
+			{
+				res = results.Get(i);
+				if ( res.entry || (!res.obj && !res.parent) )
+				{
+					contact_pos = res.pos;
+					break;
+				}
+			}
+		}
+		
+		//LOS check
+		if (contact_pos != "0 0 0")
+		{
+			vector check_pos;
+			vector check_dir;
+			int check_component = -1;
+			set<Object> hit_object = new set<Object>;
+			to = contact_pos;
+			to[1] = to[1] + 0.1;
+			
+			/*if ( DayZPlayerCamera3rdPerson.Cast(m_Player.GetCurrentCamera()) )
+			{
+				from = GetGame().GetCurrentCameraPosition();
+			}
+			else
+			{
+				from = m_FromAdjusted;
+			}*/
+			from = m_FromAdjusted;
+			
+			if (DayZPhysics.RaycastRV( from, to, check_pos, check_dir, check_component, hit_object, null, m_Player, false, false, ObjIntersectView ))
+			{
+				if ( (hit_object.Count() > 0) && (!hit_object[0].IsInherited(Watchtower) || (hit_object[0].IsInherited(Watchtower) && (m_WatchtowerIgnoreComponentNames.Find(hit_object[0].GetActionComponentName( check_component, "view" )) == -1))) )
+				{
+					contact_pos = "0 0 0";
+				}
+			}
+		}
 		
 		HideWhenClose( contact_pos );
 		
@@ -1673,3 +1732,31 @@ class ProjectionTrigger extends Trigger
 	}
 }
 
+/*
+modded class Hologram
+{
+	override EntityAI PlaceEntity( EntityAI entity_for_placing )
+	{
+		//works
+		EntityAI ent = super.PlaceEntity(entity_for_placing);
+		return ent;
+
+		//returns NULL
+		return super.PlaceEntity(entity_for_placing);
+	}
+}
+
+//same issue if I use non-modded child class:
+class HologramEx extends Hologram
+{
+	override EntityAI PlaceEntity( EntityAI entity_for_placing )
+	{
+		//works
+		EntityAI ent = super.PlaceEntity(entity_for_placing);
+		return ent;
+		
+		//returns NULL
+		return super.PlaceEntity(entity_for_placing);
+	}
+}
+*/

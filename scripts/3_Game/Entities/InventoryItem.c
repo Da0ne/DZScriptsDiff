@@ -133,6 +133,12 @@ class InventoryItem extends EntityAI
 			return surface;
 		}
 	}
+	
+	//! returns ammo (projectile) used in melee if the item is destroyed. Override higher for specific use
+	string GetRuinedMeleeAmmoType()
+	{
+		return "MeleeSoft";
+	}
 
 	// -------------------------------------------------------------------------------
 /*	override void EOnContact(IEntity other, Contact extra)

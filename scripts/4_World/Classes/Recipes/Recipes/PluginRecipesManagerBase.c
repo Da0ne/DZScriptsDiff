@@ -74,8 +74,8 @@ class PluginRecipesManagerBase extends PluginBase
 		//RegisterRecipe(new CraftCamoNetShelter);
 		RegisterRecipe(new DeCraftCamoNetShelter);
 		RegisterRecipe(new FuelChainsaw);
-		//RegisterRecipe(new CraftTripWire);
-		//RegisterRecipe(new CraftRabbitSnare);
+		RegisterRecipe(new CraftTripWire);
+		RegisterRecipe(new CraftRabbitSnare);
 		RegisterRecipe(new DeCraftSnareTrap);
 		RegisterRecipe(new DeCraftTripWire);
 		RegisterRecipe(new DisinfectItem);
@@ -115,6 +115,11 @@ class PluginRecipesManagerBase extends PluginBase
 		RegisterRecipe(new CraftShelterKit);
 		RegisterRecipe(new CraftTruck01DoubleWheel);
 		RegisterRecipe(new DeCraftTruck01DoubleWheel);
+		RegisterRecipe(new CraftFishNetTrap);
+		RegisterRecipe(new DeCraftFishNetTrap);
+		RegisterRecipe(new PrepareChicken);
+		RegisterRecipe(new PrepareRabbit);
+		RegisterRecipe(new CraftSmallFishTrap);
 		
 		//"paint" recipes
 		/*RegisterRecipe(new PaintFirefighterAxe);

@@ -26,7 +26,7 @@ class ControlsXbox extends UIScriptedMenu
 	
 	void ~ControlsXbox()
 	{
-		PPEffects.SetBlurMenu( 0 );
+		PPERequesterBank.GetRequester(PPERequester_ControlsBlur).Stop();
 	}
 	
 	void Back()
@@ -333,7 +333,11 @@ class ControlsXbox extends UIScriptedMenu
 		m_tab_images[1] = ImageWidget.Cast( layoutRoot.FindAnyWidget("WeaponsAndActionsBackdropImageWidget") );
 		m_tab_images[2] = ImageWidget.Cast( layoutRoot.FindAnyWidget("InventoryTabBackdropImageWidget") );
 		m_tab_images[3] = ImageWidget.Cast( layoutRoot.FindAnyWidget("MenusTabBackdropImageWidget") );
-		PPEffects.SetBlurMenu( 0.6 );
+		
+		PPERequester_MenuEffects requester;
+		Class.CastTo(requester,PPERequesterBank.GetRequester(PPERequesterBank.REQ_MENUEFFECTS));
+		requester.SetVignetteIntensity(0.6);
+		
 		DrawConnectingLines( 0 );
 		return layoutRoot;
 	}

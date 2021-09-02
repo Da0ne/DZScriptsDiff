@@ -1,5 +1,10 @@
 class WeldingMask extends ClothingBase
 {
+	override array<int> GetEffectWidgetTypes()
+	{
+		return {EffectWidgetsTypes.HELMET_OCCLUDER,EffectWidgetsTypes.HELMET_BREATH};
+	}
+	
 	override bool CanPutAsAttachment( EntityAI parent )
 	{
 		if(!super.CanPutAsAttachment(parent)) {return false;}
@@ -15,5 +20,10 @@ class WeldingMask extends ClothingBase
 			return true;
 		}
 		return false;
+	}
+		
+	override int GetGlassesEffectID()
+	{
+		return PPERequesterBank.REQ_GLASSESWELDING;
 	}
 }

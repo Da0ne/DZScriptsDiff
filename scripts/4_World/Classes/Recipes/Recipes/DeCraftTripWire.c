@@ -69,10 +69,10 @@ class DeCraftTripWire extends RecipeBase
 		//----------------------------------------------------------------------------------------------------------------------
 		
 		//result1
-		AddResult("WoodenStick");//add results here
+		AddResult("MetalWire");//add results here
 
 		m_ResultSetFullQuantity[0] = false;//true = set full quantity, false = do nothing
-		m_ResultSetQuantity[0] = 2;//-1 = do nothing
+		m_ResultSetQuantity[0] = 1;//-1 = do nothing
 		m_ResultSetHealth[0] = -1;//-1 = do nothing
 		m_ResultInheritsHealth[0] = 0;// (value) == -1 means do nothing; a (value) >= 0 means this result will inherit health from ingredient number (value);(value) == -2 means this result will inherit health from all ingredients averaged(result_health = combined_health_of_ingredients / number_of_ingredients)
 		m_ResultInheritsColor[0] = -1;// (value) == -1 means do nothing; a (value) >= 0 means this result classname will be a composite of the name provided in AddResult method and config value "color" of ingredient (value)
@@ -85,7 +85,8 @@ class DeCraftTripWire extends RecipeBase
 
 	override bool CanDo(ItemBase ingredients[], PlayerBase player)//final check for recipe's validity
 	{
-		return true;
+		// We don't allow dismantling if there is an item attached
+		return ingredients[0].GetInventory().AttachmentCount() == 0;
 	}
 
 	override void Do(ItemBase ingredients[], PlayerBase player,array<ItemBase> results, float specialty_weight)//gets called upon recipe's completion

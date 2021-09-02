@@ -29,9 +29,11 @@ class EntityAI extends Entity
 	bool 								m_KilledByHeadshot;
 	bool 								m_PreparedToDelete = false;
 	bool 								m_RefresherViable = false;
+	bool 								m_FinisherInProgress; //is this object being backstabbed?
 	
 	ref KillerData 						m_KillerData;
 	private ref HiddenSelectionsData	m_HiddenSelectionsData;
+	ref Timer 							m_FinisherTimer;
 	
 	ref array<EntityAI> 			m_AttachmentsWithCargo;
 	ref array<EntityAI> 			m_AttachmentsWithAttachments;
@@ -85,8 +87,9 @@ class EntityAI extends Entity
 			RegisterNetSyncVariableBool("m_EM.m_IsSwichedOn");
 			RegisterNetSyncVariableBool("m_EM.m_CanWork");
 			RegisterNetSyncVariableBool("m_EM.m_IsPlugged");
-			RegisterNetSyncVariableInt ("m_EM.m_EnergySourceNetworkIDLow");
-			RegisterNetSyncVariableInt ("m_EM.m_EnergySourceNetworkIDHigh");
+			RegisterNetSyncVariableInt("m_EM.m_EnergySourceNetworkIDLow");
+			RegisterNetSyncVariableInt("m_EM.m_EnergySourceNetworkIDHigh");
+			RegisterNetSyncVariableFloat("m_EM.m_Energy");
 		}
 		
 		// Item preview index
@@ -100,16 +103,25 @@ class EntityAI extends Entity
 		//m_OldLocation 					= new InventoryLocation;
 		m_LastUpdatedTime = 0.0;
 		m_ElapsedSinceLastUpdate = 0.0;
+		m_FinisherInProgress = false;
 		
 		InitDamageZoneMapping();
 		InitDamageZoneDisplayNameMapping();
 		
 		m_HiddenSelectionsData = new HiddenSelectionsData( GetType() );
+		m_FinisherTimer = new Timer();
+		
+		GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater(DeferredInit,34);
 	}
 	
 	void ~EntityAI()
 	{
 		
+	}
+	
+	void DeferredInit()
+	{
+		m_Initialized = true;
 	}
 
 	private ref ComponentsBank m_ComponentsBank;
@@ -484,9 +496,41 @@ class EntityAI extends Entity
 	
 	bool CanBeTargetedByAI(EntityAI ai)
 	{
-		if ( !dBodyIsActive( this ) && !IsPlayer() )
+		if (ai.IsBeingBackstabbed())
+		{
+			return false;
+		}
+		
+		if ( !dBodyIsActive( this ) && !IsMan() )
 			return false;
 		return !IsDamageDestroyed();
+	}
+	
+	bool CanBeBackstabbed()
+	{
+		return false;
+	}
+	
+	//! returns true if backstab is in progress; used for suspending of AI targeting and other useful things besides
+	override bool IsBeingBackstabbed()
+	{
+		return m_FinisherInProgress;
+	}
+	
+	override void SetBeingBackstabbed()
+	{
+		m_FinisherInProgress = true;
+		
+		if (m_FinisherTimer.IsRunning())
+			m_FinisherTimer.Stop();
+		m_FinisherTimer.Run(PlayerConstants.AI_BACKSTAB_HIT_TIME,this,"ResetBackstabbedState");
+		//Print("DbgZombies | DumbZombie on: " + GetGame().GetTime());
+	}
+	
+	protected void ResetBackstabbedState()
+	{
+		m_FinisherInProgress = false;
+		//Print("DbgZombies | DumbZombie off: " + GetGame().GetTime());
 	}
 
 	/**@brief Delete this object in next frame
@@ -580,7 +624,7 @@ class EntityAI extends Entity
 		
 		MaxLifetimeRefreshCalc();
 		
-		m_Initialized = true;
+		//m_Initialized = true;
 	}
 	
 	//! Called right before object deleting
@@ -2037,7 +2081,7 @@ class EntityAI extends Entity
 				// BODY STAGING - server => client synchronization of skinned state.
 				case ERPCs.RPC_BS_SKINNED_STATE:
 				{
-					ref Param1<bool> p_skinned_state= new Param1<bool>(false);
+					Param1<bool> p_skinned_state= new Param1<bool>(false);
 					if (ctx.Read(p_skinned_state))
 					{
 						float state = p_skinned_state.param1;
@@ -2239,18 +2283,18 @@ class EntityAI extends Entity
 		string path;
 		int consumable_count;
 		
-		for(int i = 0; i < all_paths.Count(); i++)
+		for (int i = 0; i < all_paths.Count(); i++)
 		{
 			config_path = all_paths.Get(i);
 			int children_count = GetGame().ConfigGetChildrenCount(config_path);
 			
-			for(int x = 0; x < children_count; x++)
+			for (int x = 0; x < children_count; x++)
 			{
 				GetGame().ConfigGetChildName(config_path, x, child_name);
 				path = config_path + " " + child_name;
 				scope = GetGame().ConfigGetInt( config_path + " " + child_name + " scope" );
 				bool should_check = 1;
-				if( config_path == "CfgVehicles" && scope == 0)
+				if ( config_path == "CfgVehicles" && scope == 0)
 				{
 					should_check = 0;
 				}
@@ -2259,9 +2303,9 @@ class EntityAI extends Entity
 				{
 					string inv_slot;
 					GetGame().ConfigGetText( config_path + " " + child_name + " inventorySlot",inv_slot );
-					for(int z = 0; z < slots.Count(); z++)
+					for (int z = 0; z < slots.Count(); z++)
 					{
-						if(slots.Get(z) == inv_slot)
+						if (slots.Get(z) == inv_slot)
 						{
 							this.GetInventory().CreateInInventory( child_name );
 							continue;

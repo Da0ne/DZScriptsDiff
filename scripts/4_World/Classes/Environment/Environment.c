@@ -138,10 +138,13 @@ class Environment
 		{
 			m_RoofCheckTimer += pDelta;
 			//! check if player is under roof (only if the Building check is false)
-			if (m_RoofCheckTimer >= GameConstants.ENVIRO_TICK_ROOF_RC_CHECK && !IsInsideBuilding())
+			if ( m_RoofCheckTimer >= GameConstants.ENVIRO_TICK_ROOF_RC_CHECK )
 			{
-				CheckUnderRoof();
+				if ( !IsInsideBuilding() )
+					CheckUnderRoof();
+				
 				m_RoofCheckTimer = 0;
+				m_HeatSourceTemp = 0.0;
 			}
 
 			m_Time += pDelta;
@@ -189,8 +192,6 @@ class Environment
 					m_WetDryTick = 0;
 					m_ItemsWetnessMax = 0; //! reset item wetness counter;
 				}
-				
-				m_HeatSourceTemp = 0.0;
 			}
 		}
 	}

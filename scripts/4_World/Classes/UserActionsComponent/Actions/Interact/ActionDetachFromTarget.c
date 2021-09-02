@@ -111,6 +111,8 @@ class ActionDetachFromTarget: ActionInteractBase
 
 	void Process( ActionData action_data )
 	{
+		ClearInventoryReservationEx(action_data);
+		
 		DetachActionData action_data_a = DetachActionData.Cast(action_data);
 		EntityAI target_entity = EntityAI.Cast( action_data_a.m_Target.GetObject() );
 				

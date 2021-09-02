@@ -17,8 +17,8 @@ class WoundInfectStage1Mdfr: ModifierBase
 	static const int AGENT_THRESHOLD_DEACTIVATE = 250;
 	static const int AGENT_THRESHOLD_FEVER = 250;
 	
-	static const int PAIN_EVENT_INTERVAL_MIN = 12;
-	static const int PAIN_EVENT_INTERVAL_MAX = 18;
+	static const int PAIN_EVENT_INTERVAL_MIN = 18;
+	static const int PAIN_EVENT_INTERVAL_MAX = 26;
 	
 	protected float m_NextEvent;
 	protected float m_Time;
@@ -29,6 +29,7 @@ class WoundInfectStage1Mdfr: ModifierBase
 		m_ID 					= eModifiers.MDF_WOUND_INFECTION1;
 		m_TickIntervalInactive 	= DEFAULT_TICK_TIME_INACTIVE;
 		m_TickIntervalActive 	= DEFAULT_TICK_TIME_ACTIVE;
+		m_SyncID				= eModifierSyncIDs.MODIFIER_SYNC_WOUND_INFECT_1;
 	}
 	
 	override string GetDebugText()

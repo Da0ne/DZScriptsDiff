@@ -10,6 +10,7 @@ class HungerMdfr: ModifierBase
 		m_ID 					= eModifiers.MDF_HUNGER;
 		m_TickIntervalInactive 	= DEFAULT_TICK_TIME_INACTIVE;
 		m_TickIntervalActive 	= 1;
+		DisableDeactivateCheck();
 	}
 	
 	override bool ActivateCondition(PlayerBase player)
@@ -34,9 +35,9 @@ class HungerMdfr: ModifierBase
 		float metabolic_speed = MiscGameplayFunctions.GetEnergyMetabolicSpeed(m_MovementState.m_iMovement);
 		//PrintString(metabolic_speed.ToString());
 		
-		float energy_delta  = Math.AbsInt(player.GetStatEnergy().Get() - m_LastEnergyLevel);
+		float energy_delta  = Math.AbsInt(energy - m_LastEnergyLevel);
 		if (energy <  m_LastEnergyLevel) energy_delta = -energy_delta;
-		m_LastEnergyLevel = player.GetStatEnergy().Get();
+		m_LastEnergyLevel = energy;
 		
 		player.GetStatEnergy().Add( -metabolic_speed * deltaT );
 		if ( energy <= PlayerConstants.LOW_ENERGY_THRESHOLD )
