@@ -8,7 +8,7 @@ class Trap_FishNet extends TrapSpawnBase
 		m_UpdateWaitTime = 30;
 		m_IsFoldable = true;
 		
-		m_MinimalDistanceFromPlayersToCatch 	= 25;
+		m_MinimalDistanceFromPlayersToCatch 	= 15;
 		
 		m_BaitCatchProb 						= 85;
 		m_NoBaitCatchProb						= 15;
@@ -105,12 +105,12 @@ class Trap_FishNet extends TrapSpawnBase
 		return super.CanReceiveAttachment( attachment, slotId );
 	}
 	
+	#ifdef PLATFORM_WINDOWS
 	// How one sees the tripwire when in vicinity
 	override int GetViewIndex()
 	{
 		if ( MemoryPointExists( "invView2" ) )
-		{
-			#ifdef PLATFORM_WINDOWS
+		{		
 			InventoryLocation il = new InventoryLocation;
 			GetInventory().GetCurrentInventoryLocation( il );
 			InventoryLocationType type = il.GetType();
@@ -150,13 +150,10 @@ class Trap_FishNet extends TrapSpawnBase
 					return 0;
 				}
 			}
-			#ifdef PLATFORM_CONSOLE
-			return 1;
-			#endif
-			#endif
 		}
 		return 0;
 	}
+	#endif
 	
 	//================================================================
 	// ADVANCED PLACEMENT

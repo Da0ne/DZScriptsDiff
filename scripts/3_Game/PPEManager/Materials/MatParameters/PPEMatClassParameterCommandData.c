@@ -1,7 +1,3 @@
-/*
-DISCLAIMER: may undergo some changes in the course of 1.14 experimental stage.
-*/
-
 typedef map<int,ref PPERequestParamDataBase> ActiveParameterRequestsMap; //<request_ID, data>
 
 class PPEMatClassParameterCommandData
@@ -10,12 +6,12 @@ class PPEMatClassParameterCommandData
 	const int LAYER_INFO_VALUE = 0;
 	const int LAYER_INFO_OPERATOR = 1;
 	
-	ref array<int> 									m_CommandLayersArray; //for tracking active priorities and sorting them
+	ref array<int> 									m_CommandLayersArray; //for tracking active priorities and sorting them //TODO - could have been 'set'..
 	protected int 									m_UpdatedCount;
 	protected int 									m_MaterialIndex; //just a helper
 	protected int 									m_ParameterIndex;
 	protected ref ActiveParameterRequestsMap 		m_RequestMap;//<request_ID, parameter data>
-	protected ref PPEClassBase 						m_Parent;
+	protected PPEClassBase 							m_Parent;
 	protected ref Param 							m_Defaults; // Careful, formating is such, that param1 is ALWAYS string, containing parameter name. Actual values follow.
 	protected ref Param 							m_CurrentValues; // Careful, only actual values, WITHOUT string
 	
@@ -76,11 +72,12 @@ class PPEMatClassParameterCommandData
 		}
 	}
 	
+	//! Modifies values to be used for setter methods later in the manager update. Currently used only on PPEMatClassParameterColor, TODO!!
 	void ModifyResultValues(inout Param result_values)
 	{
 	}
 	
-	//TODO - check where this is used, should match 'm_LayerInfo' use on children
+	//! Adds 'layers' to be iterated throug
 	void AddPriorityInfo(int priority)
 	{
 		if ( m_CommandLayersArray.Find(priority) == -1 )
@@ -94,7 +91,7 @@ class PPEMatClassParameterCommandData
 		}
 	}
 	
-	//TODO - redundant? Currently unused; the map and array (?) get cleared every update
+	//! Currently unused; layer info gets cleared every update
 	void RemovePriorityInfo(int priority)
 	{
 	}

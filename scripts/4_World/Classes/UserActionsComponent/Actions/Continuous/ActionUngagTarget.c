@@ -6,6 +6,7 @@ class ActionUngagTarget: ActionContinuousBase
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONMOD_COVERHEAD_TARGET;
 		//m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
+		m_Text = "#ungag_person";
 	}
 
 	override void CreateConditionComponents()  
@@ -13,11 +14,6 @@ class ActionUngagTarget: ActionContinuousBase
 	
 		m_ConditionItem = new CCINone;
 		m_ConditionTarget = new CCTMan(UAMaxDistances.DEFAULT);
-	}
-	
-	override string GetText()
-	{
-		return "#ungag_person";
 	}
 	
 	override typename GetInputType()
@@ -41,16 +37,18 @@ class ActionUngagTarget: ActionContinuousBase
 	override void OnFinishProgressServer( ActionData action_data )
 	{
 		PlayerBase ntarget = PlayerBase.Cast( action_data.m_Target.GetObject() );
-		
-		EntityAI attachment;
-		Class.CastTo(attachment, ntarget.GetInventory().FindAttachment(InventorySlots.MASK));
-		
-		if ( attachment && attachment.GetType() == "MouthRag" )
+		if (CanReceiveAction(action_data.m_Target))
 		{
-			UngagSelfLambda lamb = new UngagSelfLambda(attachment, "Rag", action_data.m_Player);
-			lamb.SetTransferParams(true, true, true, false, 1);
-			action_data.m_Player.ServerReplaceItemElsewhereWithNewInHands(lamb);
-			//action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+			EntityAI attachment;
+			Class.CastTo(attachment, ntarget.GetInventory().FindAttachment(InventorySlots.MASK));
+			
+			if ( attachment && attachment.GetType() == "MouthRag" )
+			{
+				UngagSelfLambda lamb = new UngagSelfLambda(attachment, "Rag", action_data.m_Player);
+				lamb.SetTransferParams(true, true, true, false, 1);
+				action_data.m_Player.ServerReplaceItemElsewhereWithNewInHands(lamb);
+				//action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+			}
 		}
 	}
 	

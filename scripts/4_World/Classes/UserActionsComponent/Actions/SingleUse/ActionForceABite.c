@@ -11,17 +11,13 @@ class ActionForceABite: ActionForceConsumeSingle
 	void ActionForceABite()
 	{		
 		m_CallbackClass = ActionForceABiteCB;
+		m_Text = "#feed_a_bite";
 	}
 	
 	override void CreateConditionComponents()  
 	{		
 		m_ConditionItem = new CCINonRuined;
 		m_ConditionTarget = new CCTMan(UAMaxDistances.DEFAULT);
-	}
-
-	override string GetText()
-	{
-		return "#feed_a_bite";
 	}
 	
 	override void OnEndServer( ActionData action_data )

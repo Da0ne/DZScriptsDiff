@@ -16,17 +16,13 @@ class ActionSewTarget: ActionBandageBase
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
 		m_SpecialtyWeight = UASoftSkillsWeight.PRECISE_MEDIUM;
+		m_Text = "#sew_targets_cuts";
 	}
 	
 	override void CreateConditionComponents()  
 	{	
 		m_ConditionItem = new CCINonRuined;
 		m_ConditionTarget = new CCTMan(UAMaxDistances.DEFAULT);
-	}
-		
-	override string GetText()
-	{
-		return "#sew_targets_cuts";
 	}
 	/*
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
@@ -39,10 +35,13 @@ class ActionSewTarget: ActionBandageBase
 	{
 		PlayerBase target = PlayerBase.Cast(action_data.m_Target.GetObject());
 		
-		if(action_data.m_MainItem && target)
+		if (CanReceiveAction(action_data.m_Target))
 		{
-			ApplyBandage( action_data.m_MainItem, target );
-			action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+			if (action_data.m_MainItem && target)
+			{
+				ApplyBandage( action_data.m_MainItem, target );
+				action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+			}
 		}
 	}
 	

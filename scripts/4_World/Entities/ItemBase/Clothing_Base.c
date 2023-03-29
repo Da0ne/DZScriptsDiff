@@ -3,7 +3,6 @@
 // since that will conflict with config and other parts of script and break mods :c
 class Clothing extends Clothing_Base
 {
-
 	override bool IsClothing()
 	{
 		return true;
@@ -26,61 +25,6 @@ class Clothing extends Clothing_Base
 	{
 		return null;
 	}
-
-	//TODO - revisit priority
-	/*int GetOcclusionPriority()
-	{
-		return 0;
-	}*/
-	
-	void ToggleGlassesEffect(bool enable, PlayerBase player)
-	{
-		if (!player.IsControlledPlayer())
-			return;
-		
-		if (!enable)
-		{
-			PPERequesterBank.GetRequester(GetGlassesEffectID()).Stop();
-		}
-		else
-		{
-			PPERequesterBank.GetRequester(GetGlassesEffectID()).Start();
-		}
-	}
-	
-	override void OnWasAttached( EntityAI parent, int slot_id )
-	{
-		super.OnWasAttached( parent, slot_id );
-		PlayerBase player = PlayerBase.Cast(parent);
-		
-		if (player)
-		{
-			if (GetGame().IsClient() || !GetGame().IsMultiplayer() )
-			{
-				if (GetGlassesEffectID() > -1)
-				{
-					GetGame().GetCallQueue(CALL_CATEGORY_GAMEPLAY).Call(ToggleGlassesEffect,true,player);
-				}
-			}
-		}
-	}
-	
-	override void OnWasDetached( EntityAI parent, int slot_id )
-	{
-		super.OnWasDetached( parent, slot_id );
-		PlayerBase player = PlayerBase.Cast(parent);
-		
-		if (player)
-		{
-			if (GetGame().IsClient() || !GetGame().IsMultiplayer())
-			{
-				if (GetGlassesEffectID() > -1)
-				{
-					GetGame().GetCallQueue(CALL_CATEGORY_GAMEPLAY).Call(ToggleGlassesEffect,false,player);
-				}
-			}
-		}
-	}
 	
 	// Conditions	
 	override bool CanPutInCargo( EntityAI parent )
@@ -88,7 +32,7 @@ class Clothing extends Clothing_Base
 		if ( !super.CanPutInCargo( parent ) )
 			return false;
 		
-		return CanPutInCargoClothingConditions( parent );
+		return !parent || CanPutInCargoClothingConditions( parent );
 	}
 	
 	bool CanPutInCargoClothingConditions( EntityAI parent )
@@ -157,20 +101,60 @@ class Clothing extends Clothing_Base
 	}
 	
 	//Method used to specify if a piece of eyeware can be worn under a gas mask
+	//! deprecated
 	bool CanWearUnderMask(EntityAI parent)
 	{
-		bool is_mask_only = false;
-		
-		if ( parent.FindAttachmentBySlotName( "Mask" ) )
+		return true;
+	}
+	
+	// -------------------------------------------------------------------------
+	override void EEHealthLevelChanged(int oldLevel, int newLevel, string zone)
+	{
+		super.EEHealthLevelChanged(oldLevel, newLevel, zone);
+		if ( !GetGame().IsDedicatedServer() )
 		{
-			is_mask_only = parent.FindAttachmentBySlotName( "Mask" ).ConfigGetBool( "noEyewear" );
+			PlayerBase player_owner = PlayerBase.Cast(GetHierarchyParent());
+			
+			if( player_owner )
+			{
+				if( player_owner.m_CorpseState != 0 )
+				{
+					GetGame().GetCallQueue( CALL_CATEGORY_GUI ).CallLater( player_owner.UpdateCorpseState, 0, false);
+				}
+			}
+		}
+	}
+	
+	override void SwitchItemSelectionTextureEx(EItemManipulationContext context, Param par = null)
+	{
+		super.SwitchItemSelectionTextureEx(context, par);
+		
+		Param1<PlayerBase> data = Param1<PlayerBase>.Cast(par);
+		if (!data)
+		{
+			return;
 		}
 		
-		if ( ( GetNumberOfItems() == 0 || !parent || parent.IsMan() ) && !is_mask_only )
+		PlayerBase player = data.param1;
+		
+		int personality = GetHiddenSelectionIndex("personality");
+		if (personality >= 0)
 		{
-			return true;
+			string tone_mat = player.m_EmptyGloves.GetHiddenSelectionsMaterials().Get(0);
+			string tone_texture;
+			
+			if (player.m_CorpseState > PlayerConstants.CORPSE_STATE_FRESH)
+			{
+				tone_texture = player.m_DecayedTexture;
+			}
+			else
+			{
+				tone_texture = player.m_EmptyGloves.GetHiddenSelectionsTextures().Get(0);
+			}
+			
+			SetObjectMaterial( personality, tone_mat );
+			SetObjectTexture( personality, tone_texture );
 		}
-		return false;	
 	}
 };
 

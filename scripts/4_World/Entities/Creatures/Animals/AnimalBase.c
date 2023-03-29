@@ -162,9 +162,24 @@ class Animal_GallusGallusDomesticus extends AnimalBase
 		return "HenCluck_X_SoundSet";
 	}
 	
-	string GetDeadItemName()
+	override bool ReplaceOnDeath()
+	{
+		return true;
+	}
+	
+	override bool CanBeSkinned()
+	{
+		return false;
+	}
+	
+	override string GetDeadItemName()
 	{
 		return "DeadRooster";
+	}
+	
+	override bool KeepHealthOnReplace()
+	{
+		return false;
 	}
 }
 

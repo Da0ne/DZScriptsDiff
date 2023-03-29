@@ -12,23 +12,23 @@ class ClientData
 	
 	static void ResetClientData()
 	{
-		if( m_PlayerBaseList )
+		if ( m_PlayerBaseList )
 			m_PlayerBaseList.Clear();
-		if( m_PlayerList && m_PlayerList.m_PlayerList )
+		if ( m_PlayerList && m_PlayerList.m_PlayerList )
 			m_PlayerList.m_PlayerList.Clear();
-		if( m_LastNewPlayers && m_LastNewPlayers.m_PlayerList )
+		if ( m_LastNewPlayers && m_LastNewPlayers.m_PlayerList )
 			m_LastNewPlayers.m_PlayerList.Clear();
 	}
 	
 	static void AddPlayerBase( Man player )
 	{
-		if( m_PlayerBaseList && player != GetGame().GetPlayer() )
+		if ( m_PlayerBaseList && player != GetGame().GetPlayer() )
 			m_PlayerBaseList.Insert( player );
 	}
 	
 	static void RemovePlayerBase( Man player )
 	{
-		if( m_PlayerBaseList )
+		if ( m_PlayerBaseList )
 			m_PlayerBaseList.RemoveItem( player );
 	}
 	
@@ -54,22 +54,31 @@ class ClientData
 		
 		#ifdef PLATFORM_CONSOLE
 			#ifndef PLATFORM_WINDOWS // if app is not on Windows with -XBOX parameter
-				OnlineServices.LoadPermissions( GetSimplePlayerList( new_players ) );
-				if( new_players.m_PlayerList.Count() > 0 )
+				array<string> newPlayersSimple = GetSimplePlayerList( new_players );
+				OnlineServices.LoadPermissions( newPlayersSimple );
+				OnlineServices.m_ClientServices.GetSessionService().OnSessionPlayerListUpdate(newPlayersSimple);
+				
+				if ( new_players.m_PlayerList.Count() > 0 )
+				{
 					OnlineServices.LoadFriends();
-				if( g_Game.GetGameState() == DayZGameState.IN_GAME )
+				}
+		
+				if ( g_Game.GetGameState() == DayZGameState.IN_GAME )
+				{
 					OnlineServices.SetMultiplayState(OnlineServices.GetMultiplayState());
+				}
 			#endif
 		#endif
 		
 		SyncEvent_OnPlayerListUpdate.Invoke( player_list );
 	}
+	
 	static array<string> GetSimplePlayerList()
 	{
 		array<string> ids = new array<string>;
-		if( m_PlayerList && m_PlayerList.m_PlayerList )
+		if ( m_PlayerList && m_PlayerList.m_PlayerList )
 		{
-			for( int i = 0; i < m_PlayerList.m_PlayerList.Count(); i++ )
+			for ( int i = 0; i < m_PlayerList.m_PlayerList.Count(); i++ )
 			{
 				SyncPlayer player = m_PlayerList.m_PlayerList.Get( i );
 				ids.Insert( player.m_UID );
@@ -82,9 +91,9 @@ class ClientData
 	static array<string> GetSimplePlayerList( SyncPlayerList list )
 	{
 		array<string> ids = new array<string>;
-		if( list )
+		if ( list )
 		{
-			for( int i = 0; i < list.m_PlayerList.Count(); i++ )
+			for ( int i = 0; i < list.m_PlayerList.Count(); i++ )
 			{
 				SyncPlayer player = list.m_PlayerList.Get( i );
 				ids.Insert( player.m_UID );

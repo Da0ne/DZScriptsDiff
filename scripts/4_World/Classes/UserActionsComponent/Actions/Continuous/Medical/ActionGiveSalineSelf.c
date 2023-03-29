@@ -16,6 +16,7 @@ class ActionGiveSalineSelf: ActionContinuousBase
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONFB_SALINEBLOODBAG;
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
+		m_Text = "#give_saline";
 	}
 	
 	override void CreateConditionComponents()  
@@ -28,19 +29,12 @@ class ActionGiveSalineSelf: ActionContinuousBase
 	{
 		return false;
 	}
-		
-	override string GetText()
-	{
-		return "#give_saline";
-	}
 
 	override void OnFinishProgressServer( ActionData action_data )
 	{		
 		action_data.m_MainItem.TransferModifiers(action_data.m_Player);
 		Param1<float> nacdata = Param1<float>.Cast( action_data.m_ActionComponent.GetACData() );		
 		float delta = nacdata.param1;
-		//action_data.m_Player.SetHealth("GlobalHealth", "Blood", action_data.m_Player.GetHealth("GlobalHealth", "Blood") + delta );
-		//action_data.m_Player.AddHealth("", "Blood", delta);
 		action_data.m_Player.GetModifiersManager().ActivateModifier(eModifiers.MDF_SALINE);
 		action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
 

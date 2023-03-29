@@ -28,6 +28,7 @@ class ActionDisinfectSelf: ActionDisinfectBase
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONFB_STITCHUPSELF;
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
+		m_Text = "#disinfect_self";
 	}
 	
 	override void CreateConditionComponents()  
@@ -39,11 +40,6 @@ class ActionDisinfectSelf: ActionDisinfectBase
 	override bool HasTarget()
 	{
 		return false;
-	}
-		
-	override string GetText()
-	{
-		return "#disinfect_self";
 	}
 	
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )

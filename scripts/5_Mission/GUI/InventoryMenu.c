@@ -90,7 +90,16 @@ class InventoryMenu extends UIScriptedMenu
 	override void Update( float timeslice )
 	{
 		if( m_Inventory )
-			m_Inventory.UpdateInterval();
+		{
+			m_Inventory.Update(timeslice);
+		}
+	}
+	
+	override void Refresh()
+	{
+		super.Refresh();
+		
+		m_Inventory.UpdateConsoleToolbar();
 	}
 
 	override void OnShow()
@@ -132,6 +141,7 @@ class InventoryMenu extends UIScriptedMenu
 	override void OnHide()
 	{
 		super.OnHide();
+		m_context_menu.Hide();
 		m_IsOpened = false;
 		PPERequesterBank.GetRequester(PPERequesterBank.REQ_INVENTORYBLUR).Stop();
 		if(m_Inventory)

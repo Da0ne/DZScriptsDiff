@@ -21,7 +21,7 @@ class PPERequester_ShockHitReaction extends PPERequester_GameplayBase
 		SetTargetValueFloat(PostProcessEffectType.GaussFilter,PPEGaussFilter.PARAM_INTENSITY,true,m_Gauss,PPEGaussFilter.L_0_SHOCK,PPOperators.ADD_RELATIVE);
 		//vignette
 		SetTargetValueFloat(PostProcessEffectType.Glow,PPEGlow.PARAM_VIGNETTE,false,m_VignetteIntensity,PPEGlow.L_25_SHOCK,PPOperators.ADD);
-		SetTargetValueColor(PostProcessEffectType.Glow,PPEGlow.PARAM_VIGNETTECOLOR,{0.25,0.25,0.25,0.0},PPEGlow.L_26_SHOCK,PPOperators.ADD_RELATIVE);
+		//SetTargetValueColor(PostProcessEffectType.Glow,PPEGlow.PARAM_VIGNETTECOLOR,{0.25,0.25,0.25,0.0},PPEGlow.L_26_SHOCK,PPOperators.ADD_RELATIVE);
 		//color overlay
 		SetTargetValueFloat(PostProcessEffectType.Glow,PPEGlow.PARAM_OVERLAYFACTOR,true,m_OverlayFactor,PPEGlow.L_20_SHOCK,PPOperators.HIGHEST);
 		SetTargetValueColor(PostProcessEffectType.Glow,PPEGlow.PARAM_OVERLAYCOLOR,m_OverlayColor,PPEGlow.L_21_SHOCK,PPOperators.SET);

@@ -14,6 +14,7 @@ class ActionConsumeSingle: ActionSingleUseBase
 	{
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONMOD_LICKBATTERY;
 		m_CommandUIDProne = DayZPlayerConstants.CMD_ACTIONFB_LICKBATTERY;
+		m_Text = "#eat";
 	}
 	
 	int GetConsumedQuantity()
@@ -41,11 +42,6 @@ class ActionConsumeSingle: ActionSingleUseBase
 	{
 		return false;
 	}
-
-	override string GetText()
-	{
-		return "#eat";
-	}
 	
 	override void OnExecuteServer( ActionData action_data )
 	{
@@ -64,7 +60,7 @@ class ActionConsumeSingle: ActionSingleUseBase
 			action_data.m_MainItem.SetQuantity( 0 );
 		}
 		
-		if ( action_data.m_Player.HasBloodyHandsEx() == eBloodyHandsTypes.SALMONELA && !action_data.m_Player.GetInventory().FindAttachment( InventorySlots.GLOVES ) )
+		if ( action_data.m_Player.HasBloodyHandsEx() == eBloodyHandsTypes.SALMONELA && !action_data.m_Player.GetInventory().FindAttachment( InventorySlots.GLOVES ) && GetProgress(action_data) > 0 )
 		{
 			action_data.m_Player.SetBloodyHandsPenalty();
 		}

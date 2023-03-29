@@ -26,6 +26,9 @@ enum ECurveType
 
 class Math3D
 {
+	private void Math3D() {}
+	private void ~Math3D() {}
+	
 	//-----------------------------------------------------------------
 	proto static vector ClipLine(vector start, vector end, vector norm, float d);
 

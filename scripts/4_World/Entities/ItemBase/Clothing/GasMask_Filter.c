@@ -1,5 +1,6 @@
-class GasMask_Filter extends ItemBase
+class GasMask_Filter : ItemBase
 {
+	/*
 	override void OnQuantityChanged(float delta)
 	{
 		super.OnQuantityChanged(delta);
@@ -9,6 +10,7 @@ class GasMask_Filter extends ItemBase
 			SetHealth("","",0);
 		}
 	}
+	*/
 	
 	override void EEHealthLevelChanged(int oldLevel, int newLevel, string zone)
 	{
@@ -19,5 +21,18 @@ class GasMask_Filter extends ItemBase
 				SetQuantity(0);
 			}
 		}
+	}
+	
+	override float GetFilterDamageRatio() 
+	{
+		return 0.09; //Health lost per quantity consumed
+	}
+}
+
+class GasMask_Filter_Improvised: GasMask_Filter
+{
+	override float GetFilterDamageRatio() 
+	{
+		return 0.25; //Health lost per quantity consumed
 	}
 }

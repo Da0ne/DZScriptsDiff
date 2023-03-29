@@ -25,14 +25,15 @@ class TrapSpawnBase extends ItemBase
 	string 							m_AnimationPhaseTriggered;
 	string 							m_AnimationPhaseUsed;
 
-	const string 					m_PlaceableWaterType = UAWaterType.ALL;
+	const string 					m_PlaceableWaterType //! DEPRECATED
+	protected ref array<string>		m_PlaceableWaterSurfaceList;
 
 	bool m_WaterSurfaceForSetup;	//if trap can be installed on water surface (cannot be detected via getsurfacetype)
 	ref multiMap<string, float>	m_CatchesPond;	//array of catches that can be catched in trap - string key, float catch_chance
 	ref multiMap<string, float>	m_CatchesSea;	//array of catches that can be catched in trap - string key, float catch_chance
 	ref multiMap<string, float>	m_CatchesGroundAnimal;	//array of catches that can be catched in trap - string key, float catch_chance
 	
-	ref protected EffectSound 	m_DeployLoopSound;
+	protected ref EffectSound 	m_DeployLoopSound;
 	
 	// ===============================================================
 	// =====================  DEPRECATED  ============================
@@ -67,7 +68,9 @@ class TrapSpawnBase extends ItemBase
 		m_CatchesSea 							= NULL;
 		m_CatchesGroundAnimal 					= NULL;
 		
-		m_DeployLoopSound 						= new EffectSound;
+		m_PlaceableWaterSurfaceList 			= new array<string>();
+		m_PlaceableWaterSurfaceList.Insert(UAWaterType.SEA);
+		m_PlaceableWaterSurfaceList.Insert(UAWaterType.FRESH);
 		
 		RegisterNetSyncVariableBool("m_IsSoundSynchRemote");
 		RegisterNetSyncVariableBool("m_IsDeploySound");
@@ -77,10 +80,7 @@ class TrapSpawnBase extends ItemBase
 
 	void ~TrapSpawnBase()
 	{
-		if ( m_DeployLoopSound )
-		{
-			SEffectManager.DestroySound( m_DeployLoopSound );
-		}
+		SEffectManager.DestroyEffect( m_DeployLoopSound );
 	}
 	
 	override void OnStoreSave( ParamsWriteContext ctx )
@@ -441,29 +441,18 @@ class TrapSpawnBase extends ItemBase
 	}
 	
 	// Generic water check, no real distinction between pond or sea
-	bool IsSurfaceWater( vector position )
+	bool IsSurfaceWater(vector position)
 	{
-		string surface_type;
-		GetGame().SurfaceGetType3D( position[0], position[1], position[2], surface_type );
+		string surfaceType;
+		GetGame().SurfaceGetType3D(position[0], position[1], position[2], surfaceType);
 		
-		// check water surface
-		if ( m_WaterSurfaceForSetup )
-		{
-			bool isSea;
-			// Check if we are in sea
-			if ( m_PlaceableWaterType == UAWaterType.ALL )
-				isSea = ( position[1] <= ( GetGame().SurfaceGetSeaLevel() + 0.001 ) );
-			// Check if sea or the water type if not sea
-			if ( isSea || surface_type.Contains( m_PlaceableWaterType ) )
-				return true;
-		}
-		return false;
+		return Surface.AllowedWaterSurface(position[1] + 0.1, surfaceType, m_PlaceableWaterSurfaceList);
 	}
 	
 	// Can only receive attachment if deployed
-	override bool CanDisplayAttachmentSlot( string slot_name )
+	override bool CanDisplayAttachmentSlot( int slot_id )
 	{
-		super.CanDisplayAttachmentSlot( slot_name );
+		super.CanDisplayAttachmentSlot( slot_id );
 		return IsDeployed();
 	}
 	
@@ -494,19 +483,17 @@ class TrapSpawnBase extends ItemBase
 		
 		if ( GetGame().IsServer() )
 		{
-			SetupTrapPlayer( PlayerBase.Cast( player ) );
-			
-			SetIsDeploySound( true );
-			
+			SetupTrapPlayer( PlayerBase.Cast( player ), false );
+			SetIsDeploySound( true );			
 			SetActive();
 		}	
 	}
 	
 	void PlayDeployLoopSound()
 	{		
-		if ( GetGame().IsMultiplayer() && GetGame().IsClient() || !GetGame().IsMultiplayer() )
+		if ( !GetGame().IsDedicatedServer() )
 		{		
-			if ( !m_DeployLoopSound.IsSoundPlaying() )
+			if ( !m_DeployLoopSound || !m_DeployLoopSound.IsSoundPlaying() )
 			{
 				m_DeployLoopSound = SEffectManager.PlaySound( GetLoopDeploySoundset(), GetPosition() );
 			}
@@ -515,7 +502,7 @@ class TrapSpawnBase extends ItemBase
 	
 	void StopDeployLoopSound()
 	{
-		if ( GetGame().IsMultiplayer() && GetGame().IsClient() || !GetGame().IsMultiplayer() )
+		if ( !GetGame().IsDedicatedServer() )
 		{	
 			m_DeployLoopSound.SetSoundFadeOut(0.5);
 			m_DeployLoopSound.SoundStop();
@@ -563,12 +550,8 @@ class TrapSpawnBase extends ItemBase
 	
 	override bool CanBePlaced( Man player, vector position )
 	{
-		return IsPlaceableAtPosition( position );
+		return IsPlaceableAtPosition(position);
 	}
 
-	override string CanBePlacedFailMessage( Man player, vector position )
-	{
-		return "Trap can't be placed on this surface type.";
-	}
 	// ===============================================================
 }

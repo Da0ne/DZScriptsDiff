@@ -33,11 +33,6 @@ class ContaminatedArea_Static : EffectArea
 		super.EEInit();
 	}
 	
-	// We spawn particles and setup trigger
-	override void InitZone()
-	{
-		super.InitZone();
-	}
 	
 	override void InitZoneServer()
 	{

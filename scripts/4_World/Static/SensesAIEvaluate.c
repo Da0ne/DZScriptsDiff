@@ -4,19 +4,19 @@ class NoiseAIEvaluate
 	
 	static float GetNoiseMultiplier(DayZPlayerImplement playerImplement)
 	{
-		float speedNoise =  GetNoiseMultiplierByPlayerSpeed(playerImplement);
-		float shoesNoise =  GetNoiseMultiplierByShoes(playerImplement);
-		float surfaceNoise = GetNoiseMultiplierBySurface(playerImplement);
+		float speedNoise	= GetNoiseMultiplierByPlayerSpeed(playerImplement);
+		float shoesNoise	= GetNoiseMultiplierByShoes(playerImplement);
+		float surfaceNoise	= GetNoiseMultiplierBySurface(playerImplement);
 		
-		surfaceNoise *= SURFACE_NOISE_WEIGHT;
-		float avgNoise = (shoesNoise + surfaceNoise)/(1 + SURFACE_NOISE_WEIGHT);
-		avgNoise *= speedNoise;
+		surfaceNoise 		*= SURFACE_NOISE_WEIGHT;
+		float avgNoise 		= (shoesNoise + surfaceNoise)/(1 + SURFACE_NOISE_WEIGHT);
+		avgNoise 			*= speedNoise;
 		
 		return avgNoise;
 	}
 	
 	//Noise multiplier based on player speed
-	protected static float GetNoiseMultiplierByPlayerSpeed(DayZPlayerImplement playerImplement)
+	static float GetNoiseMultiplierByPlayerSpeed(DayZPlayerImplement playerImplement)
 	{
 		HumanMovementState hms = new HumanMovementState();
 		
@@ -52,7 +52,7 @@ class NoiseAIEvaluate
 	
 	
 	//Noise multiplier based on type of boots
-	protected static float GetNoiseMultiplierByShoes(DayZPlayerImplement playerImplement)
+	static float GetNoiseMultiplierByShoes(DayZPlayerImplement playerImplement)
 	{
 		switch ( playerImplement.GetBootsType() )
 		{
@@ -71,7 +71,7 @@ class NoiseAIEvaluate
 	}
 	
 	//Gets noise multiplayer base on surface player walks on
-	protected static float GetNoiseMultiplierBySurface(DayZPlayerImplement playerImplement)
+	static float GetNoiseMultiplierBySurface(DayZPlayerImplement playerImplement)
 	{
 		return playerImplement.GetSurfaceNoise(); 
 	}

@@ -29,7 +29,7 @@ class HandsHeader: Header
 		EntityAI item = p.GetHumanInventory().GetEntityInHands();
 		if ( !m_ForceHideCollapseButtons )
 		{
-			if ( item && !item.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) )
+			if ( item && !item.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) && item.CanDisplayCargo() )
 			{
 				ShowCollapseButtons( true );
 			}

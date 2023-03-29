@@ -2,13 +2,13 @@ class WarningMenuBase extends UIScriptedMenu
 {
 	void WarningMenuBase()
 	{
-		GetGame().GetMission().PlayerControlDisable(INPUT_EXCLUDE_ALL);
+		GetGame().GetMission().AddActiveInputExcludes({"menu"});
 	}
 
 	void ~WarningMenuBase()
 	{
 		if ( GetGame() && GetGame().GetMission() )
-			GetGame().GetMission().PlayerControlEnable(true);
+			GetGame().GetMission().RemoveActiveInputExcludes({"menu"},true);
 	}
 	
 	override Widget Init()

@@ -30,38 +30,42 @@ class ShockMdfr: ModifierBase
 	{
 	}
 	
+	float GetRefillSpeed(PlayerBase player)
+	{
+		if ( player.m_IsDrowning )
+		{
+			return 0;
+		}
+		if ( player.IsUnconscious() )
+		{
+			return CfgGameplayHandler.GetShockRefillSpeedUnconscious() * player.m_UnconRefillModifier;
+		}
+		if (player.GetBrokenLegs() != eBrokenLegs.BROKEN_LEGS || (player.m_MovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_PRONE || player.m_MovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDPRONE))
+		{
+			return CfgGameplayHandler.GetShockRefillSpeedConscious();
+		}
+		if ( player.GetBrokenLegs() == eBrokenLegs.BROKEN_LEGS && (player.IsSwimming() || player.IsClimbingLadder()) )
+		{
+			return CfgGameplayHandler.GetShockRefillSpeedUnconscious();
+		}
+		return 0; //Block shock regen when standing with broken legs
+	}
+	
 	override void OnTick(PlayerBase player, float deltaT)
 	{	
 		//Print("m_UnconRefillModifier" + player.m_UnconRefillModifier);
-		if( GetGame().GetTime() > player.m_LastShockHitTime + PlayerConstants.SHOCK_REFILL_COOLDOWN_AFTER_HIT && player.GetPulseType() == EPulseType.REGULAR)
+		if ( GetGame().GetTime() > player.m_LastShockHitTime + PlayerConstants.SHOCK_REFILL_COOLDOWN_AFTER_HIT && player.GetPulseType() == EPulseType.REGULAR)
 		{
-			bool uncon = player.IsUnconscious();
-			
-			if (!uncon)
+			if (!player.IsUnconscious())
 				player.m_UnconRefillModifier = 1;//reset this UnconRefillModifier some time after the player has been hit(we want the UnconRefillModifier to only apply to uncon induced by a projectile)
 			
-			if(player.GetHealth01("","Shock") == 1)//no need to continue if the shock is full
+			if (player.GetHealth01("","Shock") == 1)//no need to continue if the shock is full
 				return;
 			
-			float refill_speed;
-
+			if ( !CfgGameplayHandler.GetAllowRefillSpeedModifier() )
+				player.m_UnconRefillModifier = 1;
 			
-			if( uncon )
-			{
-				refill_speed = PlayerConstants.SHOCK_REFILl_UNCONSCIOUS_SPEED * player.m_UnconRefillModifier;
-			}
-			else if (player.m_BrokenLegState != eBrokenLegs.BROKEN_LEGS || (player.m_MovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_PRONE || player.m_MovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDPRONE))
-			{
-				refill_speed =  PlayerConstants.SHOCK_REFILL_CONSCIOUS_SPEED;
-			}
-			else  if ( player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS && (player.IsSwimming() || player.IsClimbingLadder()) )
-			{
-				refill_speed =  PlayerConstants.SHOCK_REFILl_UNCONSCIOUS_SPEED;
-			}
-			else
-				refill_speed = 0; //Block shock regen when standing with broken legs
-			
-			player.AddHealth("","Shock", deltaT * refill_speed );
+			player.AddHealth("","Shock", deltaT * GetRefillSpeed(player) );
 		}
 	}
 	

@@ -1,3 +1,4 @@
+typedef Param3<string, bool, vector> LocationParams;//  param1 - name, param2 - isCustom?, param3 - position
 class PluginConfigDebugProfile extends PluginConfigHandler
 {	
 	protected const string SCENE_DRAW_SELECTION				= "scene_editor_draw_selection";
@@ -16,14 +17,26 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 	protected const string CHAR_STOMACH_VIS					= "console_character_stomach_visible";
 	protected const string FREE_CAMERA_CROSSHAIR			= "console_free_camera_crosshair_visible";
 	protected const string VERSION_VIS						= "console_version_visible";
+	protected const string MERGE_TYPE						= "category_merge_type";
+	protected const string TEMP_VIS							= "console_temperature_visible";
 	protected const string SUB_PARAM_ITEM					= "item";
 	protected const string SUB_PARAM_ITEM_NAME				= "name";
 	protected const string SUB_PARAM_ITEM_HEALTH			= "health";
 	protected const string SUB_PARAM_ITEM_QUANTITY			= "quantity";
 	protected const string LOGS_ENABLED						= "logs_enabled";
-	
+	protected const string CONFIG_CLASSES_FLAG				= "toggled_config_classes_flag";
+	protected const string ITEM_CATEGORY_FLAG				= "toggled_item_categories_flag";
+	protected const string ITEM_PREVIEW						= "show_item_preview";
+	protected const string BATCH_RECT						= "batch_spawn_rect";
+	protected const string BATCH_QUANT						= "batch_spawn_quantity";
+	protected const string SOUNDFILTER						= "soundset_editbox";
+	protected const string ITEMDEBUG						= "item_debug";
+	protected const string SPAWN_LOC_INDEX					= "spawn_loc_index";
+	protected const string FILTER_REVERSED					= "filter_order_reversed";
+
 	protected ref map<string, ref CfgParam>				m_DefaultValues;
 	protected ref TStringArray 							m_PresetList;	
+	protected const string POSITION_NAME_ROOT			= "console_positions_";
 	
 	//========================================
 	// GetInstance
@@ -290,6 +303,36 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 		m_DefaultValues.Insert(CHAR_DEBUG_VIS, 			GetNewCfgParamBool(false) );
 		m_DefaultValues.Insert(FREE_CAMERA_CROSSHAIR, 	GetNewCfgParamBool(true) );
 		m_DefaultValues.Insert(VERSION_VIS,				GetNewCfgParamBool(true) );
+		m_DefaultValues.Insert(CONFIG_CLASSES_FLAG,		GetNewCfgParamInt(15) );
+		m_DefaultValues.Insert(TEMP_VIS,				GetNewCfgParamBool(false) );
+		m_DefaultValues.Insert(MERGE_TYPE,				GetNewCfgParamBool(false) );
+		m_DefaultValues.Insert(ITEM_PREVIEW,			GetNewCfgParamBool(true) );
+		m_DefaultValues.Insert(BATCH_RECT,				GetNewCfgParamArray(GetDefaultBatchRectParams()) );
+		m_DefaultValues.Insert(BATCH_QUANT,				GetNewCfgParamInt(10) );
+		m_DefaultValues.Insert(SOUNDFILTER,				GetNewCfgParamString("") );
+		m_DefaultValues.Insert(ITEMDEBUG,				GetNewCfgParamString("0 0 0") );
+		m_DefaultValues.Insert(SPAWN_LOC_INDEX,			GetNewCfgParamInt(0));
+		m_DefaultValues.Insert(FILTER_REVERSED,			GetNewCfgParamBool(false));
+	}
+	
+	array<ref CfgParam> GetDefaultBatchRectParams()
+	{
+		array<ref CfgParam> params = new array<ref CfgParam>;
+		CfgParamInt param1 = new CfgParamInt("");
+		param1.SetValue(5);
+		CfgParamInt param2 = new CfgParamInt("");
+		param2.SetValue(5);
+		CfgParamFloat param3 = new CfgParamFloat("");
+		param3.SetValue(1.0);
+		CfgParamFloat param4 = new CfgParamFloat("");
+		param4.SetValue(1.0);
+		
+		params.Insert(param1);
+		params.Insert(param2);
+		params.Insert(param3);
+		params.Insert(param4);
+		
+		return params;
 	}
 	
 	//========================================
@@ -370,6 +413,32 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 	}
 	
 	//========================================
+	// SpawnLocIndex
+	//========================================
+	int GetSpawnLocIndex()
+	{
+		return GetInt( SPAWN_LOC_INDEX );
+	}
+	
+	void SetSpawnLocIndex( int value )
+	{
+		SetInt( SPAWN_LOC_INDEX, value );
+	}
+	
+	//========================================
+	// FilterOrder
+	//========================================
+	int GetFilterOrderReversed()
+	{
+		return GetBool( FILTER_REVERSED );
+	}
+	
+	void SetFilterOrderReversed( bool reversed )
+	{
+		SetBool( FILTER_REVERSED, reversed );
+	}
+	
+	//========================================
 	// DefaultPreset
 	//========================================
 	string GetDefaultPreset()
@@ -382,6 +451,48 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 		SetString( PRESET_DEFAULT, value );
 	}
 	
+	//========================================
+	// Batch Spawn Params
+	//========================================
+	array<ref CfgParam> GetBatchSpawnRectangle()
+	{
+		return GetArray( BATCH_RECT );
+	}
+	
+	void SetBatchSpawnRectangle( int row, int column, float rowStep, float columnStep)
+	{
+		array<ref CfgParam> params = GetArray( BATCH_RECT );
+		params.Clear();
+		CfgParamString param;
+		
+		CfgParamInt param1 = new CfgParamInt("");
+		param1.SetValue(row);
+		CfgParamInt param2 = new CfgParamInt("");
+		param2.SetValue(column);
+		CfgParamFloat param3 = new CfgParamFloat("");
+		param3.SetValue(rowStep);
+		CfgParamFloat param4 = new CfgParamFloat("");
+		param4.SetValue(columnStep);
+		
+		params.Insert(param1);
+		params.Insert(param2);
+		params.Insert(param3);
+		params.Insert(param4);
+		SaveConfigToFile();
+	}
+	
+	//========================================
+	// Batch Spawn Quantity
+	//========================================
+	int GetBatchSpawnQuantity()
+	{
+		return GetInt( BATCH_QUANT );
+	}
+	
+	void SetBatchSpawnQuantity(int value)
+	{
+		SetInt( BATCH_QUANT, value );
+	}
 	//========================================
 	// ItemSearch
 	//========================================
@@ -435,6 +546,20 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 		SetBool( CHAR_LEVELS_VIS, is_visible );
 	}
 	
+	
+	//========================================
+	// ItemDebugPos
+	//========================================	
+	void SetItemDebugPos(vector pos)
+	{
+		 SetString( ITEMDEBUG ,pos.ToString(false));
+	}
+	
+
+	vector GetItemDebugPos()
+	{
+		return GetString( ITEMDEBUG ).ToVector();
+	}
 	
 	//========================================
 	// CharacterStatsVisible
@@ -528,6 +653,137 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 		SetBool( VERSION_VIS, is_visible );
 	}
 	
+	//========================================
+	// Merge Type
+	//========================================	
+	bool GetMergeType()
+	{
+		return GetBool( MERGE_TYPE );
+	}
+
+	void SetMergeType( bool is_visible )
+	{
+		SetBool( MERGE_TYPE, is_visible );
+	}	
+	
+	//========================================
+	// Soundset Filter
+	//========================================	
+	string GetSoundsetFilter()
+	{
+		return GetString( SOUNDFILTER );
+	}
+
+	void SetSoundsetFilter( string content )
+	{
+		SetString( SOUNDFILTER, content );
+	}
+	
+	//========================================
+	// TemperatureVisible
+	//========================================	
+	bool GetTempVisible()
+	{
+		return GetBool( TEMP_VIS );
+	}
+
+	void SetTempVisible( bool is_visible )
+	{
+		SetBool( TEMP_VIS, is_visible );
+	}
+	
+	//========================================
+	// Show Item Preview
+	//========================================	
+	bool GetShowItemPreview()
+	{
+		return GetBool( ITEM_PREVIEW );
+	}
+
+	void SetShowItemPreview( bool show )
+	{
+		SetBool( ITEM_PREVIEW, show );
+	}
+	
+	
+	//========================================
+	// ConfigClassesFlag
+	//========================================	
+	int GetConfigClassesFlag()
+	{
+		return GetInt( CONFIG_CLASSES_FLAG );
+	}
+
+	void SetConfigClassesFlag( int flag )
+	{
+		SetInt( CONFIG_CLASSES_FLAG, flag );
+	}
+	
+	
+	//========================================
+	// Item Category Flag
+	//========================================	
+	int GetItemCategoryFlag()
+	{
+		return GetInt( ITEM_CATEGORY_FLAG );
+	}
+
+	void SetItemCategoryFlag( int flag )
+	{
+		SetInt( ITEM_CATEGORY_FLAG, flag );
+	}
+	
+	//========================================
+	// User Location
+	//========================================
+	bool CustomLocationsAdd( string name, vector position )
+	{
+		string world = g_Game.GetWorldName();
+		world.ToLower();
+		
+		CfgParamString locationName = new CfgParamString(PluginConfigDebugProfileFixed.SUB_PARAM_POS_NAME);
+		locationName.SetValue(name);
+		CfgParamString locationPos = new CfgParamString(PluginConfigDebugProfileFixed.SUB_PARAM_POS_VEC);
+		locationPos.SetValue(position.ToString(false));
+		
+		CfgParamArray locationEntry = new CfgParamArray( locationName.GetValue() );
+		locationEntry.InsertValue( locationName );
+		locationEntry.InsertValue( locationPos );
+		
+		string paramName = POSITION_NAME_ROOT + world;
+		array<ref CfgParam> params = GetArray(paramName);
+		params.Insert(locationEntry);
+		SetArray(paramName, params);
+		SaveConfigToFile();
+		
+		return true;
+	}
+	
+	void CustomLocationsRemove( string name )
+	{
+		if (!name)
+			return;
+		string world = g_Game.GetWorldName();
+		world.ToLower();
+		string paramName = POSITION_NAME_ROOT + world;
+		array<ref CfgParam> params = GetArray(paramName);
+		
+		for (int i = 0; i < params.Count(); i++)
+		{
+			CfgParamArray param = CfgParamArray.Cast(params.Get(i));
+			array<ref CfgParam> prms = param.GetValues();
+			CfgParamString par = CfgParamString.Cast(prms.Get(0));
+			if (par.GetValue() == name)
+			{
+				params.RemoveOrdered(i);
+				break;
+			}
+		}
+		
+		//SetArray(paramName, params);
+		SaveConfigToFile();
+	}
+
 	//========================================
 	// Presets
 	//========================================
@@ -696,15 +952,16 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 		
 		array<ref CfgParam> params = GetArray( preset_name );
 		
-		if ( item_index >= params.Count() )
+		if ( !params || item_index >= params.Count() )
 		{
 			return NULL;
 		}
+		if (params.IsValidIndex(item_index))
+			CfgParamArray params_array = CfgParamArray.Cast( params.Get( item_index ) );
+		if (params_array)
+			return params_array.GetValues();
 		
-		CfgParamArray params_array = CfgParamArray.Cast( params.Get( item_index ) );
-		array<ref CfgParam> item_params = params_array.GetValues();
-		
-		return item_params;
+		return null;
 	}
 	
 	protected CfgParam GetItemParam( string preset_name, int item_index, string param_name )
@@ -734,7 +991,7 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 		
 		if ( param == NULL )
 		{
-			return 100;
+			return -1;
 		}
 		else
 		{
@@ -808,5 +1065,36 @@ class PluginConfigDebugProfile extends PluginConfigHandler
 		SaveConfigToFile();
 		
 		return true;
+	}
+	
+	//========================================
+	// Locations
+	//========================================
+
+	void GetLocationsData( out array<ref LocationParams> arr , bool isCustom)
+	{
+		string world = g_Game.GetWorldName();
+		world.ToLower();
+		string paramName = POSITION_NAME_ROOT + world;
+		
+		TStringArray names = new TStringArray();
+		GetSubParametersInStringArray( paramName, PluginConfigDebugProfileFixed.SUB_PARAM_POS_NAME, names );
+		TStringArray positions = new TStringArray();
+		GetSubParametersInStringArray( paramName, PluginConfigDebugProfileFixed.SUB_PARAM_POS_VEC, positions );
+		int i;
+		if (isCustom)
+		{
+			for ( i = names.Count() - 1; i >= 0 ; i--)
+			{
+				arr.Insert(new LocationParams(names.Get(i), isCustom, positions.Get(i).ToVector()));
+			}
+		}
+		else
+		{
+			for (i = 0; i < names.Count(); i++)
+			{
+				arr.Insert(new LocationParams(names.Get(i), isCustom, positions.Get(i).ToVector()));
+			}
+		}
 	}
 }

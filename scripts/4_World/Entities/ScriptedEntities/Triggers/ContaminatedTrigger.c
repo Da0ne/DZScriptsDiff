@@ -1,13 +1,7 @@
 // In this file you will find both Static and Dynamic contaminated area triggers
-class ContaminatedTrigger : EffectTrigger
+class ContaminatedTrigger extends EffectTrigger
 {
-	const float DAMAGE_TICK_RATE = 10;//deal damage every n in seconds
-	void ContaminatedTrigger()
-	{
-		// Register this in the trigger effect manager
-		m_Manager = TriggerEffectManager.GetInstance();
-		m_Manager.SetTriggerType( this );
-	}
+	const float DAMAGE_TICK_RATE = 10;//deal damage every n-th second
 	
 	// ----------------------------------------------
 	// 				TRIGGER EVENTS
@@ -16,128 +10,94 @@ class ContaminatedTrigger : EffectTrigger
 	override void OnEnterServerEvent( TriggerInsider insider )
 	{
 		super.OnEnterServerEvent( insider );
-		
-		// We don't need to test the trigger count as Modifiers handle such cases already
-		if ( insider.GetObject().IsInherited( PlayerBase ) )
+		if ( insider )
 		{
 			PlayerBase playerInsider = PlayerBase.Cast( insider.GetObject() );
-			playerInsider.GetModifiersManager().ActivateModifier( eModifiers.MDF_AREAEXPOSURE );
 			
-			m_Manager.OnPlayerEnter( playerInsider, this );
+			
+			if ( playerInsider )
+			{
+				playerInsider.GetModifiersManager().ActivateModifier( eModifiers.MDF_AREAEXPOSURE );
+			}
+			else
+			{		
+				DayZCreatureAI creature = DayZCreatureAI.Cast( insider.GetObject() );
+				
+				if(creature)
+					creature.IncreaseEffectTriggerCount();
+			}
 		}
 		
-		
-		DayZCreatureAI creature = DayZCreatureAI.Cast( insider.GetObject() );
-		
-		if(creature)
-			creature.IncreaseEffectTriggerCount();
+	}
 
+	override void OnLeaveServerEvent( TriggerInsider insider )
+	{
+		super.OnLeaveServerEvent( insider );
 		
+		if ( insider )
+		{
+			PlayerBase playerInsider = PlayerBase.Cast( insider.GetObject() );
+			
+			if ( playerInsider && !m_Manager.IsPlayerInTriggerType( playerInsider, this ) )
+			{
+				playerInsider.GetModifiersManager().DeactivateModifier( eModifiers.MDF_AREAEXPOSURE );
+			}
+			else
+			{
+				DayZCreatureAI creature = DayZCreatureAI.Cast( insider.GetObject() );
+				
+				if(creature)
+					creature.DecreaseEffectTriggerCount();
+			}
+		}
 	}
 	
 	override void OnEnterClientEvent( TriggerInsider insider )
 	{
-		if ( insider.GetObject().IsInherited( PlayerBase ) )
-		{
-			PlayerBase playerInsider = PlayerBase.Cast( insider.GetObject() );
-			
-			// We will only handle the controlled player, as effects are only relevant to this player instance
-			if ( playerInsider.IsControlledPlayer() )
-			{
-				// If it is first entrance, we fire the following
-				if ( !m_Manager.IsPlayerInTriggerType( playerInsider, this ) )
-					playerInsider.SetContaminatedEffect( true, m_PPERequester, m_AroundPartId, m_TinyPartId );
-				
-				// We then handle the update of player trigger state in manager
-				m_Manager.OnPlayerEnter( playerInsider, this );
-			}
-		}
-		
 		super.OnEnterClientEvent( insider );
-	}
-	
-	override void OnLeaveServerEvent( TriggerInsider insider )
-	{
-		if ( insider && insider.GetObject().IsInherited( PlayerBase ) )
-		{
-			PlayerBase playerInsider = PlayerBase.Cast( insider.GetObject() );
-			
-			// We first handle the update of player trigger state in manager
-			m_Manager.OnPlayerExit( playerInsider, this );
-			// We test if player is still in designated trigger type
-			if ( !m_Manager.IsPlayerInTriggerType( playerInsider, this ) )
-				playerInsider.GetModifiersManager().DeactivateModifier( eModifiers.MDF_AREAEXPOSURE );
-		}
-		
-		DayZCreatureAI creature = DayZCreatureAI.Cast( insider.GetObject() );
-		
-		if(creature)
-			creature.DecreaseEffectTriggerCount();
-		
-		super.OnLeaveServerEvent( insider );
 	}
 	
 	override void OnLeaveClientEvent( TriggerInsider insider )
 	{
-		if ( insider.GetObject().IsInherited( PlayerBase ) )
-		{
-			// Make sure you pass the set variable for PPE effect
-			// It will not remove the correct one if START and STOP don't point to the same Requester
-			PlayerBase playerInsider = PlayerBase.Cast( insider.GetObject() );
-			
-			// We will only handle the controlled player, as effects are only relevant to this player instance
-			if ( playerInsider.IsControlledPlayer() )
-			{
-				// We first handle the update of player trigger state in manager
-				m_Manager.OnPlayerExit( playerInsider, this );
-				
-				// We test if player is still in designated trigger type
-				if ( !m_Manager.IsPlayerInTriggerType( playerInsider, this ) )
-					playerInsider.SetContaminatedEffect( false, m_PPERequester );
-			}
-		}
-		
 		super.OnLeaveClientEvent( insider );
 	}
 	
-	override void EOnFrame(IEntity other, float timeSlice)
+	
+	override void OnStayStartServerEvent(int nrOfInsiders)
 	{
-		super.EOnFrame(other, timeSlice);
-		m_DeltaTime = timeSlice;
+		m_TimeAccuStay += m_DeltaTime;
+		if (m_TimeAccuStay > DAMAGE_TICK_RATE)
+		{
+			m_DealDamageFlag = true;
+			//this is where we would normally reset the m_TimeAccuStay, but we need the value as deltaT when dealing damage to the insiders, so we reset it only after the insider update in OnStayFinishServerEvent
+		}
+
 	}
 	
 	override void OnStayFinishServerEvent()
 	{
-		m_TimeAccuStay += m_DeltaTime;
-		array<ref TriggerInsider> insiders = GetInsiders();
-		if (m_TimeAccuStay > DAMAGE_TICK_RATE && insiders && insiders.Count() > 0)
+		if(m_DealDamageFlag)//the flag was previously set to true, the insiders have been updated at this point, reset the flag and the timer as well
 		{
-			foreach( TriggerInsider insider:insiders)
-			{
-				DayZCreatureAI creature = DayZCreatureAI.Cast( insider.GetObject());
-				if(creature && creature.m_EffectTriggerCount != 0)
-					creature.DecreaseHealth("", "", GameConstants.AI_CONTAMINATION_DMG_PER_SEC * m_TimeAccuStay / creature.m_EffectTriggerCount);// we devide by m_EffectTriggerCount for multiple trigger presence(overlapping triggers)
-			}
-
 			m_TimeAccuStay = 0;
+			m_DealDamageFlag = false;
 		}
 	}
-	
-	
-	override bool CanAddObjectAsInsider(Object object)
+
+	override void OnStayServerEvent(TriggerInsider insider, float deltaTime) 
 	{
-		DayZCreatureAI creature = DayZCreatureAI.Cast( object );
-		if(creature)
+		if ( m_DealDamageFlag )
 		{
-			return !creature.ResistContaminatedEffect();
-		}
-		else
-		{
-			PlayerBase player = PlayerBase.Cast(object);
-			return player != null;
+			DayZCreatureAI creature = DayZCreatureAI.Cast( insider.GetObject());
+			if(creature && creature.m_EffectTriggerCount != 0)
+				creature.DecreaseHealth("", "", GameConstants.AI_CONTAMINATION_DMG_PER_SEC * m_TimeAccuStay / creature.m_EffectTriggerCount);// we devide by m_EffectTriggerCount for multiple trigger presence(overlapping triggers)
 		}
 	}
 	
+	override string GetAmbientSoundsetName()
+	{
+		return "ContaminatedArea_SoundSet";
+	}
+
 	
 }
 
@@ -151,7 +111,7 @@ class ContaminatedTrigger_Dynamic : ContaminatedTrigger
 		
 		// Register in the trigger effect manager
 		m_Manager = TriggerEffectManager.GetInstance();
-		m_Manager.SetTriggerType( this );
+		m_Manager.RegisterTriggerType( this );
 	}
 	
 	void SetAreaState( int state )
@@ -183,10 +143,10 @@ class ContaminatedTrigger_Dynamic : ContaminatedTrigger
 						else
 							localPartBirthRate = 10;
 						
-						playerInsider.SetContaminatedEffect( true, m_PPERequester, m_AroundPartId, m_TinyPartId, nonDefaultState, localPartBirthRate );
+						playerInsider.SetContaminatedEffectEx( true, m_PPERequester, m_AroundPartId, m_TinyPartId, GetAmbientSoundsetName(), nonDefaultState, localPartBirthRate );
 					}
 					else
-						playerInsider.SetContaminatedEffect( true, m_PPERequester, m_AroundPartId, m_TinyPartId );
+						playerInsider.SetContaminatedEffectEx( true, m_PPERequester, m_AroundPartId, m_TinyPartId, GetAmbientSoundsetName() );
 				}
 				
 				// We then handle the update of player trigger state in manager
@@ -218,7 +178,7 @@ class ContaminatedTrigger_Dynamic : ContaminatedTrigger
 							localPartBirthRate = 10;
 						
 						// Update the local effects
-						playerInsider.SetContaminatedEffect( true, m_PPERequester, m_AroundPartId, m_TinyPartId, nonDefaultState, localPartBirthRate );
+						playerInsider.SetContaminatedEffectEx( true, m_PPERequester, m_AroundPartId, m_TinyPartId, GetAmbientSoundsetName(), nonDefaultState, localPartBirthRate );
 					}
 				}
 			}

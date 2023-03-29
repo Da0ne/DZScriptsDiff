@@ -24,24 +24,27 @@ class ActionUnrestrainTargetCB : ActionContinuousBaseCB
 		PlayerBase target_player = PlayerBase.Cast(m_ActionData.m_Target.GetObject());
 		PlayerBase source_player = m_ActionData.m_Player;
 		
-		EntityAI item_in_hands_source = source_player.GetItemInHands();
-		
-		ItemBase item_in_hands_target = target_player.GetItemInHands();
-		
-		CachedObjectsArrays.ARRAY_STRING.Clear();
-		item_in_hands_target.ConfigGetTextArray( "CanBeUnrestrainedBy", CachedObjectsArrays.ARRAY_STRING );
-		
-		string item_in_hands_name = item_in_hands_source.GetType();
-		
-		for(int i = 0; i < CachedObjectsArrays.ARRAY_STRING.Count(); i++)
+		if (target_player.IsRestrained())
 		{
-			if((i % 2) == 0)
+			EntityAI item_in_hands_source = source_player.GetItemInHands();
+			
+			ItemBase item_in_hands_target = target_player.GetItemInHands();
+			
+			CachedObjectsArrays.ARRAY_STRING.Clear();
+			item_in_hands_target.ConfigGetTextArray( "CanBeUnrestrainedBy", CachedObjectsArrays.ARRAY_STRING );
+			
+			string item_in_hands_name = item_in_hands_source.GetType();
+			
+			for(int i = 0; i < CachedObjectsArrays.ARRAY_STRING.Count(); i++)
 			{
-				string class_name = CachedObjectsArrays.ARRAY_STRING.Get(i);
-				if(	GetGame().IsKindOf(item_in_hands_name, class_name) )
+				if((i % 2) == 0)
 				{
-					float value = CachedObjectsArrays.ARRAY_STRING.Get(i+1).ToFloat();
-					return value;
+					string class_name = CachedObjectsArrays.ARRAY_STRING.Get(i);
+					if(	GetGame().IsKindOf(item_in_hands_name, class_name) )
+					{
+						float value = CachedObjectsArrays.ARRAY_STRING.Get(i+1).ToFloat();
+						return value;
+					}
 				}
 			}
 		}
@@ -58,17 +61,13 @@ class ActionUnrestrainTarget: ActionContinuousBase
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
 		m_SpecialtyWeight = UASoftSkillsWeight.PRECISE_LOW;
+		m_Text = "#unrestrain";
 	}
 	
 	override void CreateConditionComponents()  
 	{	
 		m_ConditionTarget = new CCTMan(UAMaxDistances.DEFAULT, false);
 		m_ConditionItem = new CCINonRuined;
-	}
-		
-	override string GetText()
-	{
-		return "#unrestrain";
 	}
 	
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
@@ -106,43 +105,45 @@ class ActionUnrestrainTarget: ActionContinuousBase
 	}
 
 	override void OnFinishProgressServer( ActionData action_data )
-	{	
+	{
 		PlayerBase player_target = PlayerBase.Cast(action_data.m_Target.GetObject());
 		PlayerBase player_source = PlayerBase.Cast(action_data.m_Player);
 		
-		EntityAI unrestraining_tool = action_data.m_MainItem;
-		EntityAI restraining_item = player_target.GetItemInHands();
-
-		player_target.SetRestrained(false);
-		
-		
-		//Damage applied to tool
-		CachedObjectsArrays.ARRAY_STRING.Clear();
-		
-		restraining_item.ConfigGetTextArray( "CanBeUnrestrainedBy", CachedObjectsArrays.ARRAY_STRING );
-		restraining_item.ConfigGetFloatArray( "CanBeUnrestrainedByDMG", CachedObjectsArrays.ARRAY_FLOAT );
-		
-		string item_in_hands_name = unrestraining_tool.GetType();
-		float damageToTool = 0;
-		
-		for(int i = 0; i < CachedObjectsArrays.ARRAY_STRING.Count(); i++)
+		if (CanReceiveAction(action_data.m_Target) && player_target.IsRestrained())
 		{
-			string class_name = CachedObjectsArrays.ARRAY_STRING.Get(i);
-			if(	GetGame().IsKindOf(item_in_hands_name, class_name) )
-			{
-				damageToTool = CachedObjectsArrays.ARRAY_FLOAT.Get(i/2);
-				break;
-			}
-		}
-		
-		MiscGameplayFunctions.DealAbsoluteDmg(action_data.m_MainItem, damageToTool);
-		//---------------------------
-		
-		MiscGameplayFunctions.TransformRestrainItem(restraining_item, unrestraining_tool, player_source, player_target);
-		
-		action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
-	}
+			EntityAI unrestraining_tool = action_data.m_MainItem;
+			EntityAI restraining_item = player_target.GetItemInHands();
 	
+			player_target.SetRestrained(false);
+			
+			
+			//Damage applied to tool
+			CachedObjectsArrays.ARRAY_STRING.Clear();
+			
+			restraining_item.ConfigGetTextArray( "CanBeUnrestrainedBy", CachedObjectsArrays.ARRAY_STRING );
+			restraining_item.ConfigGetFloatArray( "CanBeUnrestrainedByDMG", CachedObjectsArrays.ARRAY_FLOAT );
+			
+			string item_in_hands_name = unrestraining_tool.GetType();
+			float damageToTool = 0;
+			
+			for(int i = 0; i < CachedObjectsArrays.ARRAY_STRING.Count(); i++)
+			{
+				string class_name = CachedObjectsArrays.ARRAY_STRING.Get(i);
+				if(	GetGame().IsKindOf(item_in_hands_name, class_name) )
+				{
+					damageToTool = CachedObjectsArrays.ARRAY_FLOAT.Get(i/2);
+					break;
+				}
+			}
+			
+			MiscGameplayFunctions.DealAbsoluteDmg(action_data.m_MainItem, damageToTool);
+			//---------------------------
+			
+			MiscGameplayFunctions.TransformRestrainItem(restraining_item, unrestraining_tool, player_source, player_target);
+			
+			action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+		}
+	}
 };
 
 class ReplaceAndDestroyLambda : TurnItemIntoItemLambdaAnimSysNotifyLambda
@@ -151,25 +152,40 @@ class ReplaceAndDestroyLambda : TurnItemIntoItemLambdaAnimSysNotifyLambda
 	bool	m_Destroy;
 	bool	m_Drop;
 	
-	void ReplaceAndDestroyLambda (EntityAI old_item, string new_item_type, PlayerBase player, bool destroy = false)
+	void ReplaceAndDestroyLambda(EntityAI old_item, string new_item_type, PlayerBase player, bool destroy = false)
 	{
 		m_TargetPlayer = player;
 		m_Destroy = destroy;
 		m_OldItem = old_item;
 	}
-
-	override void CopyOldPropertiesToNew (notnull EntityAI old_item, EntityAI new_item)
-	{
-		super.CopyOldPropertiesToNew(old_item, new_item);
-	}
 	
-	override void OnSuccess (EntityAI new_item)
+	override void OnSuccess(EntityAI new_item)
 	{
 		super.OnSuccess(new_item);
 		
-		if( m_Destroy )
+		if ( m_Destroy )
 		{
 			new_item.SetHealth("","",0);
 		}
+	}
+};
+
+class ReplaceAndDestroyLambdaEx : ReplaceAndDestroyLambda
+{
+	void ReplaceAndDestroyLambdaEx(EntityAI old_item, string new_item_type, PlayerBase player, bool destroy = false, bool enableDrop = true)
+	{
+		m_Drop = enableDrop;
+	}
+	
+	override protected EntityAI CreateNewEntity()
+	{
+		EntityAI newItem = super.CreateNewEntity();
+		
+		if (!newItem && m_Drop)
+		{
+			newItem = EntityAI.Cast(GetGame().CreateObjectEx(m_NewItemType, m_TargetPlayer.GetPosition(), ECE_PLACE_ON_SURFACE|ECE_LOCAL));
+		}
+		
+		return newItem;
 	}
 };

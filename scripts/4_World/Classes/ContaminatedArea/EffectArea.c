@@ -20,9 +20,15 @@ class EffectAreaParams
 	int 	m_ParamOuterOffset 			= -5;
 	int 	m_ParamVertLayers 			= 0;
 	int 	m_ParamVerticalOffset 		= 10;
+	/*
 	int 	m_ParamPartId 				= ParticleList.CONTAMINATED_AREA_GAS_BIGASS;
 	int 	m_ParamAroundPartId 		= ParticleList.CONTAMINATED_AREA_GAS_AROUND;
 	int 	m_ParamTinyPartId 			= ParticleList.CONTAMINATED_AREA_GAS_TINY;
+	*/
+	int 	m_ParamPartId 				= 0;
+	int 	m_ParamAroundPartId 		= 0;
+	int 	m_ParamTinyPartId 			= 0;
+	
 	string 	m_ParamPpeRequesterType 	= "PPERequester_ContaminatedAreaTint";
 }
 
@@ -55,14 +61,14 @@ class EffectArea : House
 	int						m_ParticleID = ParticleList.CONTAMINATED_AREA_GAS_BIGASS;
 	int						m_AroundParticleID = ParticleList.CONTAMINATED_AREA_GAS_AROUND;
 	int						m_TinyParticleID = ParticleList.CONTAMINATED_AREA_GAS_TINY;
-	string 					m_PPERequesterType = "PPERequester_ContaminatedAreaTint";
-	int 					m_PPERequesterIdx;
+	string 					m_PPERequesterType;
+	int 					m_PPERequesterIdx = -1;
 	
 	// Other values and storage
 	string 					m_TriggerType = "ContaminatedTrigger"; 	// The trigger class used by this zone
-	
-	ref array<Particle> 	m_ToxicClouds; 							// All static toxic clouds in ContaminatedArea
 	CylinderTrigger			m_Trigger; 								// The trigger used to determine if player is inside toxic area
+
+	ref array<Particle> 	m_ToxicClouds; 							// All static toxic clouds in ContaminatedArea
 
 	// ----------------------------------------------
 	// 				INITIAL SETUP
@@ -80,11 +86,13 @@ class EffectArea : House
 		RegisterNetSyncVariableInt("m_OuterSpacing");
 		RegisterNetSyncVariableInt("m_VerticalLayers");
 		RegisterNetSyncVariableInt("m_VerticalOffset");
+		
 		RegisterNetSyncVariableInt("m_ParticleID");
+		/*
 		RegisterNetSyncVariableInt("m_AroundParticleID");
 		RegisterNetSyncVariableInt("m_TinyParticleID");
 		RegisterNetSyncVariableInt("m_PPERequesterIdx");
-		
+		*/
 		RegisterNetSyncVariableBool("m_OuterRingToggle");
 	}
 	
@@ -92,7 +100,7 @@ class EffectArea : House
 	{
 		
 	}
-	
+
 	void SetupZoneData( EffectAreaParams params ) 
 	{
 		// A lot of branching, allowing to use default values on specified params
@@ -126,11 +134,13 @@ class EffectArea : House
 		m_AroundParticleID = params.m_ParamAroundPartId;
 		m_TinyParticleID = params.m_ParamTinyPartId;
 		
-		if ( params.m_ParamPpeRequesterType != "" );
+		if ( params.m_ParamPpeRequesterType != "" )
+		{
 			m_PPERequesterType = params.m_ParamPpeRequesterType;
-		
+			m_PPERequesterIdx = GetRequesterIndex(m_PPERequesterType);			
+		}
 		// We get the PPE index for future usage and synchronization
-		m_PPERequesterIdx = PPERequesterBank.GetRequester( m_PPERequesterType.ToType() ).GetRequesterIDX();
+		
 		
 		// DEVELOPER NOTE :
 		// If you cannot register a new requester, add your own indexation and lookup methods to get an index and synchronize it
@@ -143,6 +153,16 @@ class EffectArea : House
 		InitZone();
 	}
 
+	void Tick() {};
+	
+		
+	// Through this we will evaluate the resize of particles
+	override void OnCEUpdate()
+	{
+		super.OnCEUpdate();
+		Tick();
+	}
+	
 	void InitZone()
 	{
 		//Debug.Log("------------------------------------------");
@@ -150,12 +170,12 @@ class EffectArea : House
 		
 		m_Position = GetWorldPosition();
 		
-		if ( GetGame().IsClient() || !GetGame().IsMultiplayer() )
+		if ( !GetGame().IsDedicatedServer() )
 		{
 			InitZoneClient();
 		}
 		
-		if ( GetGame().IsServer() || !GetGame().IsMultiplayer() )
+		if ( GetGame().IsServer() )
 		{
 			InitZoneServer();
 		}
@@ -165,9 +185,9 @@ class EffectArea : House
 	
 	// The following methods are to be overriden to execute specifc logic
 	// Each method is executed where it says it will so no need to check for server or client ;) 
-	void InitZoneServer() {}
+	void InitZoneServer() {};
 	
-	void InitZoneClient() {}
+	void InitZoneClient() {};
 	
 	// ----------------------------------------------
 	// 				INTERACTION SETUP
@@ -196,10 +216,17 @@ class EffectArea : House
 	// ----------------------------------------------
 	// 				PARTICLE GENERATION
 	// ----------------------------------------------
-	
 	// Used to position all particles procedurally
 	void PlaceParticles( vector pos, float radius, int nbRings, int innerSpacing, bool outerToggle, int outerSpacing, int outerOffset, int partId )
 	{
+#ifdef NO_GUI
+		return; // do not place any particles if there is no GUI
+#endif
+		if (partId == 0)
+		{
+			Error("[WARNING] :: [EffectArea PlaceParticles] :: no particle defined, skipping area particle generation" );
+			return;
+		}
 		// Determine if we snap first layer to ground
 		bool snapFirstLayer = true; 
 		if ( m_Type == eZoneType.STATIC && pos[1] != GetGame().SurfaceRoadY( pos[0], pos[2] ) )
@@ -234,6 +261,8 @@ class EffectArea : House
 		
 		float angle = 0; // Used in for loop to know where we are in terms of angle spacing ( RADIANS )
 		
+		ParticlePropertiesArray props = new ParticlePropertiesArray();
+		
 		// We also populate vertically, layer 0 will be snapped to ground, subsequent layers will see particles floating and relevant m_VerticalOffset
 		for ( int k = 0; k <= m_VerticalLayers; k++ )
 		{
@@ -246,7 +275,7 @@ class EffectArea : House
 			}
 			
 			// We will want to start by placing a particle at center of area
-			m_ToxicClouds.Insert( Particle.PlayInWorld( partId, partPos ) );
+			props.Insert(ParticleProperties(partPos, ParticlePropertiesFlags.PLAY_ON_CREATION, null, vector.Zero, this));
 			partCounter++;
 			
 			// For each concentric ring, we place a particle emitter at a set offset
@@ -304,13 +333,11 @@ class EffectArea : House
 					if ( partPos[1] <= pos[1] + m_PositiveHeight && partPos[1] >= pos[1] - m_NegativeHeight )
 					{
 						// Place emitter at vector end ( coord )
-						Particle toxicParticle = Particle.PlayInWorld( partId, partPos );
-						toxicParticle.SetOrientation( GetGame().GetSurfaceOrientation( partPos[0], partPos[2] ) );
-						m_ToxicClouds.Insert( toxicParticle );
+						props.Insert(ParticleProperties(partPos, ParticlePropertiesFlags.PLAY_ON_CREATION, null, GetGame().GetSurfaceOrientation( partPos[0], partPos[2] ), this));
 						
-						partCounter++;
+						++partCounter;
 					}
-					
+
 					// Increase accumulated angle
 					angle += angleIncrement;
 				}
@@ -319,7 +346,49 @@ class EffectArea : House
 			}
 		}
 		
+		m_ToxicClouds.Reserve(partCounter);
+		
+		ParticleManager gPM = ParticleManager.GetInstance();
+		
+		array<ParticleSource> createdParticles = gPM.CreateParticlesByIdArr(partId, props, partCounter);
+		if (createdParticles.Count() != partCounter)
+		{
+			if (gPM.IsFinishedAllocating())
+			{
+				ErrorEx(string.Format("Not enough particles in pool for EffectArea: %1", m_Name));
+				OnParticleAllocation(gPM, createdParticles);
+			}
+			else
+			{
+				gPM.GetEvents().Event_OnAllocation.Insert(OnParticleAllocation);
+			}
+		}
+		else
+		{
+			OnParticleAllocation(gPM, createdParticles);
+		}
+		
 		//Debug.Log("Emitter count : " + partCounter );
+	}
+	
+	void OnParticleAllocation(ParticleManager pm, array<ParticleSource> particles)
+	{
+		foreach (ParticleSource p : particles)
+		{
+			if (p.GetOwner() == this) // Safety, since it can be unrelated particles when done through event
+				m_ToxicClouds.Insert(p);
+		}
+	}
+	
+	int GetRequesterIndex(string type)
+	{
+		typename t = type.ToType();
+		if (!t)
+			return - 1;
+		PPERequesterBase req = PPERequesterBank.GetRequester(t);
+		if (req)
+			return req.GetRequesterIDX();
+		return -1;
 	}
 	
 	
@@ -361,11 +430,11 @@ class EffectArea : House
 		}
 		
 		// We stop playing particles on this client when the base object is deleted ( out of range for example )
-		if ( GetGame().IsClient() && m_ToxicClouds )
+		if ( (GetGame().IsClient() || !GetGame().IsMultiplayer())  && m_ToxicClouds )
 		{
-			for ( int i = 0; i < m_ToxicClouds.Count(); i++ )
+			foreach ( Particle p : m_ToxicClouds )
 			{
-				m_ToxicClouds.Get( i ).Stop();
+				p.Stop();
 			}
 		}
 		

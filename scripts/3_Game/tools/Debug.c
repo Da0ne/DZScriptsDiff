@@ -18,7 +18,11 @@ class Debug
 	static private const string	LOG_DEBUG_INV_MOVE			= "Inv Move";
 	static private const string	LOG_DEBUG_INV_RESERVATION	= "Inv Rrsv";
 	static private const string	LOG_DEBUG_INV_HFSM			= "HFSM";
-	static private const string LOG_DEBUG_TRIGGER					= "Trigger";
+	static private const string LOG_DEBUG_TRIGGER			= "Trigger";
+	static private const string LOG_DEBUG_PARTICLE			= "Particle";
+	static private const string LOG_DEBUG_TF				= "TestFramework";
+	static private const string LOG_DEBUG_WEIGHT			= "Weight";
+	static private const string LOG_DEBUG_MELEE				= "Melee";
 	
 	static private const string	LOG_INFO					= "Info";
 	static private const string	LOG_WARNING					= "Warning";
@@ -29,6 +33,20 @@ class Debug
 	
 	static Widget m_DebugLayoutCanvas;
 	static CanvasWidget m_CanvasDebug;
+	
+	
+	
+	static string GetDebugName(Managed entity)
+	{
+		if (!entity)
+			return "";
+		
+		Object obj;
+		if (CastTo(obj, entity))
+			return obj.GetDebugNameNative();
+		
+		return entity.GetDebugName();
+	}
 	
 	static void InitCanvas()
 	{
@@ -144,6 +162,27 @@ class Debug
 	static void	TriggerLog(string message = LOG_DEFAULT, string plugin = LOG_DEFAULT, string author = LOG_DEFAULT, string label = LOG_DEFAULT, string entity = LOG_DEFAULT)
 	{
 		LogMessage(LOG_DEBUG_TRIGGER, plugin, entity, author, label, message);
+	}
+	
+	static void	ParticleLog(string message = LOG_DEFAULT, Managed caller = null, string function = "", Managed entity = null)
+	{
+		LogMessage(LOG_DEBUG_PARTICLE, GetDebugName(caller), GetDebugName(entity), "", function, message);
+	}
+	
+	static void	TFLog(string message = LOG_DEFAULT, TestFramework caller = null, string function = "")
+	{
+		LogMessage(LOG_DEBUG_TF, GetDebugName(caller), "", "", function, message);
+	}
+	
+	static void	WeightLog(string message = LOG_DEFAULT, Managed caller = null, string function = "", Managed entity = null)
+	{
+		//LogMessage(LOG_DEBUG_WEIGHT, GetDebugName(caller), GetDebugName(entity), "", function, message);
+	}
+	
+	static void	MeleeLog(Entity entity, string message = LOG_DEFAULT, string plugin = LOG_DEFAULT, string author = LOG_DEFAULT, string label = LOG_DEFAULT)
+	{
+		string logMessage = string.Format("%1: %2", entity.GetSimulationTimeStamp(), message);
+		LogMessage(LOG_DEBUG_MELEE, plugin, GetDebugName(entity), author, label, logMessage);
 	}
 	
 	/**
@@ -262,6 +301,14 @@ class Debug
 		return shape;
 	}
 	
+	static Shape DrawFrustum(float horizontalAngle, float verticalAngle, float length, int color = 0x1fff7f7f, ShapeFlags flags = ShapeFlags.TRANSP|ShapeFlags.WIREFRAME)
+	{
+		Shape shape = Shape.CreateFrustum(horizontalAngle, verticalAngle, length, color, flags);
+		if (( flags & ShapeFlags.ONCE ) == 0)
+			m_DebugShapes.Insert(shape);
+		return shape;
+	}
+	
 	static Shape DrawCylinder(vector pos, float radius, float height = 1, int color = 0x1fff7f7f, ShapeFlags flags = ShapeFlags.TRANSP|ShapeFlags.NOOUTLINE )
 	{
 		Shape shape = Shape.CreateCylinder(color, flags, pos, radius, height);
@@ -323,7 +370,7 @@ class Debug
 		return shape;
 	}
 	
-	static Shape DrawArrow(vector from, vector to, float size = 0.5, int color = 0xFFFFFFFF, float flags = 0)
+	static Shape DrawArrow(vector from, vector to, float size = 0.5, int color = 0xFFFFFFFF, int flags = 0)
 	{
 		Shape shape = Shape.CreateArrow(from, to, size, color, flags);
 		m_DebugShapes.Insert(shape);
@@ -345,7 +392,9 @@ class Debug
 		base_classes.Insert(CFG_AMMO);
 		base_classes.Insert(CFG_WORLDS);
 		base_classes.Insert(CFG_SURFACES);
-		base_classes.Insert(CFG_RECIPESPATH);
+		base_classes.Insert(CFG_SOUND_SETS);
+		base_classes.Insert(CFG_SOUND_SHADERS);
+		base_classes.Insert(CFG_NONAI_VEHICLES);
 	}
 	
 	/**
@@ -437,10 +486,13 @@ class Debug
 	
 	static private void	SaveLog(string log_message)
 	{
-		Print("" + log_message);
-
+		#ifdef DEVELOPER
+		#ifndef SERVER
+		CachedObjectsParams.PARAM1_STRING.param1 = log_message;
+		GetDispatcher().CallMethod(CALL_ID_SCR_CNSL_ADD_PRINT,CachedObjectsParams.PARAM1_STRING);
+		
 		//Previous was saved to separate file
-		/*FileHandle file_index = OpenFile(GetFileName(), FileMode.APPEND);
+		FileHandle file_index = OpenFile(GetFileName(), FileMode.APPEND);
 		
 		if ( file_index == 0 )
 		{
@@ -449,10 +501,14 @@ class Debug
 			
 		FPrintln(file_index, log_message);
 		
-		CloseFile(file_index);*/
+		CloseFile(file_index);
+		#endif
+		#endif
+		Print(log_message);
+
 	}
 	
-	static private void	ClearLogs()
+	static void	ClearLogs()
 	{
 		if ( FileExist( GetFileName() ) )
 		{
@@ -469,7 +525,7 @@ class Debug
 		}
 	}
 	
-	static private string GetFileName()
+	static string GetFileName()
 	{
 		return CFG_FILE_SCRIPT_LOG_EXT;
 	}
@@ -500,7 +556,7 @@ class LogManager
 	static bool m_DoInventoryMoveLog;
 	static bool m_DoInventoryReservationLog;
 	static bool m_DoInventoryHFSMLog;
-	
+	static bool m_DoWeaponLog;
 	
 	static void Init()
 	{
@@ -515,6 +571,7 @@ class LogManager
 		m_DoInventoryMoveLog = IsCLIParam("doInvMoveLog");
 		m_DoInventoryReservationLog = IsCLIParam("doInvReservLog");
 		m_DoInventoryHFSMLog = IsCLIParam("doInvHFSMLog");
+		m_DoWeaponLog = IsCLIParam("doWeaponLog");
 	}
 	
 	static bool IsLogsEnable()
@@ -577,4 +634,108 @@ class LogManager
 		m_DoSymptomDebugLog = enable;
 	}
 	
+	static bool IsWeaponLogEnable()
+	{
+		return m_DoWeaponLog;
+	}
+	
+	static void WeaponLogEnable(bool enable)
+	{
+		m_DoWeaponLog = enable;
+	}
+}
+
+enum WeightDebugType
+{
+	NONE 			= 0,
+	RECALC_FORCED 	= 1,
+	RECALC_DIRTY 	= 2,
+	DUMP_STACK		= 4,
+	SET_DIRTY_FLAG  = 8,
+}
+
+class WeightDebug
+{
+	static private ref map<EntityAI, ref WeightDebugData> m_WeightDebugData 	= new map<EntityAI, ref WeightDebugData>();
+	static WeightDebugType m_VerbosityFlags;
+	
+	//-------------------------------------------------------------
+	static WeightDebugData GetWeightDebug(EntityAI entity)
+	{
+		if (!m_WeightDebugData.Get(entity))
+		{
+			WeightDebugData data = new WeightDebugData(entity);
+			m_WeightDebugData.Insert(entity,data);
+			return data;
+		}
+		return m_WeightDebugData.Get(entity);
+	}
+	//-------------------------------------------------------------
+	static void ClearWeightDebug()
+	{
+		m_WeightDebugData.Clear();
+	}
+	//-------------------------------------------------------------
+	static void PrintAll(EntityAI entity)
+	{
+		GameInventory inv = entity.GetInventory();
+		if (!inv)
+			return;
+		array<EntityAI> items = new array<EntityAI>;
+		inv.EnumerateInventory(InventoryTraversalType.PREORDER, items);
+		for(int i = 0; i < items.Count(); i++)
+		{
+			EntityAI item = items.Get(i);
+			if (m_WeightDebugData.Get(item))
+			{
+				m_WeightDebugData.Get(item).Output();
+			}
+		}
+	}
+	//-------------------------------------------------------------
+	static void SetVerbosityFlags(WeightDebugType type)
+	{
+		m_VerbosityFlags = type;
+	}
+}
+
+class WeightDebugData
+{
+	string 	m_Classname;
+	string 	m_Weight;
+	int 	m_InventoryDepth;
+	string 	m_CalcDetails;
+	//-------------------------------------------------------------
+	void WeightDebugData(EntityAI entity)
+	{
+		m_Classname = entity.GetType();
+		m_InventoryDepth = entity.GetHierarchyLevel();
+	}
+	//-------------------------------------------------------------
+	void SetWeight(float weight)
+	{
+		m_Weight = weight.ToString();
+	}
+	//-------------------------------------------------------------
+	void SetCalcDetails(string details)
+	{
+		m_CalcDetails = details;
+	}
+	
+	//-------------------------------------------------------------
+	void AddCalcDetails(string details)
+	{
+		m_CalcDetails += "+ "+details;
+	}
+	//-------------------------------------------------------------
+	void Output()
+	{
+		string spaces;
+		for(int i = 0; i < m_InventoryDepth;i++)
+			spaces+="--------";
+
+		Print(spaces+">" + m_Classname + " Overall entity weight: "+ m_Weight + " Calculation details:" + m_CalcDetails);
+	}
+	//-------------------------------------------------------------
+
 }

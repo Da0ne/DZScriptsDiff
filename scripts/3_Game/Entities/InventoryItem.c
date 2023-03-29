@@ -1,7 +1,12 @@
 class InventoryItem extends EntityAI
 {	
-	private string m_SoundImpactType;
 	static private const float SOUND_CONTACT_SKIP = 0.33;//second
+	
+#ifdef DIAG_DEVELOPER
+	static private ref array<ref string> s_ImpactSoundsInfo = new array<ref string>();
+#endif
+
+	private SoundLookupTable m_SoundImpactTable;
 	private float m_SoundContactTickTime;
 	private bool m_IsMeleeWeapon = false;
 	
@@ -19,14 +24,15 @@ class InventoryItem extends EntityAI
 	proto native MeleeCombatData GetMeleeCombatData();	
 	
 	proto native void ThrowPhysically(DayZPlayer player, vector force);
-	
+
+	//! Sets the item to use the server configured 'networkRangeFar' instead of 'networkRangeNear'
+	//  This method performs an OR operation with the config 'forceFarBubble'. If set in the config 
+	//  this method has no effect. 
+	proto native void ForceFarBubble(bool state);
 	
 	void InventoryItem()
 	{
-		if (GetGame().IsClient() || !GetGame().IsMultiplayer())
-		{
-			PreLoadSoundImpactType();
-		}
+		InitImpactSoundData();
 		
 		if (ConfigIsExisting("isMeleeWeapon"))
 			m_IsMeleeWeapon = ConfigGetBool("isMeleeWeapon");
@@ -83,22 +89,38 @@ class InventoryItem extends EntityAI
 	}
 	
 	// -------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------
-	protected void PreLoadSoundImpactType()
+	void PlayImpactSound(float weight, float velocity, int surfaceHash)
 	{
-		string impactType = "default";
+		if (!m_SoundImpactTable)
+			return;
 
-		if ( ConfigIsExisting("soundImpactType") )
+		SoundObjectBuilder soundBuilder = m_SoundImpactTable.GetSoundBuilder(surfaceHash);
+		if (soundBuilder != NULL)
 		{
-			impactType = ConfigGetString("soundImpactType");
+			soundBuilder.SetVariable("weight", weight);
+			soundBuilder.SetVariable("speed", velocity);
+			soundBuilder.UpdateEnvSoundControllers(GetPosition());
+				
+			SoundObject soundObject = soundBuilder.BuildSoundObject();
+			if (soundObject != NULL)
+			{
+				soundObject.SetKind(WaveKind.WAVEEFFECTEX);
+				PlaySound(soundObject, soundBuilder);
+			}
 		}
-		
-		m_SoundImpactType = impactType;
 	}
 	
-	string GetSoundImpactType()
-	{	
-		return m_SoundImpactType;
+	// -------------------------------------------------------------------------------
+	protected void InitImpactSoundData()
+	{
+		if ( GetGame().IsDedicatedServer() )
+			return;
+
+		string soundImpactType = "default";
+		if ( ConfigIsExisting("soundImpactType") )
+			soundImpactType = ConfigGetString("soundImpactType");
+		
+		m_SoundImpactTable = AnimSoundLookupTableBank.GetInstance().GetImpactTable(soundImpactType + "_Impact_LookupTable");
 	}
 	
 	// -------------------------------------------------------------------------------
@@ -115,23 +137,34 @@ class InventoryItem extends EntityAI
 		return wave;
 	}
 	
+	// -------------------------------------------------------------------------------
 	string GetImpactSurfaceType(IEntity other, Contact impact)
 	{
 		string surface;
+		int liquid = -1;
+		return GetImpactSurfaceTypeEx(other, impact, liquid);
+	}
+	
+	// -------------------------------------------------------------------------------
+	string GetImpactSurfaceTypeEx(IEntity other, Contact impact, out int liquid)
+	{		
+		vector mins, maxs;
+		GetWorldBounds(mins, maxs);
+		vector size = maxs - mins;		
+
+		vector add = impact.RelativeVelocityBefore.Normalized() * size.Length();
+		string surfaceImpact;
 		if (DayZPhysics.GetHitSurface(
 			Object.Cast(other),
-			impact.Position + impact.RelativeVelocityBefore * 5,
-			impact.Position - impact.RelativeVelocityBefore * 5,
-			surface))
+			impact.Position + add,
+			impact.Position - add,
+			surfaceImpact))
 		{
-			return surface;
+			return surfaceImpact;
 		}
-		else
-		{
-			int liquid;
-			GetGame().SurfaceUnderObject(this, surface, liquid);
-			return surface;
-		}
+		string surface;
+		GetGame().SurfaceUnderObjectEx(this, surface, surfaceImpact, liquid);
+		return surfaceImpact;
 	}
 	
 	//! returns ammo (projectile) used in melee if the item is destroyed. Override higher for specific use
@@ -141,50 +174,55 @@ class InventoryItem extends EntityAI
 	}
 
 	// -------------------------------------------------------------------------------
-/*	override void EOnContact(IEntity other, Contact extra)
+	float ProcessImpactSound(IEntity other, Contact extra, float weight, out int surfaceHash)
 	{
-		if( GetGame().IsMultiplayer() && GetGame().IsServer() )
-			return;
+		int liquidType = -1;
+		return ProcessImpactSoundEx(other, extra, weight, surfaceHash,liquidType);
+	}
+	
+	
+	// -------------------------------------------------------------------------------
+	float ProcessImpactSoundEx(IEntity other, Contact extra, float weight, out int surfaceHash, out int liquidType)
+	{
+		float impactVelocity = extra.RelativeVelocityBefore.Length();
+		if ( impactVelocity < 0.3 )
+			return 0.0;
 		
 		float tickTime = GetGame().GetTickTime();
-		if(m_SoundContactTickTime + SOUND_CONTACT_SKIP > tickTime)
-			return;
+		if ( m_SoundContactTickTime + SOUND_CONTACT_SKIP > tickTime )
+			return 0.0;
 		
-		float impactVelocity = extra.RelativeVelocityBefore.Length();
-		if(impactVelocity < 0.3)
-            return;
-		
-        if(impactVelocity > 1.0)
-            impactVelocity = 1;
-		else if(impactVelocity < 0.5)
-			impactVelocity = 0.5;
+		string surfaceName = GetImpactSurfaceTypeEx(other, extra, liquidType);
+		if ( surfaceName == "" )
+			return 0.0;
 
-		string tableName = GetSoundImpactType() + "_Impact_LookupTable";
-		SoundLookupTable table = AnimSoundLookupTableBank.GetInstance().GetImpactTable(tableName);
-		if(table != NULL)
-		{
-			string surfaceName = GetImpactSurfaceType(other, extra);
-			float weight = ConfigGetFloat("weight");
-			//Print("[lukasikjak] surface: " + surfaceName + " speed: " + impactVelocity + " weight: " + weight);
-			if(surfaceName != "")
-			{
-				SoundObjectBuilder soundBuilder = table.GetSoundBuilder(surfaceName.Hash());
-				if (soundBuilder != NULL)
-				{
-					soundBuilder.SetVariable("weight", weight);
-					soundBuilder.SetVariable("speed", extra.RelativeVelocityBefore.Length());
-					soundBuilder.UpdateEnvSoundControllers(GetPosition());
-					
-					SoundObject soundObject = soundBuilder.BuildSoundObject();
-					if (soundObject != NULL)
-					{
-						soundObject.SetKind(WaveKind.WAVEEFFECTEX);
-						PlaySound(soundObject, soundBuilder);
-					}
-				}
-			}
-		}
+#ifdef DIAG_DEVELOPER
+		string infoText = "Surface: " + surfaceName + ", Weight: " + weight + ", Speed: " + impactVelocity;
+		
+		if ( s_ImpactSoundsInfo.Count() == 10 )
+			s_ImpactSoundsInfo.Remove(9);
+		
+		s_ImpactSoundsInfo.InsertAt(infoText, 0);
+#endif
 
 		m_SoundContactTickTime = tickTime;
-	}*/
+
+		surfaceHash = surfaceName.Hash();
+		return impactVelocity;		
+	}
+	
+#ifdef DIAG_DEVELOPER
+	static void DrawImpacts()
+	{
+		DbgUI.Begin("Item impact sounds", 10, 200);
+		
+		for ( int i = 0; i < s_ImpactSoundsInfo.Count(); ++i )
+		{
+			string line = (i + 1).ToString() + ". " + s_ImpactSoundsInfo.Get(i);
+			DbgUI.Text(line);
+		}
+		
+		DbgUI.End();
+	}
+#endif
 };

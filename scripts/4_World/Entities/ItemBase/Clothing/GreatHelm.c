@@ -9,16 +9,19 @@ class GreatHelm extends ClothingBase
 	{
 		if(!super.CanPutAsAttachment(parent)) {return false;}
 		
-		if ( parent.FindAttachmentBySlotName( "Mask" ) )
+		Clothing eyewear = Clothing.Cast(parent.FindAttachmentBySlotName("Eyewear"));
+		if ( eyewear && eyewear.ConfigGetBool("isStrap") )
 		{
 			return false;
 		}
 		
-		if ( GetNumberOfItems() == 0 || !parent || parent.IsMan() )
+		Clothing mask = Clothing.Cast(parent.FindAttachmentBySlotName("Mask"));
+		if ( mask && mask.ConfigGetBool("noHelmet") ) //TODO
 		{
-			return true;
+			return false;
 		}
-		return false;
+		
+		return true;
 	}
 	
 	override bool IsObstructingVoice()

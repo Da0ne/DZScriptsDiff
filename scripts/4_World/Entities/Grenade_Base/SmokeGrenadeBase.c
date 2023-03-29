@@ -73,7 +73,7 @@ class SmokeGrenadeBase extends Grenade_Base
 
 	protected void PlaySmokeParticle()
 	{
-		m_ParticleSmoke = Particle.PlayOnObject(m_ParticleSmokeCurrentId, this, m_ParticlePosition, vector.Zero, true);
+		m_ParticleSmoke = ParticleManager.GetInstance().PlayOnObject(m_ParticleSmokeCurrentId, this, m_ParticlePosition, vector.Zero, true);
 	}
 
 	protected void SoundSmokeStart()
@@ -194,7 +194,7 @@ class SmokeGrenadeBase extends Grenade_Base
 	//When grenade makes smoke
 	override void OnWork(float consumed_energy)
 	{
-		if ( GetGame().IsServer() || !GetGame().IsMultiplayer() )
+		if ( GetGame().IsServer() )
 		{
 			NoiseSystem noise = GetGame().GetNoiseSystem();
 			if ( noise )
@@ -218,7 +218,7 @@ class SmokeGrenadeBase extends Grenade_Base
 		return !GetCompEM().IsWorking();
 	}
 	
-	override void OnActivatedByTripWire()
+	override void OnActivatedByItem(notnull ItemBase item)
 	{
 		GetCompEM().SwitchOn();
 	}
@@ -246,6 +246,8 @@ class SmokeGrenadeBase extends Grenade_Base
 
 	override void EEDelete(EntityAI parent)
 	{
+		super.EEDelete(parent);
+
 		SoundSmokeStop();
 		DestroyParticle(m_ParticleSmoke);
 	}
@@ -282,9 +284,6 @@ class SmokeGrenadeBase extends Grenade_Base
 
 		RegisterNetSyncVariableInt("m_SmokeGrenadeState", ESmokeGrenadeState.NO_SMOKE, ESmokeGrenadeState.COUNT);
 	}
-	
-	override void OnExplode()
-	{}
 	
 	void ~SmokeGrenadeBase();
 }

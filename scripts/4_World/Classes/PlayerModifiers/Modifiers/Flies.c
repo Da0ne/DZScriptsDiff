@@ -2,7 +2,7 @@ class FliesMdfr: ModifierBase
 {
 	const float DISTANCE_SENSITIVITY_SQR = Math.SqrFloat(0.05/*actual distance in meters*/);
 	const int TICK_FREQUENCY = 15;
-	const int IDLE_COUNT_THRESHOLD = 2;
+	const int IDLE_COUNT_THRESHOLD = 60;
 	vector m_PrevPosition;
 	int m_IdleCount;
 	

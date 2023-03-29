@@ -214,5 +214,29 @@ class ZmbM_NBC_Grey extends ZombieMaleBase
 	}
 };
 
+class ZmbM_Mummy extends ZombieMaleBase
+{
+	#ifndef SERVER
+	protected ZombieMummyLight m_EyeLight;
+	void ZmbM_Mummy()
+	{
+		if (!IsDamageDestroyed())//walking up to or connecting to already dead zombies check
+			m_EyeLight = ZombieMummyLight.Cast(ScriptedLightBase.CreateLightAtObjMemoryPoint(ZombieMummyLight, this, "MummyLight"));
+	}
 
-
+	void ~ZmbM_Mummy()
+	{
+		if (m_EyeLight)
+			m_EyeLight.Destroy();
+	}
+	override void OnDamageDestroyed(int oldLevel)
+	{
+		if (m_EyeLight)
+			m_EyeLight.FadeOut(15);
+	}
+	#endif
+	override bool ResistContaminatedEffect()
+	{
+		return true;
+	}
+};

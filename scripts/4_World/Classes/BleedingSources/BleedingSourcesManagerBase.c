@@ -9,6 +9,7 @@ class BleedingSourcesManagerBase
 	PlayerBase m_Player;
 	//ref map<string, int> m_FireGeomToBit = new map<string, int>;
 	ref map<int, string> m_BitToFireGeom = new map<int, string>;
+	protected int m_Bit;
 	int m_BitOffset = 0;
 	
 	void BleedingSourcesManagerBase( PlayerBase player )
@@ -134,7 +135,7 @@ class BleedingSourcesManagerBase
 			name.ToLower();
 			//PrintString(name);
 			//int bit = Math.Pow(2, m_BitOffset);
-			int bit = 1 << m_BitOffset;
+			m_Bit = 1 << m_BitOffset;
 			//PrintString(bit.ToString());
 			string bone_name = bone;
 			
@@ -143,10 +144,10 @@ class BleedingSourcesManagerBase
 				bone_name = name;
 			}
 			
-			m_BleedingSourceZone.Insert(name, new BleedingSourceZone(name, bit, offset, orientation, bone_name, max_time, flow_modifier, particle_name));
+			m_BleedingSourceZone.Insert(name, new BleedingSourceZone(name, m_Bit, offset, orientation, bone_name, max_time, flow_modifier, particle_name));
 			m_BleedingSourceZone.Get(name).SetInvLocation(inv_location);
-			m_BitToFireGeom.Insert(bit, name);
-			m_BleedingSourcesZonesMaskByLocation.Set( inv_location, m_BleedingSourcesZonesMaskByLocation.Get(inv_location) | bit);//set a bit to 1 to already existing bitmask for that location
+			m_BitToFireGeom.Insert(m_Bit, name);
+			m_BleedingSourcesZonesMaskByLocation.Set( inv_location, m_BleedingSourcesZonesMaskByLocation.Get(inv_location) | m_Bit);//set a bit to 1 to already existing bitmask for that location
 			m_BleedingSourcesLocationsList.Insert(inv_location);
 			m_BitOffset++;
 		}
@@ -291,7 +292,6 @@ class BleedingSourcesManagerBase
 		return -1;
 	}
 	
-
 	protected bool RemoveBleedingSource(int bit)
 	{
 		if (m_BleedingSources.Contains(bit))
@@ -310,4 +310,13 @@ class BleedingSourcesManagerBase
 	{
 		return m_BleedingSources.Count();
 	}
+	
+	/*void ChangeBleedingIndicatorVisibility(bool visible)
+	{
+		int count = m_BleedingSources.Count();
+		for (int i = 0; i < count; i++)
+		{
+			m_BleedingSources.GetElement(i).ToggleSourceBleedingIndication(visible);
+		}
+	}*/
 }

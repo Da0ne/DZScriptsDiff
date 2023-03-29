@@ -44,12 +44,19 @@ class ContaminatedArea_Dynamic : EffectArea
 	const float 			ARTILLERY_SHELL_SPEED		= 100; // Units per second
 	
 	// Constants used for dissapearing events
-	const float				DECAY_START_PART_SIZE 		= 48;
+	const float				DECAY_START_PART_SIZE 		= 32;
 	const int				DECAY_START_PART_BIRTH_RATE = 1;
-	const float				DECAY_END_PART_SIZE 		= 32;
+	const float				DECAY_END_PART_SIZE 		= 17;
 	const int				DECAY_END_PART_BIRTH_RATE 	= 1;
 	const float 			START_DECAY_LIFETIME		= 900;
 	const float 			FINISH_DECAY_LIFETIME		= 300;
+	
+	// Item Spawning upon area creation, the 4 arrays bellow have to have the same amount of elements
+	const ref array<string> 	SPAWN_ITEM_TYPE 		= {"Grenade_ChemGas"};//item classnames
+	const ref array<int>		SPAWN_ITEM_COUNT 		= {Math.RandomIntInclusive(2,5)};//how many of each type
+	const ref array<float> 		SPAWN_ITEM_RAD_MIN 		= {5};//min distance the item will be spawned from the area position(epicenter)
+	const ref array<float> 		SPAWN_ITEM_RAD_MAX 		= {15};//max distance the item will be spawned from the area position(epicenter)
+	
 	
 	void ContaminatedArea_Dynamic()
 	{
@@ -60,7 +67,7 @@ class ContaminatedArea_Dynamic : EffectArea
 	{
 		// We get the PPE index for future usage and synchronization ( we must do it here for dynamic as it is not read through file )
 		if ( GetGame().IsServer() )
-			m_PPERequesterIdx = PPERequesterBank.GetRequester( m_PPERequesterType.ToType() ).GetRequesterIDX();
+			m_PPERequesterIdx = GetRequesterIndex(m_PPERequesterType);
 		
 		SetSynchDirty();
 		
@@ -115,34 +122,49 @@ class ContaminatedArea_Dynamic : EffectArea
 		}
 	}
 	
-	// Through this we will evaluate the resize of particles
-	override void OnCEUpdate()
+	float GetRemainingTime()
 	{
-		super.OnCEUpdate();
-
-		// The first state of decay, slight reduction in particle density and size
-		if ( GetLifetime() < START_DECAY_LIFETIME )
+		return GetLifetime();
+	}
+	
+	float GetStartDecayLifetime()
+	{
+		return START_DECAY_LIFETIME;
+	}
+	
+	float GetFinishDecayLifetime()
+	{
+		return FINISH_DECAY_LIFETIME;
+	}
+	
+	override void Tick()
+	{
+		if ( GetRemainingTime() < GetFinishDecayLifetime() )
 		{
+			// The second state of decay, further reduction of particle density and size
+			SetDecayState( eAreaDecayStage.DECAY_END );
+		}
+		else if ( GetRemainingTime() < GetStartDecayLifetime() )
+		{
+			// The first state of decay, slight reduction in particle density and size
 			SetDecayState( eAreaDecayStage.DECAY_START );
 		}
 		
-		// The second state of decay, further reduction of particle density and size
-		if ( GetLifetime() < FINISH_DECAY_LIFETIME )
-		{
-			SetDecayState( eAreaDecayStage.DECAY_END );
-		}
-		
-		SetSynchDirty();
 	}
 	
 	// Set the new state of the Area
 	void SetDecayState( int newState )
 	{
-		m_DecayState = newState;
+		if (m_DecayState != newState)
+		{
+			m_DecayState = newState;
 		
-		// We update the trigger state values as we also want to update player bound effects
-		if ( m_Trigger )
-			ContaminatedTrigger_Dynamic.Cast( m_Trigger ).SetAreaState( m_DecayState );
+			// We update the trigger state values as we also want to update player bound effects
+			if ( m_Trigger )
+				ContaminatedTrigger_Dynamic.Cast( m_Trigger ).SetAreaState( m_DecayState );
+			
+			SetSynchDirty();
+		}
 	}
 	
 	override void EEInit()
@@ -203,9 +225,32 @@ class ContaminatedArea_Dynamic : EffectArea
 	{
 		super.InitZoneServer();
 		
+		SpawnItems();
 		// We create the trigger on server
 		if ( m_TriggerType != "" )
 			CreateTrigger( m_Position, m_Radius );
+	}
+	
+	void SpawnItems()
+	{
+		//Print("---------============ Spawning items at pos:"+m_Position);
+		foreach (int j, string type:SPAWN_ITEM_TYPE)
+		{
+			//Print("----------------------------------");
+			for (int i = 0; i < SPAWN_ITEM_COUNT[j]; i++)
+			{
+				vector randomDir2d = vector.RandomDir2D();
+				float randomDist = Math.RandomFloatInclusive(SPAWN_ITEM_RAD_MIN[j],SPAWN_ITEM_RAD_MAX[j]);
+				vector spawnPos = m_Position + (randomDir2d * randomDist);
+				InventoryLocation il = new InventoryLocation;
+				vector mat[4];
+				Math3D.MatrixIdentity4(mat);
+				mat[3] = spawnPos;
+				il.SetGround(NULL, mat);
+				//Print("Spawning item:"+ type + " at position:" + il.GetPos());
+				GetGame().CreateObjectEx(type, il.GetPos(), ECE_PLACE_ON_SURFACE);
+			}
+		}
 	}
 	
 	override void InitZoneClient()
@@ -216,21 +261,26 @@ class ContaminatedArea_Dynamic : EffectArea
 			m_ToxicClouds = new array<Particle>;
 		
 		// We spawn VFX on client
-		PlaceParticles( GetWorldPosition(), m_Radius, m_InnerRings, m_InnerSpacing, m_OuterRingToggle, m_OuterSpacing, m_OuterRingOffset, m_ParticleID );
+		PlaceParticles( GetWorldPosition(), m_Radius, m_InnerRings, m_InnerSpacing, m_OuterRingToggle, m_OuterSpacing, m_OuterRingOffset, m_ParticleID );		
+	}
 	
+	override void OnParticleAllocation(ParticleManager pm, array<ParticleSource> particles)
+	{
+		super.OnParticleAllocation(pm, particles);
+		
 		if ( m_DecayState > eAreaDecayStage.LIVE )
 		{
-			for ( int i = 0; i < m_ToxicClouds.Count(); i++ )
+			foreach ( ParticleSource p : particles )
 			{
 				if ( m_DecayState == eAreaDecayStage.DECAY_END )
 				{
-					m_ToxicClouds.Get( i ).SetParameter( 0, EmitorParam.BIRTH_RATE, DECAY_END_PART_BIRTH_RATE );
-					m_ToxicClouds.Get( i ).SetParameter( 0, EmitorParam.SIZE, DECAY_END_PART_SIZE );
+					p.SetParameter( 0, EmitorParam.BIRTH_RATE, DECAY_END_PART_BIRTH_RATE );
+					p.SetParameter( 0, EmitorParam.SIZE, DECAY_END_PART_SIZE );
 				}
 				else
 				{
-					m_ToxicClouds.Get( i ).SetParameter( 0, EmitorParam.BIRTH_RATE, DECAY_START_PART_BIRTH_RATE );
-					m_ToxicClouds.Get( i ).SetParameter( 0, EmitorParam.SIZE, DECAY_START_PART_SIZE );
+					p.SetParameter( 0, EmitorParam.BIRTH_RATE, DECAY_START_PART_BIRTH_RATE );
+					p.SetParameter( 0, EmitorParam.SIZE, DECAY_START_PART_SIZE );
 				}
 			}
 		}
@@ -298,7 +348,7 @@ class ContaminatedArea_Dynamic : EffectArea
 		super.OnVariablesSynchronized();
 		
 		if ( !m_ToxicClouds )
-			return;
+			m_ToxicClouds = new array<Particle>;
 		
 		switch ( m_DecayState )
 		{
@@ -313,10 +363,10 @@ class ContaminatedArea_Dynamic : EffectArea
 			{
 				// We go through all the particles bound to this area and update relevant parameters
 				//Debug.Log("We start decay");
-				for ( int i = 0; i < m_ToxicClouds.Count(); i++ )
+				foreach ( Particle p : m_ToxicClouds )
 				{
-					m_ToxicClouds.Get( i ).SetParameter( 0, EmitorParam.BIRTH_RATE, DECAY_START_PART_BIRTH_RATE );
-					m_ToxicClouds.Get( i ).SetParameter( 0, EmitorParam.SIZE, DECAY_START_PART_SIZE );
+					p.SetParameter( 0, EmitorParam.BIRTH_RATE, DECAY_START_PART_BIRTH_RATE );
+					p.SetParameter( 0, EmitorParam.SIZE, DECAY_START_PART_SIZE );
 				}
 				
 				break;
@@ -325,10 +375,10 @@ class ContaminatedArea_Dynamic : EffectArea
 			{
 				// We go through all the particles bound to this area and update relevant parameters
 				//Debug.Log("We finish decay");
-				for ( int j = 0; j < m_ToxicClouds.Count(); j++ )
+				foreach ( Particle prt : m_ToxicClouds )
 				{
-					m_ToxicClouds.Get( j ).SetParameter( 0, EmitorParam.BIRTH_RATE, DECAY_END_PART_BIRTH_RATE );
-					m_ToxicClouds.Get( j ).SetParameter( 0, EmitorParam.SIZE, DECAY_END_PART_SIZE );
+					prt.SetParameter( 0, EmitorParam.BIRTH_RATE, DECAY_END_PART_BIRTH_RATE );
+					prt.SetParameter( 0, EmitorParam.SIZE, DECAY_END_PART_SIZE );
 				}
 				
 				break;

@@ -1,5 +1,4 @@
 //! Light / Heavy punches
-
 enum EFightLogicCooldownCategory
 {
 	EVADE = 0
@@ -17,7 +16,6 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 	const string DUMMY_LIGHT_AMMO		= "Dummy_Light";
 	const string DUMMY_HEAVY_AMMO		= "Dummy_Heavy";
 
-
 	protected DayZPlayerImplement					m_DZPlayer;
 	protected ref DayZPlayerImplementMeleeCombat	m_MeleeCombat;
 	protected EMeleeHitType							m_HitType;
@@ -26,7 +24,11 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 
 	protected bool									m_IsInBlock;
 	protected bool									m_IsEvading;
+	protected bool 									m_IsFinisher; //! DEPRECATED
 
+	protected bool									m_IsInComboRange;	
+	protected bool 									m_WasPreviousHitProcessed;
+	
 	void DayZPlayerMeleeFightLogic_LightHeavy(DayZPlayerImplement player)
 	{
 		Init(player);
@@ -34,13 +36,14 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 	
 	void Init(DayZPlayerImplement player)
 	{
-		m_DZPlayer 			= player;
-		m_MeleeCombat		= m_DZPlayer.GetMeleeCombat();
-		m_Mission			= GetGame().GetMission();
+		m_DZPlayer 					= player;
+		m_MeleeCombat				= m_DZPlayer.GetMeleeCombat();
+		m_Mission					= GetGame().GetMission();
 
-		m_IsInBlock 		= false;
-		m_IsEvading	 		= false;
-		m_HitType			= EMeleeHitType.NONE;
+		m_IsInBlock 				= false;
+		m_IsEvading	 				= false;
+		m_WasPreviousHitProcessed	= false;
+		m_HitType					= EMeleeHitType.NONE;
 		
 		RegisterCooldowns();
 	}
@@ -69,71 +72,83 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 
 	protected void RegisterCooldowns()
 	{
-		m_CooldownTimers	= new map<int, ref Timer>;
+		m_CooldownTimers = new map<int, ref Timer>;
 		m_CooldownTimers.Insert(EFightLogicCooldownCategory.EVADE, new Timer(CALL_CATEGORY_SYSTEM)); // evades
 	}
 
 	protected EMeleeHitType GetAttackTypeFromInputs(HumanInputController pInputs)
 	{
 		if (pInputs.IsMeleeFastAttackModifier() && m_DZPlayer.CanConsumeStamina(EStaminaConsumers.MELEE_HEAVY))
+		{
 			return EMeleeHitType.HEAVY;
-		else
-			return EMeleeHitType.LIGHT;
+		}
+
+		return EMeleeHitType.LIGHT;
 	}
 	
 	protected EMeleeHitType GetAttackTypeByWeaponAttachments(EntityAI pEntity)
 	{
-		if ( !m_DZPlayer.CanConsumeStamina(EStaminaConsumers.MELEE_HEAVY) )
+		if (!m_DZPlayer.CanConsumeStamina(EStaminaConsumers.MELEE_HEAVY))
+		{
 			return EMeleeHitType.NONE;
+		}
 
 		//! use stabbing if the bayonet/knife is attached to firearm
-		if ( pEntity.HasBayonetAttached() )
+		if (pEntity.HasBayonetAttached())
+		{
 			return EMeleeHitType.WPN_STAB;
-		else if ( pEntity.HasButtstockAttached() )
+		}
+		else if (pEntity.HasButtstockAttached())
+		{
 			return EMeleeHitType.WPN_HIT_BUTTSTOCK;
-		else
-			return EMeleeHitType.WPN_HIT;
+		}
+
+		return EMeleeHitType.WPN_HIT;
 	}
 	
 	protected float GetAttackTypeByDistanceToTarget(EntityAI pTarget, EMeleeTargetType pTargetType = EMeleeTargetType.ALIGNABLE)
 	{
-		if ( pTargetType == EMeleeTargetType.NONALIGNABLE )
+		if (pTargetType == EMeleeTargetType.NONALIGNABLE)
+		{
 			return 1.0;
+		}
 
 		//! target in short distance - in place attack
-		float dist2 = Math.SqrFloat(CLOSE_TARGET_DISTANCE);
-		if ( pTarget && (vector.DistanceSq(m_DZPlayer.GetPosition(), m_MeleeCombat.GetHitPos()) <= dist2 || vector.DistanceSq(m_DZPlayer.GetBonePositionWS(m_DZPlayer.GetBoneIndexByName("Head")), m_MeleeCombat.GetHitPos()) <= dist2) )
+		if (IsShortDistance(pTarget, Math.SqrFloat(CLOSE_TARGET_DISTANCE)))
+		{
 			return 1.0;
+		}
 				
 		//! target is far from the player - forward movement attack
 		return 0.0;
 	}
-
+	
 	bool HandleFightLogic(int pCurrentCommandID, HumanInputController pInputs, EntityAI pEntityInHands, HumanMovementState pMovementState, out bool pContinueAttack)
-	{		
-		InventoryItem itemInHands;
-		HumanCommandMove hcm = m_DZPlayer.GetCommand_Move();
+	{
+		HumanInventoryWithFSM invFSM = HumanInventoryWithFSM.Cast(m_DZPlayer.GetHumanInventory());
+		if (invFSM && !invFSM.IsIdle())
+			return false;
 
-		if ( m_HitType == EMeleeHitType.KICK )
-			itemInHands = null;
-		else
-			itemInHands = InventoryItem.Cast(pEntityInHands);
+		HumanCommandMove hcm 		= m_DZPlayer.GetCommand_Move();
+		PlayerBase player			= PlayerBase.Cast(m_DZPlayer);				
+		InventoryItem itemInHands	= InventoryItem.Cast(pEntityInHands);
+		bool isFireWeapon			= itemInHands && itemInHands.IsWeapon();
 		
-		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
-				
-		bool isFireWeapon = itemInHands && itemInHands.IsWeapon();
-		int finisher_type = -1;
-
-		if ((pInputs.IsUseButtonDown() && !isFireWeapon) || (pInputs.IsMeleeWeaponAttack() && isFireWeapon) || (pContinueAttack && isFireWeapon))
+		//! Check if we need to damage
+		if (HandleHitEvent(pCurrentCommandID, pInputs, itemInHands, pMovementState, pContinueAttack))
 		{
-			float attackByDistance;
-			EntityAI target;
-			EMeleeTargetType targetType;
+			return false;
+		}
+
+		//! Actually pressing a button to start a melee attack
+		if ((pInputs.IsAttackButtonDown() && !isFireWeapon) || (pInputs.IsMeleeWeaponAttack() && isFireWeapon) || (pContinueAttack && isFireWeapon))
+		{
+			//Debug.MeleeLog(m_DZPlayer, string.Format("HandleFightLogic[1] attackButtonDown=%1, meleeWeaponAttack=%2, pContinueAttack=%3, isFireWeapon=%4", pInputs.IsAttackButtonDown(), pInputs.IsMeleeWeaponAttack(), pContinueAttack, isFireWeapon));
 			
 			//! do not perform attacks when blocking
 			if (m_IsInBlock || m_IsEvading)
 			{
-				return true;
+				return false;
 			}
 			
 			//! if the item in hands cannot be used as melee weapon
@@ -142,277 +157,45 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 				return false;
 			}
 			
-			//If player has BrokenLegs she cannot use melee weapons
-			/*PlayerBase m_PlayerBase = PlayerBase.Cast(m_DZPlayer);
-			if (m_PlayerBase.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
-				return false;*/
-
+			//! Currently not performing any attacks, so here we start the initial
 			if (pCurrentCommandID == DayZPlayerConstants.COMMANDID_MOVE)
 			{
+				//Debug.MeleeLog(m_DZPlayer, "HandleFightLogic[1a]");
 				//! melee with firearm
 				if (isFireWeapon)
 				{
-					//! don't allow bash to interfere with actions like chambering or ejecting bullets
-					Weapon_Base weapon = Weapon_Base.Cast(itemInHands);
-					
-					//PlayerBase player = PlayerBase.Cast(m_DZPlayer);
-					if (weapon.IsWaitingForActionFinish() || player.GetActionManager().GetRunningAction())
-						return false;		
-					//! perform firearm melee from raised erect or continue with attack after character stand up from crouch
-					else if (hcm.GetCurrentMovementSpeed() <= 2.05 && (pMovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDERECT || pContinueAttack) && !m_DZPlayer.IsFighting())
-					{
-						m_HitType = GetAttackTypeByWeaponAttachments(pEntityInHands);
-						if ( m_HitType == EMeleeHitType.NONE )
-							return false; //! exit if there is no suitable attack
-
-						m_MeleeCombat.Update(itemInHands, m_HitType);
-
-						GetTargetData(target, targetType);
-						attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
-
-						m_DZPlayer.StartCommand_Melee2(target, m_HitType == EMeleeHitType.WPN_STAB, attackByDistance, m_MeleeCombat.GetHitPos());
-						
-						//finisher attack hittype override
-						finisher_type = GetFinisherType(itemInHands,target);
-						if (finisher_type != -1)
-						{
-							m_HitType = finisher_type;
-							target.SetBeingBackstabbed();
-						}
-						m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
-						DisableControls();
-
-						pContinueAttack = false; // reset continueAttack flag
-
-						return true;
-					}				
-					//! char stand up when performing firearm melee from crouch
-					else if ( pMovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDCROUCH )
-					{
-						if (hcm)
-						{
-							hcm.ForceStance(DayZPlayerConstants.STANCEIDX_RAISEDERECT);
-							pContinueAttack = true;
-							return false;
-						}
-					}
+					return HandleInitialFirearmMelee(pCurrentCommandID, pInputs, itemInHands, pMovementState, pContinueAttack);
 				}
 				else
 				{
 					//! first attack in raised erc (light or heavy if modifier is used). Also added support for finishers
 					if (pMovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDERECT)
 					{
-						m_HitType = GetAttackTypeFromInputs(pInputs);
-						m_MeleeCombat.Update(itemInHands, m_HitType);
-						
-						GetTargetData(target, targetType);
-						attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);		
-						
-						//finisher attack hittype override
-						finisher_type = GetFinisherType(itemInHands,target);
-						if (finisher_type != -1)
-						{
-							target.SetBeingBackstabbed();
-							if ( finisher_type == EMeleeHitType.FINISHER_LIVERSTAB )
-							{
-								m_DZPlayer.StartCommand_Melee2(target, HumanCommandMelee2.HIT_TYPE_FINISHER, attackByDistance, m_MeleeCombat.GetHitPos());
-							}
-							else
-							{
-								m_DZPlayer.StartCommand_Melee2(target, m_HitType == EMeleeHitType.HEAVY, attackByDistance, m_MeleeCombat.GetHitPos());
-							}
-							
-							m_HitType = finisher_type;
-							//Print(m_HitType);
-						}
-						else
-						{
-							m_DZPlayer.StartCommand_Melee2(target, m_HitType == EMeleeHitType.HEAVY, attackByDistance, m_MeleeCombat.GetHitPos());
-						}
-						
-						//PlayerBase m_PlayerBase = PlayerBase.Cast(m_DZPlayer);
-						if (m_HitType == EMeleeHitType.HEAVY)
-						{
-							m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
-							if (player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
-							{	
-								player.m_ShockHandler.SetShock(PlayerConstants.BROKEN_LEGS_HEAVY_MELEE_SHOCK);
-								player.m_ShockHandler.CheckValue(true);
-								//m_PlayerBase.DealShock(PlayerConstants.BROKEN_LEGS_HEAVY_MELEE_SHOCK);
-							}
-						}
-						else
-						{
-							m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_LIGHT);
-							if (player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
-							{
-								player.m_ShockHandler.SetShock(PlayerConstants.BROKEN_LEGS_LIGHT_MELEE_SHOCK);
-								player.m_ShockHandler.CheckValue(true);
-								//m_PlayerBase.DealShock(PlayerConstants.BROKEN_LEGS_LIGHT_MELEE_SHOCK);
-							}
-						}	
-						DisableControls();
-						return true;
+						return HandleInitialMeleeErc(pCurrentCommandID, pInputs, itemInHands, pMovementState, pContinueAttack);
 					}
 					//! kick from raised pne
 					else if (pMovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDPRONE)
 					{
-						HumanCommandWeapons hcw = m_DZPlayer.GetCommandModifier_Weapons();
-						
-						PlayerBase m_Player = PlayerBase.Cast(m_DZPlayer);
-						//Print("Broken leg state : " + m_Player.m_BrokenLegState);
-						
-						float hcw_angle = hcw.GetBaseAimingAngleLR();
-						//! check if player is on back
-						//! (situation where the player is raised in prone and on back is not in anim graph)
-						if ( ( hcw_angle < -90 || hcw_angle > 90 ) && m_Player.m_BrokenLegState != eBrokenLegs.BROKEN_LEGS )
-						{
-							m_HitType = EMeleeHitType.KICK;
-							m_MeleeCombat.Update(itemInHands, m_HitType);
-	
-							GetTargetData(target, targetType);
-							attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
-	
-							m_DZPlayer.StartCommand_Melee2(target, false, attackByDistance, m_MeleeCombat.GetHitPos());
-							m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
-							DisableControls();
-							
-							return true;
-						}
-						
-						return false;
+						return HandleProneKick(pCurrentCommandID, pInputs, itemInHands, pMovementState, pContinueAttack);
 					}
 					//! sprint attack in erc stance
 					else if (pMovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_ERECT && m_DZPlayer.IsSprintFull())
 					{
-						m_HitType = EMeleeHitType.SPRINT;
-						m_MeleeCombat.Update(itemInHands, m_HitType);
-
-						GetTargetData(target, targetType);
-						attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
-
-						m_DZPlayer.StartCommand_Melee2(target, false, attackByDistance, m_MeleeCombat.GetHitPos());
-						m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
-						DisableControls();
-						return true;
+						return HandleSprintAttack(pCurrentCommandID, pInputs, itemInHands, pMovementState, pContinueAttack);
 					}
 				}
 			}
 			//! combo hits - when we are already in Melee command and clicking UseButton
 			else if (pCurrentCommandID == DayZPlayerConstants.COMMANDID_MELEE2)
 			{
-				//! no suitable attack - skip that
-				if ( m_HitType == EMeleeHitType.NONE )
-					return false;
-				
-				//! No combos for the finisher command
-				if (IsHitTypeFinisher(m_HitType))
+				m_IsInComboRange = m_DZPlayer.GetCommand_Melee2().IsInComboRange();
+				if (m_IsInComboRange)
 				{
-					//Print("HandleFightLogic | FINISHER");
-					return false;
-				}
-
-				HumanCommandMelee2 hmc2 = m_DZPlayer.GetCommand_Melee2();
-
-				if (hmc2 && hmc2.IsInComboRange())
-				{
-					GetTargetData(target, targetType);
-					attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
-				
-					//! select if the next attack will light or heavy (based on input/attachment modifier)
-					if ( !isFireWeapon )
-					{
-						m_HitType = GetAttackTypeFromInputs(pInputs);
-					}
-					else
-					{
-						m_HitType = GetAttackTypeByWeaponAttachments(pEntityInHands);
-					}
-					
-					//! continue 'combo' - left hand attacks
-					if (m_HitType == EMeleeHitType.HEAVY || m_HitType == EMeleeHitType.WPN_STAB)
-					{
-						player = PlayerBase.Cast(m_DZPlayer);
-						if (player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
-						{
-							player.m_ShockHandler.SetShock(PlayerConstants.BROKEN_LEGS_HEAVY_MELEE_SHOCK);
-							player.m_ShockHandler.CheckValue(true);
-						}
-						hmc2.ContinueCombo(true, attackByDistance, target, m_MeleeCombat.GetHitPos());
-						
-						DisableControls();
-					}
-					else
-					{
-						player = PlayerBase.Cast(m_DZPlayer);
-						if (player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
-						{
-							player.m_ShockHandler.SetShock(PlayerConstants.BROKEN_LEGS_LIGHT_MELEE_SHOCK);
-							player.m_ShockHandler.CheckValue(true);
-						}
-						hmc2.ContinueCombo(false, attackByDistance, target, m_MeleeCombat.GetHitPos());
-
-						DisableControls();
-					}
-
-					//! stamina depletion per attack
-					switch ( m_HitType )
-					{
-						case EMeleeHitType.HEAVY:
-						case EMeleeHitType.SPRINT:
-						case EMeleeHitType.WPN_STAB:
-						case EMeleeHitType.WPN_STAB_FINISHER:
-						case EMeleeHitType.WPN_HIT_BUTTSTOCK:
-						case EMeleeHitType.WPN_HIT:
-							m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
-						break;
-						default:
-							m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_LIGHT);
-						break;
-					}
-
-					return true;
-				}
-				else
-				{
-					return true;
+					return HandleComboHit(pCurrentCommandID, pInputs, itemInHands, pMovementState, pContinueAttack);
 				}
 			}
 		}
-		else if (pCurrentCommandID == DayZPlayerConstants.COMMANDID_MELEE2)
-		{
-			HumanCommandMelee2 hmc2a = m_DZPlayer.GetCommand_Melee2();
-			if (hmc2a)
-			{
-				//! on anim event Hit received
-				if (hmc2a.WasHit())
-				{
-					//! re-target (enemy can be already away)
-					m_MeleeCombat.Update(itemInHands, m_HitType, true);
-					//! evaluate hit - selection of cfg 'ammo' type
-					EvaluateHit(itemInHands);
-					
-					//Get gloves
-					ClothingBase gloves;
-					
-					//We kick so "gloves" will be the shoes
-					if ( m_HitType == EMeleeHitType.KICK )
-						gloves = ClothingBase.Cast(player.GetItemOnSlot("FEET"));
-					else
-						gloves = ClothingBase.Cast(player.GetItemOnSlot("GLOVES"));
-					
-					//If we hit something, inflict damage
-					DamageHands(m_DZPlayer, gloves, itemInHands);
-					
-					//! reset - prepared for next hit
-					m_MeleeCombat.ResetTarget();
-					
-					//m_MeleeCombat.CheckMeleeItem();
-					
-					EnableControls();
-				}
-			}
-		}
+		//! evade and blocking logic
 		else if (!isFireWeapon && pCurrentCommandID == DayZPlayerConstants.COMMANDID_MOVE)
 		{
 			//! evades in raised erc stance while moving
@@ -423,7 +206,9 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 				{
 					//! not enough stamina to do evades
 					if (!m_DZPlayer.CanConsumeStamina(EStaminaConsumers.MELEE_EVADE))
+					{
 						return false;
+					}
 					
 					float angle;
 					if (roll == 1)
@@ -442,7 +227,7 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 					m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_EVADE);
 					
 					//Inflict shock when sidestepping with broken legs
-					if (player.m_BrokenLegState == eBrokenLegs.BROKEN_LEGS)
+					if (player.GetBrokenLegs() == eBrokenLegs.BROKEN_LEGS)
 					{
 						player.m_ShockHandler.SetShock(PlayerConstants.BROKEN_LEGS_LIGHT_MELEE_SHOCK);
 						player.m_ShockHandler.CheckValue(true);
@@ -453,7 +238,14 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 			//! stand up when crouching and raised pressed
 			if (pInputs.IsWeaponRaised() && pMovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_CROUCH)
 			{
-				hcm.ForceStance(DayZPlayerConstants.STANCEIDX_RAISEDERECT);
+				//Debug.MeleeLog(m_DZPlayer, "HandleFightLogic[2b]");
+				if (DayZPlayerUtils.PlayerCanChangeStance(player, DayZPlayerConstants.STANCEIDX_RAISEDERECT))
+				{
+					//Debug.MeleeLog(m_DZPlayer, "HandleFightLogic[2c]");
+					hcm.ForceStance(DayZPlayerConstants.STANCEIDX_RAISEDERECT);
+					
+					return false;
+				}
 			}
 
 			//! blocks in raised erc/pro stance
@@ -483,21 +275,320 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 		return false;
 	}
 
+	//! Handle the event that our melee hit something
+	protected bool HandleHitEvent(int pCurrentCommandID, HumanInputController pInputs, InventoryItem itemInHands, HumanMovementState pMovementState, out bool pContinueAttack)
+	{
+		//! Check if we need to damage
+		if (pCurrentCommandID == DayZPlayerConstants.COMMANDID_MELEE2)
+		{
+			HumanCommandMelee2 hmc2a = m_DZPlayer.GetCommand_Melee2();
+			if (hmc2a)
+			{
+				//! on anim event Hit received
+				if (hmc2a.WasHit())
+				{
+					//Debug.MeleeLog(m_DZPlayer, "HandleHitEvent[START]");
+					//Debug.MeleeLog(m_DZPlayer, string.Format("HandleHitEvent[1] target=%1, hitPos=%2, hitZoneIdx=%3, finisherType=%4", m_MeleeCombat.GetTargetEntity(), m_MeleeCombat.GetHitPos().ToString(), m_MeleeCombat.GetHitZoneIdx(), m_MeleeCombat.GetFinisherType()));
+					if (m_MeleeCombat.GetFinisherType() == -1)
+					{
+						//Debug.MeleeLog(m_DZPlayer, string.Format("HandleHitEvent[2] target=%1, hitPos=%2, hitZoneIdx=%3, finisherType=%4", m_MeleeCombat.GetTargetEntity(), m_MeleeCombat.GetHitPos().ToString(), m_MeleeCombat.GetHitZoneIdx(), m_MeleeCombat.GetFinisherType()));
+						//! re-target (enemy can have moved out of range or disappeared)
+						m_MeleeCombat.Update(itemInHands, m_HitType, true);
+					}
+
+					//! evaluate hit - selection of cfg 'ammo' type
+					EvaluateHit(itemInHands);					
+					
+					PlayerBase player = PlayerBase.Cast(m_DZPlayer);
+					
+					//Get gloves
+					ClothingBase gloves;
+					if (m_HitType == EMeleeHitType.KICK)
+					{
+						//We kick so "gloves" will be the shoes
+						gloves = ClothingBase.Cast(player.GetItemOnSlot("FEET"));
+					}
+					else
+					{
+						gloves = ClothingBase.Cast(player.GetItemOnSlot("GLOVES"));
+					}
+					
+					//If we hit something, inflict damage
+					DamageHands(m_DZPlayer, gloves, itemInHands);
+					
+					m_MeleeCombat.ResetTarget();
+					
+					EnableControls();
+					
+					m_WasPreviousHitProcessed = true;
+					
+					//Debug.MeleeLog(m_DZPlayer, "HandleHitEvent[END]");
+					
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+	
+	//! NOTE: Only singular (or first) hits, combo attacks are handled in combo
+	protected bool HandleInitialFirearmMelee(int pCurrentCommandID, HumanInputController pInputs, InventoryItem itemInHands, HumanMovementState pMovementState, out bool pContinueAttack)
+	{	
+		//! don't allow bash to interfere with actions like chambering or ejecting bullets
+		Weapon_Base weapon = Weapon_Base.Cast(itemInHands);
+		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
+		if (weapon.IsWaitingForActionFinish() || player.GetActionManager().GetRunningAction())
+			return false;		
+		
+		HumanCommandMove hcm = m_DZPlayer.GetCommand_Move();
+		
+		//! perform firearm melee from raised erect or continue with attack after character stand up from crouch
+		if (hcm.GetCurrentMovementSpeed() <= 2.05 && (pMovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDERECT || pContinueAttack) && !m_DZPlayer.IsFighting())
+		{
+			m_HitType = GetAttackTypeByWeaponAttachments(itemInHands);
+			if ( m_HitType == EMeleeHitType.NONE )
+				return false; //! exit if there is no suitable attack
+			
+			m_MeleeCombat.Update(itemInHands, m_HitType);
+
+			EntityAI target;
+			EMeleeTargetType targetType;
+			GetTargetData(target, targetType);
+			float attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
+
+			m_DZPlayer.StartCommand_Melee2(target, m_HitType == EMeleeHitType.WPN_STAB, attackByDistance, m_MeleeCombat.GetHitPos());			
+			m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
+			DisableControls();
+
+			pContinueAttack = false; // reset continueAttack flag
+
+			return true;
+		}				
+		//! char stand up when performing firearm melee from crouch
+		else if ( pMovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDCROUCH )
+		{
+			if (hcm)
+			{
+				hcm.ForceStance(DayZPlayerConstants.STANCEIDX_RAISEDERECT);
+				pContinueAttack = true;
+				return false;
+			}
+		}
+		
+		return false;
+	}
+	
+	//! First attack in raised erc (light or heavy if modifier is used). Also added support for finishers
+	protected bool HandleInitialMeleeErc(int pCurrentCommandID, HumanInputController pInputs, InventoryItem itemInHands, HumanMovementState pMovementState, out bool pContinueAttack)
+	{
+		//Debug.MeleeLog(m_DZPlayer, "HandleInitialMeleeErc[1]");
+		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
+		
+		m_HitType = GetAttackTypeFromInputs(pInputs);
+		m_MeleeCombat.Update(itemInHands, m_HitType);
+		
+		//Debug.MeleeLog(m_DZPlayer, string.Format("HandleInitialMeleeErc[2] %1", EnumTools.EnumToString(EMeleeHitType, m_HitType)));
+		
+		EntityAI target;
+		EMeleeTargetType targetType;
+		GetTargetData(target, targetType);
+		float attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
+		
+		// finisher attack hittype override
+		int finisherType = m_MeleeCombat.GetFinisherType();
+		if (finisherType != -1)
+		{
+			int animationType = DetermineFinisherAnimation(finisherType);
+			if (animationType > -1)
+			{
+				//Debug.MeleeLog(m_DZPlayer, string.Format("HandleInitialMeleeErc[3a] target=%1, finisherType=%2, animationType=%3, hitPositionWS=%4", target, finisherType, animationType, m_MeleeCombat.GetHitPos().ToString()));
+				m_DZPlayer.StartCommand_Melee2(target, animationType, attackByDistance, m_MeleeCombat.GetHitPos());
+			}
+			else
+			{
+				//Debug.MeleeLog(m_DZPlayer, string.Format("HandleInitialMeleeErc[3b] target=%1, finisherType=%2, animationType=%3, hitPositionWS=%4", target, finisherType, (m_HitType == EMeleeHitType.HEAVY).ToString(), m_MeleeCombat.GetHitPos().ToString()));
+				m_DZPlayer.StartCommand_Melee2(target, m_HitType == EMeleeHitType.HEAVY, attackByDistance, m_MeleeCombat.GetHitPos());
+			}
+			
+			m_HitType = finisherType;
+			target.SetBeingBackstabbed(finisherType);
+		}
+		else
+		{
+			//Debug.MeleeLog(m_DZPlayer, string.Format("HandleInitialMeleeErc[3d] target=%1, animationType=%2, hitPositionWS=%3", target, (m_HitType == EMeleeHitType.HEAVY).ToString(), m_MeleeCombat.GetHitPos().ToString()));
+			m_DZPlayer.StartCommand_Melee2(target, m_HitType == EMeleeHitType.HEAVY, attackByDistance, m_MeleeCombat.GetHitPos());
+		}
+		
+		if (m_HitType == EMeleeHitType.HEAVY)
+		{
+			m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
+			if (player.GetBrokenLegs() == eBrokenLegs.BROKEN_LEGS)
+			{	
+				player.m_ShockHandler.SetShock(PlayerConstants.BROKEN_LEGS_HEAVY_MELEE_SHOCK);
+				player.m_ShockHandler.CheckValue(true);
+			}
+		}
+		else
+		{
+			m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_LIGHT);
+			if (player.GetBrokenLegs() == eBrokenLegs.BROKEN_LEGS)
+			{
+				player.m_ShockHandler.SetShock(PlayerConstants.BROKEN_LEGS_LIGHT_MELEE_SHOCK);
+				player.m_ShockHandler.CheckValue(true);
+			}
+		}	
+
+		m_WasPreviousHitProcessed = false;
+		
+		DisableControls();
+		
+		return true;
+	}
+	
+	//! kick from raised pne
+	protected bool HandleProneKick(int pCurrentCommandID, HumanInputController pInputs, InventoryItem itemInHands, HumanMovementState pMovementState, out bool pContinueAttack)
+	{
+		HumanCommandWeapons hcw = m_DZPlayer.GetCommandModifier_Weapons();
+
+		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
+
+		float hcw_angle = hcw.GetBaseAimingAngleLR();
+		//! check if player is on back
+		//! (situation where the player is raised in prone and on back is not in anim graph)
+		if ( ( hcw_angle < -90 || hcw_angle > 90 ) && player.GetBrokenLegs() != eBrokenLegs.BROKEN_LEGS )
+		{
+			// targetting
+			m_HitType = EMeleeHitType.KICK;
+			m_MeleeCombat.Update(itemInHands, m_HitType);
+
+			EntityAI target;
+			EMeleeTargetType targetType;
+			GetTargetData(target, targetType);
+			float attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
+
+			// command
+			m_DZPlayer.StartCommand_Melee2(target, false, attackByDistance, m_MeleeCombat.GetHitPos());
+			m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
+			DisableControls();
+			
+			return true;
+		}
+		
+		return false;
+	}
+	
+	//! sprint attack in erc stance
+	protected bool HandleSprintAttack(int pCurrentCommandID, HumanInputController pInputs, InventoryItem itemInHands, HumanMovementState pMovementState, out bool pContinueAttack)
+	{
+		//! targetting
+		m_HitType = EMeleeHitType.SPRINT;
+		m_MeleeCombat.Update(itemInHands, m_HitType);
+
+		EntityAI target;
+		EMeleeTargetType targetType;
+		GetTargetData(target, targetType);
+		float attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
+
+		//! command
+		//Debug.MeleeLog(m_DZPlayer, string.Format("HandleSprintAttack[1] target=%1, animationType=%2, hitPositionWS=%3", target, false, m_MeleeCombat.GetHitPos().ToString()));
+		m_DZPlayer.StartCommand_Melee2(target, false, attackByDistance, m_MeleeCombat.GetHitPos());
+		m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
+		DisableControls();
+
+		return true;
+	}
+	
+	//! combo hits - when we are already in Melee command and clicking UseButton
+	protected bool HandleComboHit(int pCurrentCommandID, HumanInputController pInputs, InventoryItem itemInHands, HumanMovementState pMovementState, out bool pContinueAttack)
+	{
+		//Debug.MeleeLog(m_DZPlayer, "HandleComboHit::");
+
+		//! no suitable attack - skip that
+		if (m_HitType == EMeleeHitType.NONE)
+			return false;
+		
+		//! No combos for the finisher command
+		if (m_MeleeCombat.GetFinisherType() > -1)
+			return false;
+		
+		EntityAI target;
+		EMeleeTargetType targetType;
+		GetTargetData(target, targetType);
+		float attackByDistance = GetAttackTypeByDistanceToTarget(target, targetType);
+		
+		PlayerBase player = PlayerBase.Cast(m_DZPlayer);
+	
+		//! select if the next attack will light or heavy (based on input/attachment modifier)
+		if (itemInHands && itemInHands.IsWeapon())
+		{
+			m_HitType = GetAttackTypeByWeaponAttachments(itemInHands);			
+		}
+		else
+		{
+			m_HitType = GetAttackTypeFromInputs(pInputs);
+		}
+
+		//! targetting
+		//Debug.MeleeLog(m_DZPlayer, string.Format("HandleComboHit:: %1", EnumTools.EnumToString(EMeleeHitType, m_HitType)));
+		//! wait for the previous hit commit before hitting again
+		if (m_WasPreviousHitProcessed)
+		{
+		  m_MeleeCombat.Update(itemInHands, m_HitType);
+		}
+
+		//! continue 'combo' - left hand attacks
+		bool isHeavy = (m_HitType == EMeleeHitType.HEAVY || m_HitType == EMeleeHitType.WPN_STAB);	
+		m_DZPlayer.GetCommand_Melee2().ContinueCombo(isHeavy, attackByDistance, target, m_MeleeCombat.GetHitPos());				
+		DisableControls();
+		
+		//! broken legs shock
+		if (player.GetBrokenLegs() == eBrokenLegs.BROKEN_LEGS)
+		{
+			float shock = PlayerConstants.BROKEN_LEGS_HEAVY_MELEE_SHOCK;
+			
+			if (!isHeavy)
+				shock = PlayerConstants.BROKEN_LEGS_LIGHT_MELEE_SHOCK;
+			
+			player.m_ShockHandler.SetShock(PlayerConstants.BROKEN_LEGS_HEAVY_MELEE_SHOCK);
+			player.m_ShockHandler.CheckValue(true);
+		}
+
+		//! stamina depletion per attack
+		switch (m_HitType)
+		{
+			case EMeleeHitType.HEAVY:
+			case EMeleeHitType.SPRINT:
+			case EMeleeHitType.WPN_STAB:
+			case EMeleeHitType.WPN_HIT_BUTTSTOCK:
+			case EMeleeHitType.WPN_HIT:
+				m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_HEAVY);
+				break;
+			default:
+				m_DZPlayer.DepleteStamina(EStaminaModifiers.MELEE_LIGHT);
+				break;
+		}
+
+		m_IsInComboRange = false;
+
+		return true;
+	}
+
 	protected void EvaluateHit(InventoryItem weapon)
 	{
 		EntityAI target = m_MeleeCombat.GetTargetEntity();
 	
-		if ( target )
+		if (target)
 		{
-			if ( target.IsInherited(DayZPlayer) )
+			if (target.IsInherited(DayZPlayer))
 			{
 				EvaluateHit_Player(weapon, target);
 			}
-			else if ( target.IsInherited(DayZInfected) )
+			else if (target.IsInherited(DayZInfected))
 			{
 				EvaluateHit_Infected(weapon, target);
 			}
-			else if ( target.GetMeleeTargetType() == EMeleeTargetType.NONALIGNABLE )
+			else if (target.GetMeleeTargetType() == EMeleeTargetType.NONALIGNABLE)
 			{
 				EvaluateHit_NonAlignableObjects(weapon, target);
 			}
@@ -529,7 +620,7 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 			float hitAngle = Math.RAD2DEG * Math.AbsFloat(Math3D.AngleFromPosition(targetPos, MiscGameplayFunctions.GetHeadingVector(targetPlayer), agressorPos));
 							
 			//! if the oponnent is in Melee Block shift the damage down
-			if ( targetPlayer.GetMeleeFightLogic() && targetPlayer.GetMeleeFightLogic().IsInBlock() && hitAngle <= GameConstants.PVP_MAX_BLOCKABLE_ANGLE )
+			if (targetPlayer.GetMeleeFightLogic() && targetPlayer.GetMeleeFightLogic().IsInBlock() && hitAngle <= GameConstants.PVP_MAX_BLOCKABLE_ANGLE)
 			{
 				if ( weaponMode > 0 )
 				{
@@ -552,26 +643,19 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 			EvaluateHit_Common(weapon, target);
 	}
 	
+	//! Check and evaluate stealth kill, if applicable
 	protected bool EvaluateFinisherAttack(InventoryItem weapon, Object target)
 	{
-		int hitZoneIdx = m_MeleeCombat.GetHitZoneIdx();
-		vector hitPosWS;
+		//Debug.MeleeLog(m_DZPlayer, string.Format("EvaluateFinisherAttack[1] target=%1, hitPos=%2, hitZoneIdx=%3, finisherType=%4", m_MeleeCombat.GetTargetEntity(), m_MeleeCombat.GetHitPos().ToString(), m_MeleeCombat.GetHitZoneIdx(), m_MeleeCombat.GetFinisherType()));
 		
-		//! check and evaluate stealth kill
-		if (GetGame().IsServer())
+		if (m_MeleeCombat.GetFinisherType() > -1)
 		{
-			if ( IsHitTypeFinisher(m_HitType) )
-			{
-				EntityAI targetEntity = EntityAI.Cast(target);
-				// execute attack (dmg part)
-				hitPosWS = targetEntity.ModelToWorld(targetEntity.GetDefaultHitPosition());
-				DamageSystem.CloseCombatDamage(m_DZPlayer, target, hitZoneIdx/*-1*/, "FinisherHit", hitPosWS);
-				//Print("Backstab!");
+			if (GetGame().IsServer())
+				DamageSystem.CloseCombatDamage(m_DZPlayer, target, -1, DetermineFinisherAmmo(m_MeleeCombat.GetFinisherType()), m_MeleeCombat.GetHitPos());
 				
-				return true;
-			}
+			return true;
 		}
-		//Finisher attack not performed
+
 		return false;
 	}
 	
@@ -593,18 +677,25 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 				hitPosWS = targetEntity.ModelToWorld(targetEntity.GetDefaultHitPosition());
 				
 				if (WeaponDestroyedCheck(weapon,ammo))
-					DamageSystem.CloseCombatDamage(m_DZPlayer, target, hitZoneIdx, ammo, hitPosWS);
+				{
+					DamageSystem.CloseCombatDamage(m_DZPlayer, target, hitZoneIdx, ammo, hitPosWS);					
+					//Debug.MeleeLog(m_DZPlayer, string.Format("EvaluateHit_Common::CloseCombatDamage:: target: %1, hitzone: %2, ammo: %3", target, hitZoneIdx, ammo));
+				}
 				else
+				{
 					m_DZPlayer.ProcessMeleeHit(weapon, weaponMode, target, hitZoneIdx, hitPosWS);
+					//Debug.MeleeLog(m_DZPlayer, string.Format("EvaluateHit_Common::ProcessMeleeHit:: target: %1, hitzone: %2, meleeMode: %3", target, hitZoneIdx, weaponMode));
+				}
 			}
 		}
 		else
 		{
 			//! play hit animation for dummy hits
-			if ( GetGame().IsServer() && targetEntity )
+			if (GetGame().IsServer() && targetEntity)
 			{
 				hitPosWS = targetEntity.ModelToWorld(targetEntity.GetDefaultHitPosition()); //! override hit pos by pos defined in type
 				targetEntity.EEHitBy(null, 0, m_DZPlayer, hitZoneIdx, "", ammo, hitPosWS, 1.0);
+				//Debug.MeleeLog(m_DZPlayer, string.Format("EvaluateHit_Common::EEHitBy:: target: %1, hitzone: %2, meleeMode: %3", target, hitZoneIdx, weaponMode));
 			}
 		}
 	}
@@ -690,32 +781,9 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 		return false;
 	}
 	
+	//! DEPRECATED - moved into DayZPlayerImplementMeleeCombat
 	protected bool IsBehindEntity(int angle, DayZPlayer source, Object target)
 	{
-		//! behind entity check			
-		vector targetDirection = target.GetDirection();
-		vector toSourceDirection = (source.GetPosition() - target.GetPosition());
-
-		targetDirection[1] = 0;
-		toSourceDirection[1] = 0;
-
-		targetDirection.Normalize();
-		toSourceDirection.Normalize();
-
-		float cosFi = vector.Dot(targetDirection, toSourceDirection);
-		vector cross = targetDirection * toSourceDirection;
-
-		int hitDir = Math.Acos(cosFi) * Math.RAD2DEG;
-		
-		if ( cross[1] < 0 )
-			hitDir = -hitDir;
-		
-		if ( hitDir <= (-180 + angle) || hitDir >= (180 - angle) )
-		{
-			//Print("HitDir: " + hitDir + " angle passed");
-			return true;
-		}
-		
 		return false;
 	}
 
@@ -742,25 +810,8 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 		}
 	}
 
-	protected void EnableControls()
-	{
-		/*
-		if (m_Mission)
-		{
-			m_Mission.PlayerControlEnable(true);
-		}
-		*/
-	}
-
-	protected void DisableControls()
-	{
-		/*
-		if (m_Mission)
-		{
-			m_Mission.PlayerControlDisable(INPUT_EXCLUDE_MOUSE_ALL);
-		}
-		*/
-	}
+	protected void EnableControls();
+	protected void DisableControls();
 	
 	protected void DamageHands(DayZPlayer DZPlayer, ClothingBase gloves, InventoryItem itemInHands)
 	{
@@ -868,80 +919,64 @@ class DayZPlayerMeleeFightLogic_LightHeavy
 		}
 	}
 	
-	/**
-	\brief General condition for finisher attacks
-		\param weapon \p Weapon used in the attack
-		\param target \p Target entity
-		\return \p int - type of finisher (-1 == no finisher)
-	*/
+	//! DEPRECATED
 	int GetFinisherType(InventoryItem weapon, EntityAI target)
 	{
-		//! perform only for finisher suitable weapons
-		if ( target && target.CanBeBackstabbed() && weapon && (weapon.IsMeleeFinisher() || m_HitType == EMeleeHitType.WPN_STAB) && !weapon.IsRuined() )
-		{
-			bool play_generic_finisher = false;
-			ZombieBase target_zombie = ZombieBase.Cast(target);
-			PlayerBase target_player = PlayerBase.Cast(target);
-			if ( target_zombie )
-			{
-				int mindState = target_zombie.GetMindStateSynced();
-				//Print("mindState: " + mindState + " | SST: " + m_DZPlayer.GetSimulationTimeStamp());
-				
-				//Check if the infected is aware of the player
-				if (mindState >= DayZInfectedConstants.MINDSTATE_DISTURBED)
-				{
-					return -1;
-				}
-				else
-				{
-					//Log("FinisherDebug | GetFinisherType | Target " + target_zombie + " - mindState: " + mindState);
-				}
-			}
-			
-			//prone check
-			if (target_zombie)
-			{
-				play_generic_finisher = target_zombie.IsCrawling();
-			}
-			else if (target_player)
-			{
-				play_generic_finisher = target_player.IsInProne();
-			}
-			else
-			{
-				play_generic_finisher = true; //unhandled target, play generic animation..
-			}
-			
-			//! check if attacker is in right pos and angle against victim
-			/*if ( !IsBehindEntity(60, m_DZPlayer, target) )
-			{
-				return -1;
-			}*/
-			
-			//firearm
-			if ( weapon.IsWeapon() )
-			{
-				return EMeleeHitType.WPN_STAB_FINISHER;
-			}
-			else if (play_generic_finisher)
-			{
-				return EMeleeHitType.FINISHER_GENERIC;
-			}
-			else
-			{
-				return EMeleeHitType.FINISHER_LIVERSTAB;
-			}
-		}
 		return -1;
 	}
 	
+	//! DEPRECATED
 	bool IsHitTypeFinisher(int type)
 	{
-		if ( type == EMeleeHitType.WPN_STAB_FINISHER || type == EMeleeHitType.FINISHER_GENERIC || type == EMeleeHitType.FINISHER_LIVERSTAB )
+		return false;
+	}
+	
+	//! Picks a specific finisher animation. Not used for mounted bayonet stabs
+	int DetermineFinisherAnimation(int finisher_type)
+	{
+		int animation = -1;
+		
+		switch (finisher_type)
 		{
-			return true;
+			case EMeleeHitType.FINISHER_LIVERSTAB:
+				animation = HumanCommandMelee2.HIT_TYPE_FINISHER;
+			break;
+			
+			case EMeleeHitType.FINISHER_NECKSTAB:
+				animation = HumanCommandMelee2.HIT_TYPE_FINISHER_NECK;
+			break;
 		}
 		
-		return false;
+		return animation;
+	}
+	
+	//! Picks a specific finisher ammo fot the hit type. This gets synchronized and guides further behaviour of the target.
+	string DetermineFinisherAmmo(int finisher_type)
+	{
+		string ret = "";
+		
+		switch (finisher_type)
+		{
+			case EMeleeHitType.FINISHER_NECKSTAB:
+				ret = "FinisherHitNeck";
+				break;
+			
+			default:
+				ret = "FinisherHit";
+				break;
+		}
+
+		return ret;
+	}
+	
+	//! DEPRECATED
+	int DetermineSpecificFinisherType(ItemBase weapon, int component)
+	{
+		return -1;
+	}
+	
+	protected bool IsShortDistance(EntityAI pTarget, float pDistanceSq)
+	{
+		return pTarget && vector.DistanceSq(m_DZPlayer.GetPosition(), m_MeleeCombat.GetHitPos()) <= pDistanceSq || vector.DistanceSq(m_DZPlayer.GetBonePositionWS(m_DZPlayer.GetBoneIndexByName("Head")), m_MeleeCombat.GetHitPos()) <= pDistanceSq)
 	}
 }

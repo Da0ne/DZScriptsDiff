@@ -1,7 +1,3 @@
-/*
-DISCLAIMER: may undergo some changes in the course of 1.14 experimental stage.
-*/
-
 class PPEMatClassParameterBool extends PPEMatClassParameterCommandData
 {
 	protected ref map<int,ref array<bool,int>> m_LayerInfo; //<priority,<value,operator>>

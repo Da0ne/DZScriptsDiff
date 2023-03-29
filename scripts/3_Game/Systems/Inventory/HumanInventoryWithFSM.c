@@ -59,7 +59,7 @@ class HumanInventoryWithFSM : HumanInventory
 
 		m_FSM.AddTransition(new HandTransition(m_Equipped, __D__,    m_Empty, new HandActionDrop, null));
 		m_FSM.AddTransition(new HandTransition(m_Equipped, __Tw_,    m_Empty, new HandActionThrow, null));
-		m_FSM.AddTransition(new HandTransition(m_Equipped, __M__,    m_Empty, new HandActionMoveTo, new HandGuardAnd(HandGuardHasItemInHands(GetManOwner()), new HandGuardHasRoomForItem(GetManOwner()))));
+		m_FSM.AddTransition(new HandTransition(m_Equipped, __M__,    m_Empty, new HandActionMoveTo, new HandGuardAnd(new HandGuardHasItemInHands(GetManOwner()), new HandGuardCanMove(GetManOwner()))));
 		m_FSM.AddTransition(new HandTransition(m_Equipped, __X__,    m_Empty, new HandActionDestroy, new HandGuardHasItemInHands(GetManOwner())));
 		m_FSM.AddTransition(new HandTransition(m_Equipped, __Xd_,    m_Empty, new HandActionDestroyed, new HandGuardHasDestroyedItemInHands(GetManOwner())));
 		m_FSM.AddTransition(new HandTransition(m_Equipped, __Xd_, m_Equipped, new HandActionDestroyed, new HandGuardNot(new HandGuardHasDestroyedItemInHands(GetManOwner()))));
@@ -99,7 +99,7 @@ class HumanInventoryWithFSM : HumanInventory
 			#ifdef DEVELOPER
 			if ( LogManager.IsInventoryHFSMLogEnable() )
 			{
-				Debug.InventoryHFSMLog("STS=" + GetManOwner().GetSimulationTimeStamp() , e.ToString(), "ProcessHandEvent", e.m_Player.ToString() );
+				Debug.InventoryHFSMLog("STS = " + GetManOwner().GetSimulationTimeStamp() , e.ToString(), "ProcessHandEvent", e.m_Player.ToString() );
 			}
 			#endif
 			return true;
@@ -118,7 +118,7 @@ class HumanInventoryWithFSM : HumanInventory
 		m_FSM.ProcessAbortEvent(e, aa);
 		if (aa == ProcessEventResult.FSM_OK)
 		{
-			hndDebugSpam("[hndfsm]  STS=" + GetManOwner().GetSimulationTimeStamp() + " Processed event e=" + e.ToString());
+			hndDebugSpam("[hndfsm]  STS = " + GetManOwner().GetSimulationTimeStamp() + " Processed event e=" + e.ToString());
 			return true;
 		}
 		else

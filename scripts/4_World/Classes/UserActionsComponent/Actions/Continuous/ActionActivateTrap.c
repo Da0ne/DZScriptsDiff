@@ -23,17 +23,13 @@ class ActionActivateTrap: ActionContinuousBase
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_CROUCH;
 		m_Sound = "craft_universal_0";
 		m_SpecialtyWeight = UASoftSkillsWeight.PRECISE_LOW;
+		m_Text = "#activate";
 	}
 	
 	override void CreateConditionComponents()  
 	{	
 		m_ConditionTarget = new CCTNonRuined( UAMaxDistances.DEFAULT );
 		m_ConditionItem = new CCINotPresent;
-	}
-
-	override string GetText()
-	{
-		return "#activate";
 	}
 	
 	override typename GetInputType()

@@ -10,6 +10,7 @@ typedef int[] dBlock;
 proto native int dGetNumDynamicBodies(notnull IEntity worldEnt);
 proto native IEntity dGetDynamicBody(notnull IEntity worldEnt, int index);
 proto native void dSetInteractionLayer(notnull IEntity worldEntity, int mask1, int mask2, bool enable);
+proto native bool dGetInteractionLayer(notnull IEntity worldEntity, int mask1, int mask2);
 
 //!Gets global gravity
 proto native vector dGetGravity(notnull IEntity worldEntity);
@@ -47,13 +48,6 @@ class PhysicsGeomDef: Managed
 };
 
 /*!
-Creates CollisionObject from geometry embedded in attached vobject. If there is not any, false is returned
-\param mass Body mass
-\param layerMask Bit mask of layers that is ANDed with layers in object geometry. Use 0xffffffff if you want to keep it unmodified
-*/
-proto native bool dBodyCreateStatic(notnull IEntity ent, int layerMask);
-
-/*!
 Creates RigidBody from custom made geometries. The geometries are deleted when rigid body is destroyed
 \param geoms array of custom made geometries
 @code
@@ -62,16 +56,7 @@ Creates RigidBody from custom made geometries. The geometries are deleted when r
 @endcode
 */
 proto bool dBodyCreateStaticEx(notnull IEntity ent, PhysicsGeomDef geoms[]);
-
-/*!
-Creates RigidBody from geometry embedded in attached vobject. If there is not any, false is returned
-\param mass Body mass
-\param layerMask Bit mask of layers that is ANDed with layers in object geometry. Use 0xffffffff if you want to keep it unmodified
-*/
-proto native bool dBodyCreateDynamic(notnull IEntity ent, float mass, int layerMask);
-
-//int SetupPhysicsGeomDefs(vobject obj, out PhysicsGeomDef defs[], int maxDefs);
-//proto native int dBodyAddGeoms(IEntity body, PhysicsGeomDef defs[], int numGeoms);
+proto bool dBodyCreateGhostEx(notnull IEntity ent, PhysicsGeomDef geoms[]);
 
 /*!
 Creates RigidBody from custom made geometries. The geometries are deleted when rigid body is destroyed
@@ -84,8 +69,6 @@ Creates RigidBody from custom made geometries. The geometries are deleted when r
 @endcode
 */
 proto bool dBodyCreateDynamicEx(notnull IEntity ent, vector centerOfMass, float mass, PhysicsGeomDef geoms[]);
-
-proto bool dBodyCreateGhostEx(notnull IEntity ent, PhysicsGeomDef geoms[]);
 
 //!Destroys attached physics body
 proto native void dBodyDestroy(notnull IEntity ent);
@@ -114,6 +97,9 @@ proto native bool dBodyIsActive(notnull IEntity ent);
 proto native bool dBodyEnableGravity(notnull IEntity ent, bool enable);
 proto native void dBodySetDamping(notnull IEntity ent, float linearDamping, float angularDamping);
 proto native void dBodySetSleepingTreshold(notnull IEntity body, float linearTreshold, float angularTreshold);
+
+proto native bool dBodyIsSolid(notnull IEntity ent);
+proto native void dBodySetSolid(notnull IEntity ent, bool solid);
 
 /*!
 If both maxMotion and shapeCastRadius is >=0 then the continuous collision detection is enabled.
@@ -243,45 +229,6 @@ proto native int dBodyGetNumGeoms(notnull IEntity ent);
 //@}
 
 /**
- * \defgroup Vehicle Vehicle API definition
- * @{
- */
-class VehicleWheelParams
-{
-	float	SuspensionStiffness;
-	float	SuspensionCompression;
-	float	SuspensionDamping;
-	float	MaxSuspensionTravel;
-	float RollInfluence;
-};
-
-proto native bool dBodyCreateVehicle(notnull IEntity ent, vector center, float mass, int layerMask);
-proto native void dVehicleAddWheel(notnull IEntity ent, vector offset, vector suspensionDir, vector axleDir, float wheelRadius, VehicleWheelParams params, string wheelMat);
-proto native void dVehicleApplyEngineForce(notnull IEntity ent, int wheel, float force);
-proto native void dVehicleSetBrake(notnull IEntity ent, int wheel, float brake);
-proto native void dVehicleSetSteering(notnull IEntity ent, int wheel, float steering);
-proto native float dVehicleGetSteering(notnull IEntity ent, int wheel);
-proto native float dVehicleGetWheelAngle(notnull IEntity ent, int wheel);
-proto native float dVehicleGetWheelAngularVelocity(notnull IEntity ent, int wheel);
-proto native float dVehicleGetWheelSuspensionLength(notnull IEntity ent, int wheel);
-proto native vector dVehicleGetWheelEndPosition(notnull IEntity ent, int wheel);
-proto native IEntity dVehicleHasWheelContact(notnull IEntity ent, int wheel);
-
-class WheelContactInfo
-{
-	int		Type;
-	vector	EndPos;
-	float		SuspensionLength;
-	float		Fraction;
-	vector	ContactNormal;
-	owned string	Mat;
-	IEntity	ContactEntity;
-};
-
-proto native bool dVehicleGetWheelContact(int wheel, notnull WheelContactInfo info);
-//@}
-
-/**
  * \defgroup Constraints Constraints API definition
  * @{
  */
@@ -352,6 +299,9 @@ typedef int[] dMaterial;
 
 class Contact
 {
+	private void Contact() {}
+	private void ~Contact() {}
+	
 	dMaterial	Material1;
 	dMaterial	Material2;
 	int			MaterialIndex1;
@@ -359,9 +309,12 @@ class Contact
 	int			Index1;
 	int			Index2;
 
+	float		PenetrationDepth;
+
 	float		Impulse;
 	float		RelativeNormalVelocityBefore;
 	float		RelativeNormalVelocityAfter;
+
 	vector		Normal;
 	vector		Position;
 	vector		RelativeVelocityBefore;

@@ -1,3 +1,6 @@
+// ip, name, connection port, queryPort
+typedef Param4<string, string, int, int> CachedServerInfo;
+
 // Script File
 
 enum ESortType
@@ -75,6 +78,27 @@ class GetServersResultRow
 	
 	bool m_Favorite;
 
+	string GetIpPort()
+	{
+#ifdef PLATFORM_WINDOWS
+		return m_Id;
+#else
+		return GetIP() + ":" + m_HostPort;
+#endif
+	}
+	
+	string GetIP()
+	{
+#ifdef PLATFORM_WINDOWS
+		// Hack - In new Serverborwser on PC has bad m_HostIp but ID contains correct IP
+		array<string> parts = new array<string>;
+		m_Id.Split(":", parts);
+		return parts[0];
+#else
+		return m_HostIp;
+#endif
+	}
+	
 	bool IsSelected()
 	{
 		return m_IsSelected;
@@ -475,7 +499,14 @@ class BiosLobbyService
 	
 	proto native void AddServerFavorite(string ipAddress, int port, int steamQueryPort);
 	proto native void RemoveServerFavorite(string ipAddress, int port, int steamQueryPort);
-
+	proto native void GetFavoriteServers(TStringArray favServers);
+	
+	//! Get cached info about favorited servers (ONLY ON WINDOWS)
+	/*!
+		@param favServersInfoCache gets populated with data with format: key = Query End Point, value.param1 = Server Name, value.param2 = Connection Port
+	*/
+	proto native void GetCachedFavoriteServerInfo(array<ref CachedServerInfo> favServersInfoCache);
+	
 	//! Async function to retrieve info about mods for specific server (only for PC)
 	//! @param serverId have to be an id returned by callbacks issued by last call to GetServers
 	//! if GetServers is used another time the id's must be upated

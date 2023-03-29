@@ -1,5 +1,8 @@
 class DayZCreatureAnimInterface
-{	
+{
+	private void DayZCreatureAnimInterface() {}
+	private void ~DayZCreatureAnimInterface() {}
+	
 	//-----------------------------------------------------
 	// Binds, returns -1 when error, otherwise if ok
 
@@ -33,6 +36,15 @@ class DayZCreature extends EntityAI
 
 	
 	proto native void UpdateSimulationPrecision(int simLOD);
+
+	//---------------------------------------------------------
+	// helper functions for disabling simulation upon death
+	proto native void StartDeath();
+	proto native void ResetDeath();
+
+	proto native void ResetDeathCooldown();
+	proto native bool IsDeathProcessed();
+	proto native bool IsDeathConditionMet();
 	
 	override bool IsDayZCreature()
 	{
@@ -55,7 +67,7 @@ class DayZCreatureAI extends DayZCreature
 	proto native AIAgent GetAIAgent();
 
 	proto native bool IsSoundInsideBuilding();
-#ifdef DEVELOPER
+#ifdef DIAG_DEVELOPER
 	proto native void DebugDisableAIControl();
 	proto native void DebugRestoreAIControl();
 #endif
@@ -165,7 +177,7 @@ class DayZCreatureAI extends DayZCreature
 			Print("Error registering anim. event (SoundVoice)");
 		}
 
-		if(GetGame().IsClient() || !GetGame().IsMultiplayer())
+		if(!GetGame().IsDedicatedServer())
 		{
 			if(!RegisterAnimationEvent("Step", "OnStepEvent"))
 			{
@@ -181,7 +193,7 @@ class DayZCreatureAI extends DayZCreature
 	
 	private void ProcessSoundEvent(AnimSoundEvent sound_event)
 	{
-		if(GetGame().IsClient() || !GetGame().IsMultiplayer())
+		if(!GetGame().IsDedicatedServer())
 		{
 			SoundObjectBuilder objectBuilder = sound_event.GetSoundBuilder();
 			if(NULL != objectBuilder)
@@ -192,7 +204,7 @@ class DayZCreatureAI extends DayZCreature
 			}
 		}
 		
-		if(GetGame().IsServer() || !GetGame().IsMultiplayer())
+		if(GetGame().IsServer())
 		{
 			if(sound_event.m_NoiseParams != NULL)
 				GetGame().GetNoiseSystem().AddNoise(this, sound_event.m_NoiseParams);
@@ -201,7 +213,7 @@ class DayZCreatureAI extends DayZCreature
 
 	private void ProcessSoundVoiceEvent(AnimSoundVoiceEvent sound_event)
 	{
-		if(GetGame().IsClient() || !GetGame().IsMultiplayer())
+		if(!GetGame().IsDedicatedServer())
 		{
 			SoundObjectBuilder objectBuilder = sound_event.GetSoundBuilder();
 			if(NULL != objectBuilder)
@@ -213,7 +225,7 @@ class DayZCreatureAI extends DayZCreature
 			}
 		}
 		
-		if(GetGame().IsServer() || !GetGame().IsMultiplayer())
+		if(GetGame().IsServer())
 		{
 			if(sound_event.m_NoiseParams != NULL)
 				GetGame().GetNoiseSystem().AddNoise(this, sound_event.m_NoiseParams);
@@ -287,37 +299,57 @@ enum DayZAnimalConstants
 	COMMANDID_SCRIPT,
 };
 
-class DayZAnimalInputController
+class DayZAnimalCommandMove extends AnimCommandBase
 {
-	proto native bool IsDead();
-	proto native bool IsJump();
-	proto native bool IsAttack();
-	
-	//--------------------------------------------------------------
 
-	//! never created by script
-	private void DayZAnimalInputController()
-	{
-	}
+}
 
-	//! never destroyed by script
-	private void ~DayZAnimalInputController()
-	{
-	}	
-};
+class DayZAnimalCommandAttack extends AnimCommandBase
+{
 
-class DayZAnimalCommandScript
+}
+
+class DayZAnimalCommandJump extends AnimCommandBase
+{
+
+}
+
+class DayZAnimalCommandLookAt extends AnimCommandBase
+{
+
+}
+
+class DayZAnimalCommandBehaviourModifier extends AnimCommandBase
+{
+
+}
+
+class DayZAnimalCommandHit extends AnimCommandBase
+{
+
+}
+
+class DayZAnimalCommandDeath extends AnimCommandBase
+{
+
+}
+
+class DayZAnimalCommandAnimCallback extends AnimCommandBase
+{
+
+}
+
+/**
+*\brief DayZAnimalCommandScript fully scriptable command
+*	\warning NON-MANAGED, will be managed by C++ once it is sent to the CommandHandler through DayZAnimal.StartCommand_Script
+*	\note So ideally, it is best to set up the DayZAnimalCommandScript, not create any instances and start it through DayZAnimal.StartCommand_ScriptInst
+*			In case an instance needs to be created, it needs manual deletion if not sent to the CommandHandler
+*			But deleting it while it is in the CommandHandler will cause crashes
+*/
+class DayZAnimalCommandScript extends AnimCommandBase
 {
 	//! constructor must have 1st parameter to be DayZAnimal
-	// DayZAnimalCommandScript(DayZAnimal pInfected);
-
-	//! virtual to be overridden
-	//! called when command starts
-	void 	OnActivate()	{ };
-
-	//! called when command ends
-	void 	OnDeactivate()	{ };
-
+	//void DayZAnimalCommandScript(DayZAnimal pAnimal)
 
 	//---------------------------------------------------------------
 	// usable everywhere
@@ -325,31 +357,10 @@ class DayZAnimalCommandScript
 	//! this terminates command script and shows CommandHandler(  ... pCurrentCommandFinished == true );
 	proto native void 	SetFlagFinished(bool pFinished);
 
-
-	//---------------------------------------------------------------
-	// PreAnim Update 
-
-	//! override this !
-	//! called before any animation is processed
-	//! here change animation values, add animation commands	
-	void 	PreAnimUpdate(float pDt);
-
-	//! function usable in PreAnimUpdate or in !!! OnActivate !!!
-	proto native 	void	PreAnim_CallCommand(int pCommand, int pParamInt, float pParamFloat);
-	proto native 	void	PreAnim_SetFloat(int pVar, float pFlt);
-	proto native 	void	PreAnim_SetInt(int pVar, int pInt);
-	proto native 	void	PreAnim_SetBool(int pVar, bool pBool);
-
 	//---------------------------------------------------------------
 	// PrePhys Update 
 
-	//! override this !
-	//! after animation is processed, before physics is processed
-	void 	PrePhysUpdate(float pDt);
-
 	//! script function usable in PrePhysUpdate
-	proto native 	bool	PrePhys_IsEvent(int pEvent);
-	proto native 	bool	PrePhys_IsTag(int pTag);
 	proto native 	bool	PrePhys_GetTranslation(out vector pOutTransl);		// vec3 in local space !
 	proto native 	bool	PrePhys_GetRotation(out float pOutRot[4]);         	// quaternion in local space !
 	proto native 	void	PrePhys_SetTranslation(vector pInTransl); 			// vec3 in local space !
@@ -422,6 +433,18 @@ class DayZAnimal extends DayZCreatureAI
 	override bool IsInventoryVisible()
 	{
 		return false;
+	}
+	
+	override int GetHideIconMask()
+	{
+		return EInventoryIconVisibility.HIDE_VICINITY;
+		/*
+		if (IsAlive())
+		{
+			return EInventoryIconVisibility.HIDE_VICINITY;
+		}
+		return super.GetHideIconMask();
+		*/
 	}
 	
 	void CommandHandler(float dt, int currentCommandID, bool currentCommandFinished)
@@ -533,8 +556,6 @@ class DayZAnimal extends DayZCreatureAI
 			{
 				StartCommand_Death(0, 0);
 			}
-			
-			dBodySetInteractionLayer(this, PhxInteractionLayers.RAGDOLL);
 	
 			return true;
 		}
@@ -666,7 +687,7 @@ class DayZAnimal extends DayZCreatureAI
 	//! Phx contact event
 	//! 
 	
-	override private void EOnContact(IEntity other, Contact extra)
+	override protected void EOnContact(IEntity other, Contact extra)
 	{
 		if( !IsAlive() )
 			return;
@@ -674,7 +695,7 @@ class DayZAnimal extends DayZCreatureAI
 		Transport transport = Transport.Cast(other);
 		if( transport )
 		{
-			if ( GetGame().IsServer() || !GetGame().IsMultiplayer() )
+			if ( GetGame().IsServer() )
 			{
 				RegisterTransportHit(transport);
 			}			

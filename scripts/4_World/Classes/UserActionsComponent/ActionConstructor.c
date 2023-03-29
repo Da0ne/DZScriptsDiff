@@ -57,12 +57,13 @@ class ActionConstructor
 		actions.Insert(ActionCreateIndoorOven);
 		actions.Insert(ActionAttach);
 		actions.Insert(ActionAttachOnProxy);
+		actions.Insert(ActionAttachOnTrap);
 		actions.Insert(ActionAttachWheels);
 		actions.Insert(ActionPlugTargetIntoThis);
 		actions.Insert(ActionInsertSparkplug);
 		actions.Insert(ActionEmptySeedsPack);
-		actions.Insert(ActionWorldCraftSwitch);
-		actions.Insert(ActionWorldLiquidActionSwitch);
+		//actions.Insert(ActionWorldCraftSwitch);
+		//actions.Insert(ActionWorldLiquidActionSwitch);
 		actions.Insert(ActionAttachPowerSourceToPanel);
 //		actions.Insert(ActionAttachMetalWire);
 		actions.Insert(ActionInjectSelf);
@@ -72,7 +73,7 @@ class ActionConstructor
 		actions.Insert(ActionInjectMorphineSelf);
 		actions.Insert(ActionInjectMorphineTarget);
 		actions.Insert(ActionHandcuffTarget);
-		actions.Insert(ActionBuildPartSwitch);
+		//actions.Insert(ActionBuildPartSwitch);
 		actions.Insert(ActionAttachOnSelection);
 		actions.Insert(ActionTurnOnWeaponFlashlight);
 		actions.Insert(ActionTurnOffWeaponFlashlight);
@@ -84,6 +85,7 @@ class ActionConstructor
 		actions.Insert(ActionPlaceFireplaceIntoBarrel);
 		actions.Insert(ActionStopEngine);
 		actions.Insert(ActionUnfoldMap);
+		actions.Insert(ActionFoldMap);
 		actions.Insert(ActionDropItem);
 		actions.Insert(ActionDropItemSimple);
 		actions.Insert(ActionSwitchSeats);
@@ -94,9 +96,26 @@ class ActionConstructor
 		actions.Insert(ActionToggleNVG);
 		//actions.Insert(ActionSwitchMineWood);
 		actions.Insert(ActionAttachOnTentProxy);
+		actions.Insert(ActionTriggerRemotely);
+		actions.Insert(ActionDisarmExplosive);
+		actions.Insert(ActionDisarmExplosiveWithRemoteDetonator);
+		actions.Insert(ActionDisarmExplosiveWithRemoteDetonatorUnpaired);
 
 		// Continuous use actions
 		actions.Insert(ActionWorldCraft);
+		actions.Insert(ActionCraftImprovisedHandsCover);
+		actions.Insert(ActionCraftImprovisedHeadCover);
+		actions.Insert(ActionCraftImprovisedFeetCover);
+		actions.Insert(ActionCraftImprovisedFaceCover);
+		actions.Insert(ActionCraftImprovisedTorsoCover);
+		actions.Insert(ActionCraftImprovisedLegsCover);
+		actions.Insert(ActionCraftImprovisedEyePatch);
+		actions.Insert(ActionCraftRopeBelt);
+		actions.Insert(ActionDeCraftRopeBelt);
+		actions.Insert(ActionCraftBoneKnife);
+		actions.Insert(ActionCraftArmband);
+		actions.Insert(ActionCraftBoneKnifeEnv);
+		actions.Insert(ActionCraftStoneKnifeEnv);
 //		actions.Insert(ActionDigStash);
 		actions.Insert(ActionSkinning);
 		actions.Insert(ActionPlaceObject);
@@ -159,6 +178,7 @@ class ActionConstructor
 		actions.Insert(ActionTuneRadioStation);
 		actions.Insert(ActionIgniteFireplaceByAir);
 		actions.Insert(ActionLightItemOnFire);
+		actions.Insert(ActionLightItemOnFireWithBlowtorch);
 		actions.Insert(ActionExtinguishFireplaceByLiquid);
 		actions.Insert(ActionExtinguishFireplaceByExtinguisher);
 		actions.Insert(ActionBurnSewSelf);
@@ -179,6 +199,7 @@ class ActionConstructor
 		actions.Insert(ActionLoadMagazine);
 		actions.Insert(ActionEmptyMagazine);
 		actions.Insert(ActionBuildPart);
+		actions.Insert(ActionActionBuildPartNoTool);
 		actions.Insert(ActionDismantlePart);
 		actions.Insert(ActionDestroyPart);
 		actions.Insert(ActionCPR);
@@ -204,13 +225,16 @@ class ActionConstructor
 		//actions.Insert(ActionWritePaper);
 		//actions.Insert(ActionReadPaper);
 		actions.Insert(ActionFillFuel);
-		actions.Insert(ActionTransferLiquid);
+		//actions.Insert(ActionTransferLiquid);
+		actions.Insert(ActionDrainLiquid);
+		actions.Insert(ActionPourLiquid);
 		actions.Insert(ActionStartEngine);
 		actions.Insert(ActionRaiseMegaphone);
 		actions.Insert(ActionActivateTrap);
 		actions.Insert(ActionEmptyBottleBase);
 		actions.Insert(ActionEmptyCookingPot);
 		actions.Insert(ActionViewOptics);
+		actions.Insert(ActionToggleNVMode);
 		actions.Insert(ActionViewBinoculars);
 		actions.Insert(ActionFoldBaseBuildingObject);
 		//actions.Insert(ActionUseRangefinder);
@@ -235,11 +259,21 @@ class ActionConstructor
 		actions.Insert(ActionRepairTentPart);
 		actions.Insert(ActionRepairPart);
 		actions.Insert(ActionRepairCarPart);
+		actions.Insert(ActionRepairCarPartWithBlowtorch);
 		actions.Insert(ActionRepairCarChassis);
+		actions.Insert(ActionRepairCarChassisWithBlowtorch);
 		actions.Insert(ActionRepairCarEngine);
+		actions.Insert(ActionRepairCarEngineWithBlowtorch);
 		actions.Insert(ActionRepairShelter);
+		actions.Insert(ActionRepairItemWithBlowtorch);
 		actions.Insert(ActionLockAttachment);
+		actions.Insert(ActionUnpackGift);
+		actions.Insert(ActionPackGift);
 		//actions.Insert(ActionEmptyBarrel);
+		actions.Insert(ActionAttachExplosivesTrigger);
+		actions.Insert(ActionArmExplosive);
+		actions.Insert(ActionTurnValve);
+		actions.Insert(ActionTurnValveUndergroundReservoir);
 		
 		// Interact actions
 		actions.Insert(ActionPullOutPlug);
@@ -271,6 +305,7 @@ class ActionConstructor
 		actions.Insert(ActionTakeOvenIndoor);
 		actions.Insert(ActionOpenDoors);
 		actions.Insert(ActionCloseDoors);
+		actions.Insert(ActionLockedDoors);
 		actions.Insert(ActionEnterLadder);
 		actions.Insert(ActionExitLadder);
 		actions.Insert(ActionGetInTransport);
@@ -279,7 +314,6 @@ class ActionConstructor
 		actions.Insert(ActionSortAmmoPile);
 		actions.Insert(ActionSwapItemToHands);
 		actions.Insert(ActionTakeItemToHands);
-		actions.Insert(ActionLockedDoors);
 		actions.Insert(ActionTakeFireplaceFromBarrel);
 		actions.Insert(ActionOpenCarDoors);
 		actions.Insert(ActionCloseCarDoors);
@@ -288,15 +322,16 @@ class ActionConstructor
 		actions.Insert(ActionWashHandsWellOne);
 		actions.Insert(ActionWashHandsWaterOne);
 		actions.Insert(ActionGetOutTransport);
-		actions.Insert(ActionAnimateSeats); //<- action doesn't work well, add it later
-		actions.Insert(ActionAnimateCarSelection); //<- action doesn't work well, add it later
-		actions.Insert(ActionSidePlateInteract); //Same as previous but specific to v3s to play sounds
+		actions.Insert(ActionAnimateSeats);
+		actions.Insert(ActionAnimateCarSelection);
+		actions.Insert(ActionSidePlateInteract);
 		actions.Insert(ActionDetach);
 		actions.Insert(ActionOpenFence);
 		actions.Insert(ActionCloseFence);
 		actions.Insert(ActionNextCombinationLockDialOnTarget);
 		actions.Insert(ActionTakeMaterialToHands);
-		actions.Insert(ActionCheckPulse);
+		//actions.Insert(ActionCheckPulse);
+		actions.Insert(ActionCheckPulseTarget);
 		actions.Insert(ActionUnpin);
 		actions.Insert(ActionPin);
 		actions.Insert(ActionTakeHybridAttachment);
@@ -306,7 +341,7 @@ class ActionConstructor
 		actions.Insert(ActionLowerFlag);
 		actions.Insert(ActionDeconstructShelter);
 		actions.Insert(ActionBuildShelter);
-		actions.Insert(ActionHandsPartSwitch);
+		//actions.Insert(ActionHandsPartSwitch);
 		actions.Insert(ActionDetachFromTarget);
 		actions.Insert(ActionDetachFromTarget_SpecificSlot_WoodenLogs);
 		actions.Insert(ActionDetachFromTarget_SpecificSlot_WoodenPlanks);
@@ -316,6 +351,8 @@ class ActionConstructor
 		
 		//vehicle actions
 		actions.Insert(ActionSwitchLights);
+		actions.Insert(ActionCarHornShort);
+		actions.Insert(ActionCarHornLong);
 		
 		//Instant action - debug
 		actions.Insert(ActionDebug);
@@ -340,6 +377,16 @@ class ActionConstructor
 		actions.Insert(ActionPullBodyFromTransport);
 		
 		actions.Insert(ActionPickupChicken);
+		actions.Insert(ActionSetAlarmClock);
+		actions.Insert(ActionTurnOnAlarmClock);
+		actions.Insert(ActionTurnOffAlarmClock);
 		
+		actions.Insert(ActionAttachWithSwitch);
+		
+		actions.Insert(ActionSetKitchenTimer);
+		actions.Insert(ActionResetKitchenTimer);
+		actions.Insert(ActionUseUndergroundPanel);
+		actions.Insert(ActionUseUndergroundLever);
+		actions.Insert(ActionUnrestrainTargetHands);
 	}
 };

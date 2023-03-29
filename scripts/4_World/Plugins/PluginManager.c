@@ -41,53 +41,58 @@ class PluginManager
 		//----------------------------------------------------------------------
 		// Register modules
 		//----------------------------------------------------------------------
-		//				Module Class Name 						Client	Server
+		//				Module Class Name 								Client	Server
 		//----------------------------------------------------------------------
-		RegisterPlugin( "PluginHorticulture",					true, 	true );
-		RegisterPlugin( "PluginRepairing",						true, 	true );
-		RegisterPlugin( "PluginPlayerStatus",					true, 	true );
-		RegisterPlugin( "PluginMessageManager",					true, 	true );
-		RegisterPlugin( "PluginLifespan",						true, 	true );
-		RegisterPlugin( "PluginVariables",						true, 	true );
-		RegisterPlugin( "PluginObjectsInteractionManager",		false, 	true );
-		RegisterPlugin( "PluginRecipesManager",					true, 	true );
-		RegisterPlugin( "PluginTransmissionAgents",				true, 	true );
-		RegisterPlugin( "PluginAdditionalInfo",					true,	true ); //TODO clean up after Gamescom
-		RegisterPlugin( "PluginConfigEmotesProfile",			true, 	true );
-		RegisterPlugin( "PluginPresenceNotifier",				true,	false );
-		RegisterPlugin( "PluginAdminLog",						false, 	true );
+		RegisterPlugin( "PluginHorticulture",							true, 	true );
+		RegisterPlugin( "PluginRepairing",								true, 	true );
+		RegisterPlugin( "PluginPlayerStatus",							true, 	true );
+		RegisterPlugin( "PluginMessageManager",							true, 	true );
+		RegisterPlugin( "PluginLifespan",								true, 	true );
+		RegisterPlugin( "PluginVariables",								true, 	true );
+		RegisterPlugin( "PluginObjectsInteractionManager",				false, 	true );
+		RegisterPlugin( "PluginRecipesManager",							true, 	true );
+		RegisterPlugin( "PluginTransmissionAgents",						true, 	true );
+		RegisterPlugin( "PluginAdditionalInfo",							true,	true ); //TODO clean up after Gamescom
+		RegisterPlugin( "PluginConfigEmotesProfile",					true, 	true );
+		RegisterPlugin( "PluginPresenceNotifier",						true,	false );
+		RegisterPlugin( "PluginAdminLog",								false, 	true );
+		
+		// Developer + Diag
+		RegisterPluginDiag( "PluginKeyBinding",							true, 	false );
+		RegisterPluginDiag( "PluginDeveloper",							true, 	true );
+		RegisterPluginDiag( "PluginDeveloperSync",						true, 	true );
+		RegisterPluginDiag( "PluginDiagMenuClient",						true, 	false );
+		RegisterPluginDiag( "PluginDiagMenuServer",						false, 	true );
+		RegisterPluginDiag( "PluginPermanentCrossHair",					true,	false );
+		RegisterPluginDiag( "PluginRemotePlayerDebugClient",			true,	false );
+		RegisterPluginDiag( "PluginRemotePlayerDebugServer",			false,	true );
+		RegisterPluginDiag( "PluginUniversalTemperatureSourceClient",	true, 	false );
+		RegisterPluginDiag( "PluginUniversalTemperatureSourceServer",	false, 	true );
+		RegisterPluginDiag( "PluginDrawCheckerboard",					true,	false );
+		RegisterPluginDiag( "PluginItemDiagnostic",						true, 	true );
+		RegisterPluginDiag( "PluginDayZCreatureAIDebug",				true, 	true );
 		
 		// Only In Debug / Internal
-		RegisterPluginDebug( "PluginConfigViewer",				true, 	true );
-		RegisterPluginDebug( "PluginLocalEnscriptHistory",		true, 	true );
-		RegisterPluginDebug( "PluginLocalEnscriptHistoryServer",true, 	true );
-		RegisterPluginDebug( "PluginKeyBinding",				true, 	false );
-		RegisterPluginDebug( "PluginDeveloper",					true, 	true );
-		RegisterPluginDebug( "PluginDeveloperSync",				true, 	true );
+		RegisterPluginDebug( "PluginConfigViewer",						true, 	true );
+		RegisterPluginDebug( "PluginLocalEnscriptHistory",				true, 	true );
+		RegisterPluginDebug( "PluginLocalEnscriptHistoryServer",		true, 	true );
 		
-		RegisterPluginDebug( "PluginSceneManager",				true, 	true );
-		RegisterPluginDebug( "PluginConfigScene",				true, 	true );
-		RegisterPluginDebug( "PluginMissionConfig",				true, 	true );
-		RegisterPluginDebug( "PluginConfigEmotesProfile",		true, 	true );
-		RegisterPluginDebug( "PluginConfigDebugProfile",		true, 	true );
-		RegisterPluginDebug( "PluginConfigDebugProfileFixed",	true, 	true );
+		RegisterPluginDebug( "PluginSceneManager",						true, 	true );
+		RegisterPluginDebug( "PluginConfigScene",						true, 	true );
+		RegisterPluginDebug( "PluginMissionConfig",						true, 	true );
+		RegisterPluginDebug( "PluginConfigEmotesProfile",				true, 	true );
+		RegisterPluginDebug( "PluginConfigDebugProfile",				true, 	true );
+		RegisterPluginDebug( "PluginConfigDebugProfileFixed",			true, 	true );
 		
-		RegisterPluginDebug( "PluginItemDiagnostic",			true, 	true );
-		RegisterPluginDebug( "PluginDayzPlayerDebug",			true, 	true );
-		RegisterPluginDebug( "PluginDayZInfectedDebug",			true, 	true );
-		RegisterPluginDebug( "PluginDiagMenu",					true, 	true );
-		RegisterPluginDebug( "PluginDayZCreatureAIDebug",		true, 	true );
-		RegisterPluginDebug( "PluginDoorRuler",					true, 	false );
-		RegisterPluginDebug( "PluginCharPlacement",				true, 	false );
-		RegisterPluginDebug( "PluginPermanentCrossHair",		true,	false );
-		RegisterPluginDebug( "PluginRemotePlayerDebugClient",	true,	false );
-		RegisterPluginDebug( "PluginRemotePlayerDebugServer",	false,	true );
-		RegisterPluginDebug( "PluginDrawCheckerboard",			true,	false );
-		//RegisterPluginDebug( "PluginSoundDebug",				false,	false );
-		RegisterPluginDebug( "PluginCameraTools",					true, 	true );
-		RegisterPluginDebug( "PluginNutritionDumper",				true, 	false );
+		RegisterPluginDebug( "PluginDayzPlayerDebug",					true, 	true );
+		RegisterPluginDebug( "PluginDayZInfectedDebug",					true, 	true );
+		RegisterPluginDebug( "PluginDoorRuler",							true, 	false );
+		RegisterPluginDebug( "PluginCharPlacement",						true, 	false );
+		//RegisterPluginDebug( "PluginSoundDebug",						false,	false );
+		RegisterPluginDebug( "PluginCameraTools",						true, 	true );
+		RegisterPluginDebug( "PluginNutritionDumper",					true, 	false );
 		
-		GetGame().GetUpdateQueue(CALL_CATEGORY_GAMEPLAY).Insert(this.MainOnUpdate);
+		GetGame().GetUpdateQueue(CALL_CATEGORY_GAMEPLAY).Insert(MainOnUpdate);
 	}
 	
 	//=================================
@@ -96,25 +101,27 @@ class PluginManager
 	void PluginsInit()
 	{
 		int i = 0;
+		int regCount = m_PluginRegister.Count();
 		
-		for ( i = 0; i < m_PluginRegister.Count(); ++i)
+		array<PluginBase> pluginPtrs = {};
+		pluginPtrs.Reserve(regCount);
+		
+		foreach (typename pluginType : m_PluginRegister)
 		{
-			typename plugin_type = m_PluginRegister.Get(i);
-			
-			PluginBase module_exist = GetPluginByType( plugin_type );
-			if ( module_exist )
+			PluginBase moduleExist = GetPluginByType( pluginType );
+			if ( moduleExist )
 			{
-				m_PluginsPtrs.Remove( plugin_type );
+				m_PluginsPtrs.Remove( pluginType );
 			}
 			
-			PluginBase module_new = PluginBase.Cast(plugin_type.Spawn());
-			m_PluginsPtrs.Set(plugin_type, module_new);
+			PluginBase moduleNew = PluginBase.Cast(pluginType.Spawn());
+			m_PluginsPtrs.Set(pluginType, moduleNew);
+			pluginPtrs.Insert(moduleNew);
 		}
 		
-		for ( i = 0; i < m_PluginsPtrs.Count(); ++i)
+		foreach (PluginBase plugin : pluginPtrs)
 		{
-			PluginBase plugin = m_PluginsPtrs.GetElement(i);
-			if ( plugin != NULL )
+			if ( plugin )
 			{
 				plugin.OnInit();
 			}
@@ -154,7 +161,7 @@ class PluginManager
 			return m_PluginsPtrs.Get( plugin_type );
 		}
 		
-		return NULL;
+		return null;
 	}
 	
 	/**
@@ -225,6 +232,17 @@ class PluginManager
 	{
 		RegisterPlugin(plugin_class_name, reg_on_client, reg_on_server, false);
 	}
+	//=================================
+	// RegisterPlugin
+	//=================================
+	protected void RegisterPluginDiag( string plugin_class_name, bool reg_on_client, bool reg_on_server )
+	{
+		#ifdef DIAG_DEVELOPER
+		RegisterPlugin(plugin_class_name, reg_on_client, reg_on_server, true);
+		#else
+		return;
+		#endif		
+	}
 	
 	//---------------------------------
 	// UnregisterPlugin
@@ -287,7 +305,7 @@ void PluginManagerDelete()
 
 bool IsPluginManagerExists()
 {
-	if ( g_Plugins != NULL )
+	if ( g_Plugins != null )
 	{
 		return true;
 	}	
@@ -297,20 +315,21 @@ bool IsPluginManagerExists()
 
 PluginBase GetPlugin(typename plugin_type)
 {
-	PluginBase plugin = NULL;
+	PluginBase plugin = null;
 	
-	if ( IsPluginManagerExists () )
+	if ( IsPluginManagerExists() )
 	{
 		plugin = GetPluginManager().GetPluginByType(plugin_type);
 	
-		if ( plugin == NULL )
+		if ( plugin == null )
 		{
-			if ( GetGame().IsDebug() && IsPluginManagerExists() )
+			#ifdef DIAG_DEVELOPER
+			if ( IsPluginManagerExists() )
 			{
 				PrintString("Module " + plugin_type.ToString() + " is not Registred in PluginManager.c!");
 				DumpStack();
 			}
-			return NULL;
+			#endif
 		}
 	}
 	

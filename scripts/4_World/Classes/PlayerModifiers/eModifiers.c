@@ -53,6 +53,7 @@ enum eModifiers
 	MDF_AREAEXPOSURE,
 	MDF_MASK,
 	MDF_FLIES,
+	MDF_DROWNING,
 	// ---------------only count bellow
 	COUNT,
 }

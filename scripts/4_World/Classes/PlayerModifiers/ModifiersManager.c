@@ -2,12 +2,12 @@
 enum eModifierSyncIDs 
 {
 
-	MODIFIER_SYNC_WOUND_INFECT_1 = 			0x00000001,
-	MODIFIER_SYNC_WOUND_INFECT_2 = 			0x00000002,
-	MODIFIER_SYNC_CONTAMINATION =			0x00000004,//stage1 
-	MODIFIER_SYNC_CONTAMINATION2 = 			0x00000008,//stage2 and stage3 share the same sync id
-	MODIFIER_SYNC_ZONE_EXPOSURE = 			0x00000010,
-	//0x00000020,
+	MODIFIER_SYNC_WOUND_INFECT_1 	= 0x00000001,
+	MODIFIER_SYNC_WOUND_INFECT_2 	= 0x00000002,
+	MODIFIER_SYNC_CONTAMINATION 	= 0x00000004,//stage1 
+	MODIFIER_SYNC_CONTAMINATION2 	= 0x00000008,//stage2 and stage3 share the same sync id
+	MODIFIER_SYNC_ZONE_EXPOSURE 	= 0x00000010,
+	MODIFIER_SYNC_DROWNING 			= 0x00000020,
 	//0x00000040,
 	//0x00000080,
 	//0x00000100,
@@ -142,15 +142,25 @@ class ModifiersManager
 		AddModifier(new AreaExposureMdfr);
 		AddModifier(new MaskMdfr);
 		AddModifier(new FliesMdfr);
+		AddModifier(new DrowningMdfr);
 	}
 
 	void SetModifiers(bool enable)
 	{
+		if (m_AllowModifierTick == enable)
+			return;
 		
 		m_AllowModifierTick = enable;
-		if( enable == false )
+		
+		#ifdef DIAG_DEVELOPER
+		#ifndef SERVER
+		DiagMenu.SetValue(DiagMenuIDs.CHEATS_MODIFIERS, enable);
+		#endif
+		#endif
+		
+		if ( !enable )
 		{
-			for(int i = 0; i < m_ModifierList.Count(); i++)
+			for (int i = 0; i < m_ModifierList.Count(); i++)
 			{
 				m_ModifierList.GetElement(i).ResetLastTickTime();
 			}
@@ -172,7 +182,7 @@ class ModifiersManager
 		modifier.InitBase(m_Player,this);
 		int id = modifier.GetModifierID();
 		
-		if(id < 1)
+		if (id < 1)
 		{
 			Error("modifiers ID must be 1 or higher(for debugging reasons)");			
 		}

@@ -2,6 +2,7 @@ class ZombieBase extends DayZInfected
 {
 	const float TARGET_CONE_ANGLE_CHASE = 20;
 	const float TARGET_CONE_ANGLE_FIGHT = 30;
+	const float ORIENTATION_SYNC_THRESHOLD = 30; //threshold for local heading/orientation sync
 	
 	const float	SHOCK_TO_STUN_MULTIPLIER = 2.82;
 
@@ -14,17 +15,26 @@ class ZombieBase extends DayZInfected
 	protected float m_KnuckleOutTimer = 0;
 
 	protected int m_MindState = -1;
+	protected int m_OrientationLocal = -1; //local 'companion' value for sync checking
+	protected int m_OrientationSynced = -1;
+	protected float m_OrientationTimer;
 	protected float m_MovementSpeed = -1;
 	
 	protected vector m_DefaultHitPosition;
 	
-	protected ref AbstractWave				m_LastSoundVoiceAW;
+	protected AbstractWave m_LastSoundVoiceAW;
 	protected ref InfectedSoundEventHandler	m_InfectedSoundEventHandler;
 
-	protected ref array<Object> 			m_AllTargetObjects;
-	protected ref array<typename>			m_TargetableObjects;
+	protected ref array<Object> m_AllTargetObjects;
+	protected ref array<typename>m_TargetableObjects;
 	
-	protected bool 							m_IsCrawling; //'DayZInfectedCommandCrawl' is transition to crawl only, 'DayZInfectedCommandMove' used after that, hence this variable
+	//static ref map<int,ref array<string>> 	m_FinisherSelectionMap; //! which selections in the FireGeometry trigger which finisher on hit (when applicable)
+	
+	protected bool m_IsCrawling; //'DayZInfectedCommandCrawl' is transition to crawl only, 'DayZInfectedCommandMove' used after that, hence this VARIABLE_WET
+	
+	protected bool m_FinisherInProgress = false; //is this object being backstabbed?
+
+
 
 	//-------------------------------------------------------------
 	void ZombieBase()
@@ -39,6 +49,7 @@ class ZombieBase extends DayZInfected
 		m_IsCrawling = false;
 		
 		RegisterNetSyncVariableInt("m_MindState", -1, 4);
+		RegisterNetSyncVariableInt("m_OrientationSynced", 0, 359);
 		RegisterNetSyncVariableFloat("m_MovementSpeed", -1, 3);
 		RegisterNetSyncVariableBool("m_IsCrawling");
 		
@@ -46,7 +57,7 @@ class ZombieBase extends DayZInfected
 		m_DefaultHitPosition = SetDefaultHitPosition(GetDayZInfectedType().GetDefaultHitPositionComponent());
 
 		//! client only
-		if ( !GetGame().IsMultiplayer() || GetGame().IsClient() )
+		if ( !GetGame().IsDedicatedServer() )
 		{
 			m_LastSoundVoiceAW 			= null;
 			m_InfectedSoundEventHandler = new InfectedSoundEventHandler(this);
@@ -56,6 +67,8 @@ class ZombieBase extends DayZInfected
 		m_TargetableObjects 	= new array<typename>;
 		m_TargetableObjects.Insert(PlayerBase);
 		m_TargetableObjects.Insert(AnimalBase);
+		
+		m_OrientationTimer = 0;
 	}
 	
 	//! synced variable(s) handler
@@ -63,6 +76,11 @@ class ZombieBase extends DayZInfected
 	{
 		DebugSound("[Infected @ " + this + "][OnVariablesSynchronized]");
 		HandleSoundEvents();
+		
+		if ( m_OrientationLocal != m_OrientationSynced )
+		{
+			m_OrientationLocal = m_OrientationSynced;
+		}
 	}
 
 	//-------------------------------------------------------------
@@ -89,11 +107,6 @@ class ZombieBase extends DayZInfected
 	
 	override bool IsZombieMilitary()
 	{
-		/*if ( IsKindOf( "ZmbM_SoldierNormal_Base" ) )
-		{
-			return true;
-		}*/
-		
 		return false;
 	}
 	
@@ -150,7 +163,7 @@ class ZombieBase extends DayZInfected
 		return GetSelectionPositionMS(pSelection);
 	}
 
-	//! returns suitable hit components for finisher attacks
+	//! returns suitable hit components for finisher attacks; DEPRECATED
 	override array<string> GetSuitableFinisherHitComponents()
 	{
 		return GetDayZInfectedType().GetSuitableFinisherHitComponents();
@@ -159,6 +172,12 @@ class ZombieBase extends DayZInfected
 	int GetMindStateSynced()
 	{
 		return m_MindState;
+	}
+	
+	//! returns rounded zombie yaw for sync purposes
+	int GetOrientationSynced()
+	{
+		return m_OrientationSynced;
 	}
 
 	//-------------------------------------------------------------
@@ -175,13 +194,20 @@ class ZombieBase extends DayZInfected
 		}
 
 		//! handle death
-		if ( HandleDeath(pCurrentCommandID) )
+		if ( pCurrentCommandID != DayZInfectedConstants.COMMANDID_DEATH )		
+		{
+			if ( HandleDeath(pCurrentCommandID) )
+				return;
+		}
+		else if (!pCurrentCommandFinished)
 		{
 			return;
 		}
+		
 
 		//! movement handler (just for sync now)
 		HandleMove(pCurrentCommandID);
+		HandleOrientation(pDt,pCurrentCommandID);
 		
 		//! handle finished commands
 		if (pCurrentCommandFinished)
@@ -198,7 +224,6 @@ class ZombieBase extends DayZInfected
 		{
 			return;
 		}
-
 		
 		//! crawl transition
 		if ( HandleCrawlTransition(pCurrentCommandID) )
@@ -229,7 +254,7 @@ class ZombieBase extends DayZInfected
 			{
 				return;
 			}
-		}		
+		}
 		
 		//!
 		if ( ModCommandHandlerAfter(pDt, pCurrentCommandID, pCurrentCommandFinished) )
@@ -286,7 +311,41 @@ class ZombieBase extends DayZInfected
 		{
 			SetSynchDirty();
 		}
+		
 		m_LastMovementSpeed = m_MovementSpeed;
+	}
+	
+	//-------------------------------------------------------------
+	//!
+	//! HandleOrientation
+	//!
+	
+	void HandleOrientation(float pDt, int pCurrentCommandID)
+	{
+		m_OrientationTimer += pDt;
+		
+		int yaw = Math.Round(GetOrientation()[0]);
+		yaw = Math.NormalizeAngle(yaw);
+		
+		//atan2(sin(x-y), cos(x-y))
+		float angleSourceRad = m_OrientationSynced * Math.DEG2RAD;
+		float angleTargetRad = yaw * Math.DEG2RAD;
+		
+		float angleDiffRad = Math.Atan2(Math.Sin(angleTargetRad - angleSourceRad), Math.Cos(angleSourceRad - angleTargetRad));
+		angleDiffRad *= Math.RAD2DEG;
+		angleDiffRad = Math.Round(angleDiffRad);
+		
+		if (m_OrientationTimer >= 2.0 || m_OrientationSynced == -1 || Math.AbsInt(angleDiffRad) > ORIENTATION_SYNC_THRESHOLD)
+		{
+			m_OrientationTimer = 0.0;
+			
+			if (m_OrientationSynced == -1 || Math.AbsInt(angleDiffRad) > 5)
+			{
+				//Print("DbgSyncOrientation | HandleMove | original: " + m_OrientationSynced + " | target: " + yaw + " | diff: " + angleDiffRad);
+				m_OrientationSynced = yaw;
+				SetSynchDirty();
+			}
+		}
 	}
 	
 	//-------------------------------------------------------------
@@ -299,12 +358,7 @@ class ZombieBase extends DayZInfected
 
 	bool HandleDeath(int pCurrentCommandID)
 	{
-		if ( pCurrentCommandID == DayZInfectedConstants.COMMANDID_DEATH )
-		{
-			return true;
-		}
-
-		if ( !IsAlive() )
+		if ( !IsAlive() || m_FinisherInProgress )
 		{
 			StartCommand_Death(m_DeathType, m_DamageHitDirection);
 			m_MovementSpeed = -1;
@@ -316,6 +370,13 @@ class ZombieBase extends DayZInfected
 		return false;
 	}	
 	
+	bool EvaluateDeathAnimationEx(EntityAI pSource, ZombieHitData data, out int pAnimType, out float pAnimHitDir)
+	{
+		bool ret = EvaluateDeathAnimation(pSource,data.m_DamageZone,data.m_AmmoType,pAnimType,pAnimHitDir);
+				
+		return ret;
+	}
+	
 	bool EvaluateDeathAnimation(EntityAI pSource, string pComponent, string pAmmoType, out int pAnimType, out float pAnimHitDir)
 	{
 		//! 
@@ -326,12 +387,6 @@ class ZombieBase extends DayZInfected
 		
 		//! direction
 		pAnimHitDir = ComputeHitDirectionAngle(pSource);
-		
-		if (pAmmoType == "FinisherHit")
-		{
-			pAnimType = DayZInfectedDeathAnims.ANIM_DEATH_BACKSTAB;
-			return true;
-		}
 		
 		//! add some impulse if needed
 		if ( doPhxImpulse )
@@ -345,7 +400,7 @@ class ZombieBase extends DayZInfected
 				
 		return true;
 	}
-
+	
 	//-------------------------------------------------------------
 	//!
 	//! HandleVault
@@ -405,8 +460,6 @@ class ZombieBase extends DayZInfected
 	bool HandleMindStateChange(int pCurrentCommandID, DayZInfectedInputController pInputController, float pDt)
 	{
 		DayZInfectedCommandMove moveCommand = GetCommand_Move();
-		if ( moveCommand && moveCommand.IsTurning() )
-			return false;
 		
 		m_MindState = pInputController.GetMindState();
 		if ( m_LastMindState != m_MindState )
@@ -414,17 +467,17 @@ class ZombieBase extends DayZInfected
 			switch ( m_MindState )
 			{
 			case DayZInfectedConstants.MINDSTATE_CALM:
-				if ( moveCommand )
+				if ( moveCommand && !moveCommand.IsTurning() )
 					moveCommand.SetIdleState(0);
 				break;
 
 			case DayZInfectedConstants.MINDSTATE_DISTURBED:
-				if ( moveCommand )
+				if ( moveCommand && !moveCommand.IsTurning() )
 					moveCommand.SetIdleState(1);
 				break;
 			
 			case DayZInfectedConstants.MINDSTATE_CHASE:
-				if ( moveCommand && (m_LastMindState < DayZInfectedConstants.MINDSTATE_CHASE) )
+				if ( moveCommand && !moveCommand.IsTurning() && (m_LastMindState < DayZInfectedConstants.MINDSTATE_CHASE) )
 					moveCommand.SetIdleState(2);
 				break;
 			}
@@ -482,10 +535,10 @@ class ZombieBase extends DayZInfected
 
 	AbstractWave ProcessVoiceFX(string pSoundSetName)
 	{
-		ref SoundParams			soundParams;
-		ref SoundObjectBuilder	soundObjectBuilder;
-		ref SoundObject			soundObject;
-		if (GetGame().IsClient() || !GetGame().IsMultiplayer())
+		SoundParams			soundParams;
+		SoundObjectBuilder	soundObjectBuilder;
+		SoundObject			soundObject;
+		if (!GetGame().IsDedicatedServer())
 		{
 			soundParams = new SoundParams( pSoundSetName );
 			if ( !soundParams.IsValid() )
@@ -533,7 +586,7 @@ class ZombieBase extends DayZInfected
 	
 	protected void ProcessSoundVoiceEvent(AnimSoundVoiceEvent sound_event, out AbstractWave aw)
 	{
-		if (GetGame().IsClient() || !GetGame().IsMultiplayer())
+		if (!GetGame().IsDedicatedServer())
 		{
 			SoundObjectBuilder objectBuilder = sound_event.GetSoundBuilder();
 			if (NULL != objectBuilder)
@@ -545,7 +598,7 @@ class ZombieBase extends DayZInfected
 			}
 		}
 		
-		if (GetGame().IsServer() || !GetGame().IsMultiplayer())
+		if (GetGame().IsServer())
 		{
 			if (sound_event.m_NoiseParams != NULL)
 				GetGame().GetNoiseSystem().AddNoise(this, sound_event.m_NoiseParams);
@@ -926,8 +979,11 @@ class ZombieBase extends DayZInfected
 		
 		if ( !IsAlive() )
 		{
-			dBodySetInteractionLayer(this, PhxInteractionLayers.RAGDOLL);
-			EvaluateDeathAnimation(source, dmgZone, ammo, m_DeathType, m_DamageHitDirection);
+			ZombieHitData data = new ZombieHitData;
+			data.m_Component = component;
+			data.m_DamageZone = dmgZone;
+			data.m_AmmoType = ammo;
+			EvaluateDeathAnimationEx(source, data, m_DeathType, m_DamageHitDirection);
 		}
 		else
 		{
@@ -964,7 +1020,7 @@ class ZombieBase extends DayZInfected
 	//! Phx contact event
 	//! 
 	
-	override private void EOnContact(IEntity other, Contact extra)
+	override protected void EOnContact(IEntity other, Contact extra)
 	{
 		if ( !IsAlive() )
 			return;
@@ -972,7 +1028,7 @@ class ZombieBase extends DayZInfected
 		Transport transport = Transport.Cast(other);
 		if ( transport )
 		{
-			if ( GetGame().IsServer() || !GetGame().IsMultiplayer() )
+			if ( GetGame().IsServer() )
 			{
 				RegisterTransportHit(transport);
 			}			
@@ -988,42 +1044,66 @@ class ZombieBase extends DayZInfected
 		return super.CanReceiveAttachment(attachment, slotId);
 	}
 	
-	/*override void SetCrawlTransition(string zone)
-	{
-		
-	}*/
-	
 	override vector GetCenter()
 	{
 		return GetBonePositionWS( GetBoneIndexByName( "spine3" ) );
 	}
 	
-	override void SetBeingBackstabbed()
+	//! returns true if backstab is in progress; used for suspending of AI targeting and other useful things besides
+	override bool IsBeingBackstabbed()
 	{
-		DayZInfectedInputController ic = GetInputController();
-		if( ic )
-		{
-			ic.OverrideMovementSpeed(true,0.0); //TODO - figure out better way to limit AI movement?
-		}
-		//Print("DbgZombies | SlowZombie on: " + GetGame().GetTime());
-		
-		super.SetBeingBackstabbed();
+		return m_FinisherInProgress;
 	}
 	
-	protected override void ResetBackstabbedState()
+	override void SetBeingBackstabbed(int backstabType)
 	{
-		DayZInfectedInputController ic = GetInputController();
-		if( ic )
-		{
-			ic.OverrideMovementSpeed(false,1.0);
-		}
-		//Print("DbgZombies | SlowZombie off: " + GetGame().GetTime());
+		// disable AI simulation
+		GetAIAgent().SetKeepInIdle(true);
 		
-		super.ResetBackstabbedState();
+		// select death animation
+		switch (backstabType)
+		{
+			case EMeleeHitType.FINISHER_LIVERSTAB:
+				m_DeathType = DayZInfectedDeathAnims.ANIM_DEATH_BACKSTAB;
+				break;
+				
+			case EMeleeHitType.FINISHER_NECKSTAB:
+				m_DeathType = DayZInfectedDeathAnims.ANIM_DEATH_NECKSTAB;	
+				break;
+				
+			default:
+				m_DeathType = DayZInfectedDeathAnims.ANIM_DEATH_DEFAULT;
+		}
+
+		// set flag - death command will be executed
+		m_FinisherInProgress = true;
+				
+		//Print("DbgZombies | DumbZombie on: " + GetGame().GetTime());
 	}
 	
+	//! returns true if crawling; 'DayZInfectedCommandCrawl' is only for the transition, after that it remains 'DayZInfectedCommandMove' (unreliable)
 	bool IsCrawling()
 	{
 		return m_IsCrawling;
 	}
+	
+	// called from command death when stealth attack wan't successful
+	void OnRecoverFromDeath()
+	{
+		// enable AI simulation again
+		GetAIAgent().SetKeepInIdle(false);
+
+		// reset flag
+		m_FinisherInProgress = false;
+		
+		//Print("DbgZombies | DumbZombie off: " + GetGame().GetTime());
+	}	
+}
+
+//! an extendable data container
+class ZombieHitData
+{
+	int m_Component;
+	string m_DamageZone;
+	string m_AmmoType;
 }

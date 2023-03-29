@@ -1,13 +1,13 @@
 class SoundEventBase
 {
-	AbstractWave m_SoundSetCallback;
-	int m_Type;
-	int m_ID;
-	int m_SoundVoiceAnimEventClassID;
-	bool m_RequestDestroy;
-	string m_SoundSetNameRoot;
-	bool m_SkipForControlledCharacter;
-	int			m_Param;
+	AbstractWave 	m_SoundSetCallback;
+	int 			m_Type;
+	int 			m_ID;
+	int 			m_SoundVoiceAnimEventClassID;
+	bool 			m_RequestDestroy;
+	string 			m_SoundSetNameRoot;
+	bool 			m_SkipForControlledCharacter;
+	int				m_Param;
 	
 	
 	void ~SoundEventBase()

@@ -8,7 +8,7 @@ class Trap_RabbitSnare extends TrapSpawnBase
 		m_UpdateWaitTime 						= 30;
 		m_IsFoldable 							= true;
 		m_IsUsable 								= true;
-		m_MinimalDistanceFromPlayersToCatch 	= 50;
+		m_MinimalDistanceFromPlayersToCatch 	= 30;
 		
 		m_BaitCatchProb 						= 85;
 		m_NoBaitCatchProb						= 15;
@@ -28,11 +28,23 @@ class Trap_RabbitSnare extends TrapSpawnBase
 		m_CatchesGroundAnimal.Insert("DeadRabbit", 1);
 	}
 	
+	override bool CanBePlaced(Man player, vector position)
+	{
+		if (m_IsBeingPlaced)
+			return true;
+
+		int liquidType;
+		string surfaceType;
+		g_Game.SurfaceUnderObject(PlayerBase.Cast(player).GetHologramLocal().GetProjectionEntity(), surfaceType, liquidType);
+
+		return g_Game.IsSurfaceDigable(surfaceType);
+	}
+	
 	override void OnVariablesSynchronized()
 	{
 		super.OnVariablesSynchronized();
 				
-		if ( IsPlaceSound() )
+		if (IsPlaceSound())
 		{
 			PlayPlaceSound();
 		}

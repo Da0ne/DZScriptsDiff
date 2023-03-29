@@ -42,19 +42,19 @@ class MeleeTargetSettings
 		ConeMinHeight 		= coneMinHeight;
 		ConeMaxHeight 		= coneMaxHeight;
 		
-		RayStart 	= rayStart;
-		RayEnd 		= rayStart + Math.SqrFloat(coneLength) * dir;
+		RayStart 			= rayStart;
+		RayEnd 				= rayStart + Math.SqrFloat(coneLength) * dir;
 		
-		Dir 		= dir; 
+		Dir 				= dir; 
 		
-		XZDir 		= dir;
-		XZDir[1] = 0;
+		XZDir 				= dir;
+		XZDir[1] 			= 0;
 		XZDir.Normalize();
 		
-		MaxDist 	= maxDist;
+		MaxDist 			= maxDist;
 		
-		Attacker = pToIgnore;
-		TargetableObjects = targetableObjects;
+		Attacker 			= pToIgnore;
+		TargetableObjects 	= targetableObjects;
 		
 		// Calculate cone points
 		Math3D.ConePoints(ConeOrigin, ConeLength, ConeHalfAngleRad, -Math.Atan2(XZDir[0], XZDir[2]), ConeLeftPoint, ConeRightPoint);
@@ -73,26 +73,26 @@ class MeleeTargeting
 {
 	const static PhxInteractionLayers MELEE_TARGET_OBSTRUCTION_LAYERS = PhxInteractionLayers.BUILDING|PhxInteractionLayers.DOOR|PhxInteractionLayers.VEHICLE|PhxInteractionLayers.ROADWAY|PhxInteractionLayers.TERRAIN|PhxInteractionLayers.ITEM_SMALL|PhxInteractionLayers.ITEM_LARGE|PhxInteractionLayers.FENCE;
 	
-	MeleeTargetData GetMeleeTarget(MeleeTargetSettings settings, out array<Object> allTargets = null)
+	MeleeTargetData GetMeleeTargetEx(MeleeTargetSettings settings, out array<Object> allTargets = null, array<string> blacklistedDamageZones = null)
 	{
 		MeleeTargetData ret;
 		
 		// Easier access to MeleeTargetSettings variables
-		vector 	coneOrigin 		= settings.ConeOrigin;
-		float 	coneLength 		= settings.ConeLength;
-		float 	coneHalfAngle 	= settings.ConeHalfAngle;
-		float	radAngle 		= settings.ConeHalfAngleRad;
-		float 	coneMinHeight 	= settings.ConeMinHeight;
-		float 	coneMaxHeight 	= settings.ConeMaxHeight;
+		vector 	coneOrigin 					= settings.ConeOrigin;
+		float 	coneLength 					= settings.ConeLength;
+		float 	coneHalfAngle 				= settings.ConeHalfAngle;
+		float	radAngle 					= settings.ConeHalfAngleRad;
+		float 	coneMinHeight 				= settings.ConeMinHeight;
+		float 	coneMaxHeight 				= settings.ConeMaxHeight;
 		
-		vector coneLeft 	= settings.ConeLeftPoint;
-		vector coneRight 	= settings.ConeRightPoint;
+		vector coneLeft 					= settings.ConeLeftPoint;
+		vector coneRight 					= settings.ConeRightPoint;
 		
-		vector rayStart = settings.RayStart;
-		vector rayEnd 	= settings.RayEnd;
-		vector dir 		= settings.Dir;
-		vector xzDir 	= settings.XZDir;
-		float maxDist 	= settings.MaxDist;
+		vector rayStart 					= settings.RayStart;
+		vector rayEnd 						= settings.RayEnd;
+		vector dir 							= settings.Dir;
+		vector xzDir 						= settings.XZDir;
+		float maxDist 						= settings.MaxDist;
 		
 		EntityAI pToIgnore 					= settings.Attacker;
 		array<typename> targetableObjects 	= settings.TargetableObjects;
@@ -112,14 +112,15 @@ class MeleeTargeting
 		BoxCollidingParams params = new BoxCollidingParams();
 		params.SetParams(boxCenter, xzDir.VectorToAngles(), boxSize, ObjIntersect.Fire, ObjIntersect.Fire, true);
 		array<ref BoxCollidingResult> results = new array<ref BoxCollidingResult>;
-		if (GetGame().IsBoxCollidingGeometryProxy(params, {pToIgnore}, results))
+		array<Object> toIgnore = { pToIgnore };
+		if (GetGame().IsBoxCollidingGeometryProxy(params, toIgnore, results))
 		{
 			//
 			float 	retVal 	= float.MAX;
 			float 	tgAngle = Math.Tan(radAngle);	
 		
-			#ifdef DEVELOPER
-			if (DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DRAW_RANGE) && DiagMenu.GetBool(DiagMenuIDs.DM_MELEE_DEBUG_ENABLE))
+			#ifdef DIAG_DEVELOPER
+			if (DiagMenu.GetBool(DiagMenuIDs.MELEE_DRAW_RANGE) && DiagMenu.GetBool(DiagMenuIDs.MELEE_DEBUG))
 				Debug.DrawLine(rayStart, rayEnd, COLOR_GREEN, ShapeFlags.ONCE);
 			#endif
 			
@@ -129,8 +130,10 @@ class MeleeTargeting
 				Object obj = bResult.obj;
 				
 				// Check for targetable objects
-				if ( !obj.IsAnyInherited(targetableObjects) || !obj.IsAlive() )
+				if (!obj.IsAnyInherited(targetableObjects) || !obj.IsAlive())
+				{
 					continue;
+				}
 				
 				// Ready the defaults for the object
 				vector targetPos = obj.GetPosition();							
@@ -142,20 +145,20 @@ class MeleeTargeting
 				
 				// Find the most suitable component
 				ComponentResult result;
-				if (FindMostSuitableComponent(obj, bResult, settings, csSum, result))
+				if (FindMostSuitableComponentEx(obj, bResult, settings, csSum, result, blacklistedDamageZones))
 				{
-					targetPos 		= result.ComponentPos;							
-					targetAngle 	= result.ComponentAngle;	
-					targetDistance2 = result.ComponentDistance2;	
+					targetPos 		= result.ComponentPos;
+					targetAngle 	= result.ComponentAngle;
+					targetDistance2 = result.ComponentDistance2;
 					hitComponent 	= result.ComponentIdx;
 				}
-	
+
 				// ProxyInfo
 				if (bResult.proxyInfo)
 				{
 					foreach (BoxCollidingResult pInfo : bResult.proxyInfo)
 					{
-						if (FindMostSuitableComponent(obj, pInfo, settings, csSum, result))
+						if (FindMostSuitableComponentEx(obj, pInfo, settings, csSum, result, blacklistedDamageZones))
 						{
 							targetPos 		= result.ComponentPos;							
 							targetAngle 	= result.ComponentAngle;	
@@ -167,8 +170,10 @@ class MeleeTargeting
 				
 				// No suitable component found
 				if (hitComponent == -1 || csSum == float.MAX)
+				{
 					continue;
-				
+				}
+
 				// Check if it is a better fit than what has been found previously
 				float sum  = targetDistance2;
 				if (sum < retVal)
@@ -180,18 +185,26 @@ class MeleeTargeting
 				allTargets.Insert(obj);
 			}
 		}
-
+		
 		return ret;
 	}
 	
-	bool FindMostSuitableComponent(Object obj, BoxCollidingResult bResult, MeleeTargetSettings settings, out float sum, out ref ComponentResult result)
+	MeleeTargetData GetMeleeTarget(MeleeTargetSettings settings, out array<Object> allTargets = null)
+	{
+		return GetMeleeTargetEx(settings, allTargets);
+	}
+	
+
+	bool FindMostSuitableComponentEx(Object obj, BoxCollidingResult bResult, MeleeTargetSettings settings, out float sum, out ref ComponentResult result, array<string> blacklistedDamageZones)
 	{
 		foreach (ComponentInfo cInfo : bResult.componentInfo)
 		{
 			ComponentResult cResult = new ComponentResult;
 			
-			if (!EvaluateComponent(obj, cInfo, settings, cResult))
+			if (!EvaluateComponentEx(obj, cInfo, settings, cResult, blacklistedDamageZones))
+			{
 				continue;
+			}
 			
 			// Smallest number is a winner
 			float cSum = cResult.ComponentDistance2;
@@ -204,9 +217,23 @@ class MeleeTargeting
 		
 		return result != null;
 	}
+
+	bool FindMostSuitableComponent(Object obj, BoxCollidingResult bResult, MeleeTargetSettings settings, out float sum, out ref ComponentResult result)
+	{
+		return FindMostSuitableComponentEx(obj, bResult, settings, sum, result, null);
+	}
 	
-	bool EvaluateComponent(Object obj, ComponentInfo cInfo, MeleeTargetSettings settings, out ref ComponentResult result)
-	{	
+	bool EvaluateComponentEx(Object obj, ComponentInfo cInfo, MeleeTargetSettings settings, out ref ComponentResult result, array<string> blacklistedDamageZones)
+	{
+		//! check if the component is on blacklist, if so, continue in lookup
+		foreach (string zoneName: blacklistedDamageZones)
+		{
+			if (obj.GetDamageZoneNameByComponentIndex(cInfo.component) == zoneName)
+			{
+				return false;
+			}
+		}
+
 		vector componentPos = cInfo.componentCenter;
 		
 		// Too far away! (fast reject)
@@ -214,19 +241,25 @@ class MeleeTargeting
 		vector nearestPoint = Math3D.NearestPoint(settings.RayStart, settings.RayEnd, componentPos);
 		float componentDistance2 = vector.DistanceSq(componentPos, nearestPoint);
 		if (componentDistance2 > componentMaxDist2)
+		{
 			return false;
+		}
 		
 		// Here some more accurate check could be placed that would adjust the componentPos
 		
 		// Outside of the cone angle!
 		float componentAngle = Math.RAD2DEG * Math.AbsFloat(Math3D.AngleFromPosition(settings.ConeOrigin, settings.XZDir, componentPos));	
 		if (componentAngle > settings.ConeHalfAngle)
+		{
 			return false;
-					
+		}
+			
 		// Obstructed!
 		if (IsMeleeTargetObstructed(settings.RayStart, componentPos))
+		{
 			return false;
-		
+		}
+
 		// We found something, fill it in!
 		result.ComponentPos = componentPos;
 		result.ComponentAngle = componentAngle;
@@ -236,10 +269,17 @@ class MeleeTargeting
 		return true;
 	}
 	
+	bool EvaluateComponent(Object obj, ComponentInfo cInfo, MeleeTargetSettings settings, out ref ComponentResult result)
+	{
+		return EvaluateComponentEx(obj, cInfo, settings, result, {});
+	}
+	
 	bool IsMeleeTargetObstructed(vector rayStart, vector rayEnd)
 	{
-		if ( rayStart == rayEnd )
+		if (rayStart == rayEnd)
+		{
 			return true; // Not possible to trace when this happens (zero length raycast)
+		}
 		
 		Object hitObject;
 		vector hitPos, hitNormal;

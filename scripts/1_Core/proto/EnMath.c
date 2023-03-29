@@ -5,6 +5,10 @@
 
 class Math
 {
+	private void Math() {}
+	private void ~Math() {}
+	
+	static const float EULER = 2.7182818284590452353;
 	static const float PI = 3.14159265358979;
 	static const float PI2 = 6.28318530717958;
 	static const float PI_HALF = 1.570796326794;
@@ -471,11 +475,11 @@ class Math
 	proto static float WrapFloat0XInclusive(float f, float max);
 	
 	/**
-	\brief Returns wrap number to specified interval [min, max]
+	\brief Returns wrap number to specified interval [min, max[
 		\param i \p int Value
 		\param min \p float Minimum
 		\param max \p int Maximum
-		\return \p int - number in specified interval [min, max]
+		\return \p int - number in specified interval [min, max[
 		@code
 			Print( Math.WrapInt(9, 1, 9) );
 
@@ -485,10 +489,10 @@ class Math
 	proto static int WrapInt(int i, int min, int max);
 	
 	/**
-	\brief Returns wrap number to specified interval [0, max]
+	\brief Returns wrap number to specified interval [0, max[
 		\param i \p int Value
 		\param max \p int Maximum
-		\return \p int - number in specified interval [0, max]
+		\return \p int - number in specified interval [0, max[
 		@code
 			Print( Math.WrapInt0X(9, 9) );
 
@@ -652,6 +656,29 @@ class Math
 	*/
 
 	proto static float SmoothCD(float val, float target, inout float velocity[], float smoothTime, float maxVelocity, float dt);
+	
+	//! occurences values above '12' will cause Factorial to overflow int.
+	static float Poisson(float mean, int occurences)
+	{
+		return Pow(mean, occurences) * Pow(EULER,-mean) / Factorial(occurences);
+	}
+	
+	//! values above '12' will cause int overflow
+	static int Factorial(int val)
+	{
+		if (val > 12)
+		{
+			ErrorEx("Values above '12' cause int overflow! Returning '1'");
+			return 1;
+		}
+		
+		int res = 1;
+		while (val > 1)
+		{
+			res *= val--;
+		}
+		return res;
+	}
 };
 
 //@}

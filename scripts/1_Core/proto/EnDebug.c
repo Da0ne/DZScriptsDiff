@@ -3,7 +3,7 @@
  * @{
  */
 
- /**
+/**
 \brief Prints current call stack (stack trace)
 	\return \p void
 	@code
@@ -26,19 +26,67 @@
 */
 proto void DumpStack();
 
+/**
+\brief Prints current call stack (stack trace) to given output
+	\return \p void
+	@code
+    string tmp;
+		DumpStackString(tmp);
+    Print(tmp);
+
+	@endcode
+
+	\verbatim
+	Output:
+	  SaveFile() Scripts\Entities\Modules\ModuleBase\ModuleFileHandler.c : 51
+	  SaveConfigToFile() Scripts\Entities\Modules\ModuleBase\ModuleFileHandler\ModuleLocalProfile.c : 114
+	  SaveParameterArray() Scripts\Entities\Modules\ModuleBase\ModuleFileHandler\ModuleLocalProfile.c : 133
+	  SetParameterArray() Scripts\Entities\Modules\ModuleBase\ModuleFileHandler\ModuleLocalProfile.c : 231
+	  PresetAdd() Scripts\Entities\Modules\ModuleBase\ModuleFileHandler\ModuleLocalProfile\ModuleLocalProfileUI.h : 46
+	  OnKeyPress() Scripts/mission/missionGameplay.c : 215
+	  OnKeyPress() Scripts/DayZGame.c : 334
+	\endverbatim
+*/
+proto void DumpStackString(out string stack);
+
 //! Triggers breakpoint in C++ in run time(when app is running in debug enviroment)
 proto void DebugBreak(bool condition = true, void param1 = NULL, void param2 = NULL, void param3 = NULL, void param4 = NULL, void param5 = NULL, void param6 = NULL, void param7 = NULL, void param8 = NULL, void param9 = NULL);
 
 //! Triggers breakpoint in C++ in compile time(when app is running in debug enviroment)
 void CompileBreak();
 
-//!Prints content of variable to console/log. Should be used for critical messages so it will appear in debug log
+//! Prints content of variable to console/log. Should be used for critical messages so it will appear in debug log
 proto void DPrint(string var);
 
-//!Messagebox with error message
+enum ErrorExSeverity
+{
+	INFO,
+	WARNING,
+	ERROR,
+}
+
+/**
+\brief Error message, prefixed by method name, above 'INFO' will show a messagebox
+	\note Format: [%className%::%methodName%] :: [%severity%] :: %errString%
+	\param \p string Error message to use
+	@code
+	class ErrorExTest
+	{
+		void ThrowWarning()
+		{
+			// [ErrorExTest::ThrowWarning] :: [WARNING] :: This is a warning.
+			ErrorEx("This is a warning.", ErrorExSeverity.WARNING);		
+		}
+	}
+	@endcode
+*/
+proto void ErrorEx(string err, ErrorExSeverity severity = ErrorExSeverity.ERROR);
+proto void ErrorExString(string err, out string str, ErrorExSeverity severity = ErrorExSeverity.ERROR);
+
+//! Messagebox with error message
 proto native void Error2(string title, string err);
 
-//!Messagebox with error message
+//! Messagebox with error message
 void Error(string err)
 {
 	Error2("", err);
@@ -107,8 +155,10 @@ class Shape
 	//!don't call destructor directly. Use Destroy() instead
 	proto private void ~Shape();
 
+	proto native void GetMatrix(out vector mat[4]);
 	proto native void SetMatrix(vector mat[4]);
 	proto native void SetDirection(vector direction);
+	proto native void SetPosition(vector position);
 	proto native void SetColor(int color);
 	proto native void SetFlags(ShapeFlags flags);
 	proto native void Destroy();
@@ -117,6 +167,7 @@ class Shape
 	proto static native Shape CreateLines(int color, ShapeFlags flags, vector p[], int num);
 	proto static native Shape CreateTris(int color, ShapeFlags flags, vector p[], int num);
 	proto static native Shape CreateSphere(int color, ShapeFlags flags, vector origin, float radius);
+	proto static native Shape CreateFrustum(float horizontalAngle, float verticalAngle, float length, int color, ShapeFlags flags);
 	proto static native Shape CreateCylinder(int color, ShapeFlags flags, vector origin, float radius, float length);
 
 	static Shape CreateArrow(vector from, vector to, float size, int color, ShapeFlags flags)
@@ -180,19 +231,106 @@ class Shape
  */
 class DiagMenu
 {
-	proto static native void RegisterMenu(int id, string name, string parent);
-	proto static native void Unregister(int id);
-	proto static native void RegisterItem(int id, string shortcut, string name, string parent, string values);
-	/*!
-	range value, are defined in format "min,max,startValue,step" -> e.g. "-2, 2, 0, 0.1"
-	*/ 
-	proto static native void RegisterRange(int id, string shortcut, string name, string parent, string valuenames);
-	proto static native void RegisterBool(int id, string shortcut, string name, string parent, bool reverse = false);
-	proto static native bool GetBool(int id, bool reverse = false);
-	proto static native int GetValue(int id);
-	proto static native void SetValue(int id, int value);
-	proto static native float GetRangeValue(int id);
-	proto static native void SetRangeValue(int id, float value);
+	//! To be used before registering scripted diags
+	static proto void InitScriptDiags();
+	//! To be used when scripted diags should not be present
+	static proto void ClearScriptDiags();
+	
+	/**
+	\brief Register a new menu
+		\param id \p int The unique ID of the menu in the range [0,512]
+		\param name \p string The name of the menu
+		\param parent \p int The index of the parent of the menu
+	*/
+	static proto void RegisterMenu(int id, string name, int parent);
+	
+	/**
+	\brief Register a new item
+		\param id \p int The unique ID of the item in the range [0,512]
+		\param shortcut \p string The keyboard shortcut of the item
+		\param name \p string The name of the item
+		\param parent \p int The index of the parent of the item
+		\param values \p string The values of the item separated by commas, internally this will be an int starting at 0 for the first item
+		\param callback \p func Callback to call when the value is changed (OPTIONAL) (Also read BindCallback)
+	*/
+	static proto void RegisterItem(int id, string shortcut, string name, int parent, string values, func callback = null);
+	
+	/**
+	\brief Register a new bool item
+	\note This is just a RegisterItem with value="true,false" or when reversed value="false,true"
+		\param id \p int The unique ID of the item in the range [0,512]
+		\param shortcut \p string The keyboard shortcut of the item
+		\param name \p string The name of the item
+		\param parent \p string The index of the parent of the item
+		\param values \p string The values of the item, separated by commas
+		\param reverse \p bool Whether to reverse the bool (OPTIONAL)
+		\param callback \p func Callback to call when the value is changed (OPTIONAL) (Also read BindCallback)
+	*/
+	static proto void RegisterBool(int id, string shortcut, string name, int parent, bool reverse = false, func callback = null);
+
+	/**
+	\brief Register a new range item
+		\param id \p int The unique ID of the item in the range [0,512]
+		\param shortcut \p string The keyboard shortcut of the item
+		\param name \p string The name of the item
+		\param parent \p int The index of the parent of the item
+		\param values \p string Range specification in format "min,max,startValue,step"
+		\param callback \p func Callback to call when the value is changed (OPTIONAL) (Also read BindCallback)
+	*/
+	static proto void RegisterRange(int id, string shortcut, string name, int parent, string valuenames, func callback = null);
+	
+	//! Unregister the item at given id
+	static proto void Unregister(int id);
+	
+	//! Check if the item at given id has been registered
+	static proto bool IsRegistered(int id);
+	
+	/**
+	*\brief Bind a callback to the given id
+	*	\note Only one callback can be registered, so when attempting to registering multiple, only the last one will be present
+	*	\note The callbacks are required to have one of following signatures
+	*		- All Register... support:
+	*			o static void Callback();
+	*		- RegisterItem & RegisterBool:
+	*			o static void Callback(int value);
+	*			o static void Callback(int value, int id);
+	*			o static void Callback(bool value);
+	*			o static void Callback(bool value, int id);
+	*		- RegisterRange:
+	*			o static void Callback(float value);
+	*			o static void Callback(float value, int id);
+	*			o static void Callback(int value);
+	*			o static void Callback(int value, int id);
+	*	\note Keep in mind that bool and int are interchangeable, so 'bool value' is possible for RegisterRange too
+	*/
+	static proto bool BindCallback(int id, func callback);
+	//! Unbind the callback from the given id
+	static proto void UnbindCallback(int id);
+	
+	//! Get value as bool from the given script id
+	static proto bool GetBool(int id, bool reverse = false);
+	//! Get value as int from the given script id
+	static proto int GetValue(int id);
+	//! Set value at the given script id
+	static proto void SetValue(int id, int value);
+	
+	//! Get range value at the given script id 
+	static proto float GetRangeValue(int id);
+	//! Set range value at the given script id
+	static proto void SetRangeValue(int id, float value);
+	
+	//! Get value at the given engine id
+	static proto int GetEngineValue(int id);
+	//! Set value at the given engine id
+	static proto void SetEngineValue(int id, int value);
+	
+	//! Get range value at the given engine id
+	static proto float GetEngineRangeValue(int id);
+	//! Set range value at the given engine id
+	static proto void SetEngineRangeValue(int id, float value);
+	
+	//! Check if a menu with supplied name already exists
+	static proto bool MenuExists(string name);	
 };
 
 //@}

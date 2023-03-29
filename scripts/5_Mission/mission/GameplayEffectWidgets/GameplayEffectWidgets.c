@@ -15,10 +15,11 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 	protected ref array<ref Widget> 					m_UpdatedWidgetsCheck; //to make sure widgets are not updated over and over (case of multiple IDs sharing same widget set)
 	protected ref array<int> 							m_UpdatedWidgetSetsCheck; //to make sure sets are not updated over and over (case of multiple IDs sharing same widget set)
 	protected ref set<int> 								m_SuspendRequests;
+	protected ref map<int,typename> 					m_IDToTypeMap;
 	
 	protected float 									m_TimeProgBreath;
 	protected float 									m_BreathMultStamina;
-	protected float 									m_BreathMultFilterQty;
+	protected float 									m_BreathResidue;
 	
 	//UserID's for widget containers that use something different from 'EffectWidgetsTypes' defaults
 	protected const int 								WIDGETSET_BREATH = 100;
@@ -40,11 +41,15 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		m_UpdatedWidgetsCheck = new array<ref Widget>;
 		m_UpdatedWidgetSetsCheck = new array<int>;
 		m_SuspendRequests = new set<int>;
+		m_IDToTypeMap = new map<int,typename>;
 		
 		m_TimeProgBreath = 0.0;
 		m_BreathMultStamina = 1.0;
 		
+		PairIDToTypes();
+		
 		RegisterLayouts("gui/layouts/gameplay/CameraEffects.layout",CompileEffectListing());
+		RegisterLayouts("gui/layouts/gameplay/BleedingEffects.layout",{EffectWidgetsTypes.BLEEDING_LAYER});
 		
 		InitWidgetSet(EffectWidgetsTypes.MASK_BREATH,true,WIDGETSET_BREATH);
 		InitWidgetSet(EffectWidgetsTypes.HELMET_BREATH,true,WIDGETSET_BREATH);
@@ -55,8 +60,11 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		InitWidgetSet(EffectWidgetsTypes.MOTO_OCCLUDER);
 		InitWidgetSet(EffectWidgetsTypes.NVG_OCCLUDER,false,EffectWidgetsTypes.NVG_OCCLUDER);
 		InitWidgetSet(EffectWidgetsTypes.PUMPKIN_OCCLUDER,false,EffectWidgetsTypes.NVG_OCCLUDER);
+		InitWidgetSet(EffectWidgetsTypes.EYEPATCH_OCCLUDER);
 		
 		InitWidgetSet(EffectWidgetsTypes.COVER_FLASHBANG);
+		
+		InitWidgetSet(EffectWidgetsTypes.BLEEDING_LAYER,true);
 		
 		UpdateVisibility();
 	}
@@ -82,6 +90,24 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		foreach (int i : types)
 		{
 			m_Layouts.Set(i,w);
+		}
+	}
+	
+	protected void PairIDToTypes()
+	{
+		m_IDToTypeMap.Insert(EffectWidgetsTypes.BLEEDING_LAYER,GameplayEffectsDataBleeding);
+	}
+	
+	protected typename TranslateIDToType(int typeID)
+	{
+		return m_IDToTypeMap.Get(typeID);
+	}
+	
+	override void RegisterGameplayEffectData(int id, Param p)
+	{
+		if (!m_WidgetDataMap.Get(id).DataInitialized())
+		{
+			m_WidgetDataMap.Get(id).RegisterData(p);
 		}
 	}
 	
@@ -129,13 +155,21 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 			
 			if (parent.GetChildren())
 			{
-				if (ImageWidget.Cast(parent.GetChildren()))
+				typename handled_type = TranslateIDToType(type);
+				if ( handled_type )
 				{
-					m_WidgetDataMap.Set(type, new GameplayEffectsDataImage(output,type,user_id_override) );
+					CreateHandledClass(handled_type,output,type,user_id_override);
 				}
 				else
 				{
-					m_WidgetDataMap.Set(type, new GameplayEffectsData(output,type,user_id_override) );
+					if (ImageWidget.Cast(parent.GetChildren()))
+					{
+						m_WidgetDataMap.Set(type, new GameplayEffectsDataImage(output,type,user_id_override) );
+					}
+					else
+					{
+						m_WidgetDataMap.Set(type, new GameplayEffectsData(output,type,user_id_override) );
+					}
 				}
 			}
 			
@@ -144,7 +178,19 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		}
 	}
 	
-	//! returns all vanilla effects, nested in vanilla a layout. If using different layouts for custom effects, please register and link separately
+	bool CreateHandledClass(typename handled_type, array<ref Widget> input, int type, int user_override)
+	{
+		if (handled_type)
+		{
+			GameplayEffectsData data = GameplayEffectsData.Cast(handled_type.Spawn());
+			data.Init(input,type,m_Layouts.Get(type),user_override);
+			m_WidgetDataMap.Set(type, data);
+			return true;
+		}
+		return false;
+	}
+	
+	//! returns all vanilla effects, nested in a vanilla layout. If using different layouts for custom effects, please register and link separately
 	array<int> CompileEffectListing()
 	{
 		array<int> ret = new array<int>;
@@ -157,6 +203,7 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		ret.Insert(EffectWidgetsTypes.COVER_FLASHBANG);
 		ret.Insert(EffectWidgetsTypes.NVG_OCCLUDER);
 		ret.Insert(EffectWidgetsTypes.PUMPKIN_OCCLUDER);
+		ret.Insert(EffectWidgetsTypes.EYEPATCH_OCCLUDER);
 		
 		return ret;
 	}
@@ -166,46 +213,66 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		Widget w;
 		//Hide diff
 		int value;
+		int runningEffectCount = m_RunningEffects.Count();
+		bool runningEffectsPresent = runningEffectCount > 0;
+		GameplayEffectsData dta;
 		for (int i = 0; i < m_RunningEffectsPrevious.Count(); i++)
 		{
 			value = m_RunningEffectsPrevious.Get(i);
-			if (m_RunningEffects.Count() < 1 || m_RunningEffects.Find(value) == -1)
+			dta = m_WidgetDataMap.Get(value);
+			if (runningEffectCount < 1 || m_RunningEffects.Find(value) == -1)
 			{
-				for (int j = 0; j < m_WidgetDataMap.Get(value).GetWidgetSet().Count(); j++)
+				if (dta.HasDefinedHandle())
 				{
-					w = m_WidgetDataMap.Get(value).GetWidgetSet().Get(j);
-					w.Show(false);
+					dta.UpdateVisibility(false);
 				}
-				w.GetParent().Show(false);
+				else
+				{
+					for (int j = 0; j < m_WidgetDataMap.Get(value).GetWidgetSet().Count(); j++)
+					{
+						w = m_WidgetDataMap.Get(value).GetWidgetSet().Get(j);
+						w.Show(false);
+					}
+					w.GetParent().Show(false);
+				}
 			}
 		}
 		
 		//Show running effects
-		if (m_RunningEffects.Count() > 0)
+		if (runningEffectsPresent)
 		{
 			value = 0;
-			for (i = 0; i < m_RunningEffects.Count(); i++)
+			for (i = 0; i < runningEffectCount; i++)
 			{
 				value = m_RunningEffects.Get(i);
-				for (j = 0; j < m_WidgetDataMap.Get(value).GetWidgetSet().Count(); j++)
+				dta = m_WidgetDataMap.Get(value);
+				if (dta.HasDefinedHandle())
 				{
-					w = m_WidgetDataMap.Get(value).GetWidgetSet().Get(j);
-					w.Update();
-					w.Show(true);
+					dta.m_LayoutRoot.Show(true);
+					dta.UpdateVisibility(true);
 				}
-				
-				while (w) //dumb but necessary because of uncertain "visible" setting of the layout
+				else
 				{
-					w = w.GetParent();
-					if (w)
+					for (j = 0; j < m_WidgetDataMap.Get(value).GetWidgetSet().Count(); j++)
 					{
+						w = m_WidgetDataMap.Get(value).GetWidgetSet().Get(j);
+						w.Update();
 						w.Show(true);
+					}
+					
+					while (w) //dumb but necessary because of uncertain "visible" setting of the layout
+					{
+						w = w.GetParent();
+						if (w)
+						{
+							w.Show(true);
+						}
 					}
 				}
 			}
 		}
 		
-		m_Root.Show(m_RunningEffects.Count() > 0 && m_SuspendRequests.Count() < 1);
+		m_Root.Show(runningEffectsPresent && m_SuspendRequests.Count() < 1);
 		m_RunningEffectsPrevious.Clear();
 	}
 	
@@ -221,7 +288,11 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 				value = effects.Get(i);
 				m_RunningEffects.Insert(value);
 			}
-			UpdateVisibility();
+			
+			if (m_RunningEffectsPrevious.Count() != m_RunningEffects.Count())
+			{
+				UpdateVisibility();
+			}
 		}
 	}
 	
@@ -242,13 +313,28 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 					m_RunningEffects.Remove(idx);
 				}
 			}
-			UpdateVisibility();
+			
+			if (m_RunningEffectsPrevious.Count() != m_RunningEffects.Count())
+			{
+				UpdateVisibility();
+			}
 		}
 	}
 	
 	override void StopAllEffects()
 	{
 		m_Root.Show(false); //to avoid visual 'peeling'
+		
+		if (IsAnyEffectRunning())
+		{
+			int count = m_RunningEffects.Count();
+			GameplayEffectsData data;
+			for (int i = 0; i < count; i++) //iterates over running metadata, in case anything requires its own stop handling
+			{
+				data = m_WidgetDataMap.Get(m_RunningEffects[i]);
+				data.ForceStop();
+			}
+		}
 		
 		m_RunningEffectsPrevious.Copy(m_RunningEffects);
 		m_RunningEffects.Clear();
@@ -290,11 +376,6 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 	//! Usually called in course of an OnFrame update, can be manually called from elsewhere with parameters
 	override void UpdateWidgets(int type = -1, float timeSlice = 0, Param p = null, int handle = -1)
 	{
-		if (m_SuspendRequests.Count() > 0)
-		{
-			return;
-		}
-		
 		GameplayEffectsData dta;
 		array<ref Widget> widget_set;
 		
@@ -310,16 +391,24 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 				if (m_RunningEffects.Find(m_UpdatingEffects.Get(i)) != -1)
 				{
 					type_widgetset = m_UpdatingEffects.Get(i);
-					CalculateValues(type_widgetset,timeSlice,p,handle);
 					
 					dta = m_WidgetDataMap.Get(type_widgetset);
-					widget_set = dta.GetWidgetSet();
-					foreach (Widget w : widget_set)
+					
+					if (dta.HasDefinedHandle() && dta.DataInitialized())
 					{
-						if (w.IsVisibleHierarchy() && m_UpdatedWidgetsCheck.Find(w) == -1)
+						dta.Update(timeSlice,p,handle); //calculate and apply
+					}
+					else
+					{
+						CalculateValues(type_widgetset,timeSlice,p,handle);
+						widget_set = dta.GetWidgetSet();
+						foreach (Widget w : widget_set)
 						{
-							m_UpdatedWidgetsCheck.Insert(w);
-							ProcessWidgetUpdate(w,type_widgetset,timeSlice,p,handle);
+							if (w.IsVisibleHierarchy() && m_UpdatedWidgetsCheck.Find(w) == -1)
+							{
+								m_UpdatedWidgetsCheck.Insert(w);
+								ProcessWidgetUpdate(w,type_widgetset,timeSlice,p,handle);
+							}
 						}
 					}
 				}
@@ -329,16 +418,23 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		{
 			if (m_RunningEffects.Find(type) != -1) //only do if the effect is running (FPS stonks!)
 			{
-				CalculateValues(type,timeSlice,p,handle);
-				
 				dta = m_WidgetDataMap.Get(type);
-				widget_set = dta.GetWidgetSet();
-				foreach (Widget w2 : widget_set)
+				
+				if (dta.HasDefinedHandle() && dta.DataInitialized())
 				{
-					if (w2.IsVisibleHierarchy() && m_UpdatedWidgetsCheck.Find(w2) == -1)
+					dta.Update(timeSlice,p,handle); //calculate and apply
+				}
+				else
+				{
+					CalculateValues(type,timeSlice,p,handle);
+					widget_set = dta.GetWidgetSet();
+					foreach (Widget w2 : widget_set)
 					{
-						m_UpdatedWidgetsCheck.Insert(w2);
-						ProcessWidgetUpdate(w2,type,timeSlice,p,handle);
+						if (w2.IsVisibleHierarchy() && m_UpdatedWidgetsCheck.Find(w2) == -1)
+						{
+							m_UpdatedWidgetsCheck.Insert(w2);
+							ProcessWidgetUpdate(w2,type,timeSlice,p,handle);
+						}
 					}
 				}
 			}
@@ -368,6 +464,7 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 			break;
 			
 			case EffectWidgetsTypes.MOTO_OCCLUDER:
+			case EffectWidgetsTypes.EYEPATCH_OCCLUDER:
 			case EffectWidgetsTypes.HELMET_OCCLUDER:
 			case EffectWidgetsTypes.MASK_OCCLUDER:
 			{
@@ -402,6 +499,7 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 			break;
 			
 			case EffectWidgetsTypes.MOTO_OCCLUDER:
+			case EffectWidgetsTypes.EYEPATCH_OCCLUDER:
 			case EffectWidgetsTypes.HELMET_OCCLUDER:
 			case EffectWidgetsTypes.MASK_OCCLUDER:
 			{
@@ -427,16 +525,18 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 	const float BREATH_HDR_MIN = 0.005; //dusk?
 	const float BREATH_HDR_MAX = 1.0; //dark?
 	const float BREATH_COLOR_MULT_MIN = 0.5;
-	const float BREATH_COLOR_MULT_MAX = 1.0;
+	const float BREATH_COLOR_MULT_MAX = 0.8;
 	
 	//-----------------------------------------
 	//Breath
 	//-----------------------------------------
 	protected void CalculateBreathEffect(float timeSlice = 0, int type = -1, Param p = null)
 	{
-		m_TimeProgBreath += timeSlice * 4; //The multiplication factor set the speed of the breath. The larger it is, the faster the breath effect
-		if(m_TimeProgBreath > Math.PI * 2)  //Force a single breath pulse
-			return;
+		float modifier = Math.Lerp(0.25, 0.5, m_BreathResidue);
+		float speed = timeSlice * modifier;
+		m_BreathResidue -= speed;
+		m_BreathResidue = Math.Clamp(m_BreathResidue,0,1);
+		float residue_final = Math.Lerp(0, 0.7, m_BreathResidue);
 		
 		float hdr_mult;
 		hdr_mult = GetSceneHDRMul(0);
@@ -445,12 +545,8 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		hdr_mult = Math.Lerp(BREATH_COLOR_MULT_MAX,BREATH_COLOR_MULT_MIN,hdr_mult);
 		m_BreathColor = ARGBF(0.0,1.0 * hdr_mult,1.0 * hdr_mult,1.0 * hdr_mult); //grayscaling of the image
 		
-		float interpolTime  = Math.Sin(m_TimeProgBreath);	// Used a sine to simulate the breath "pulse"
-		if(interpolTime < 0)						// Prevents negative values to interpolate 
-			interpolTime = 0;						// Also add a extra buffer time to clean the breath
 		
-		m_BreathAlphaVal = Math.Lerp(0, 0.5, interpolTime);	// Lerp between mix and max value of the texture alpha value
-		m_BreathAlphaVal = m_BreathAlphaVal / 20 * m_BreathMultStamina * m_BreathMultFilterQty;
+		m_BreathAlphaVal = Math.Lerp(m_BreathAlphaVal, residue_final, timeSlice);
 	}
 	
 	protected void UpdateBreathEffect(ImageWidget w)
@@ -523,26 +619,17 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		UpdateWidgets(-1,timeSlice);
 	}
 	
-	//-----------------------------------------
-	override void SetBreathTime(float value)
-	{
-		m_TimeProgBreath = value;
-	}
-	
+	/*
 	override void SetBreathIntensityStamina(float stamina_cap, float stamina_current)
 	{
-		//Disconnected for now
-		m_BreathMultStamina = 1.0;
-		return;
-		
 		float stamina_normalized = Math.InverseLerp(0, stamina_cap, stamina_current);
 		stamina_normalized = Math.Clamp(stamina_normalized,0,1);
 		
-		if ( stamina_normalized < STAMINA_SOUND_TR2)
+		if ( stamina_normalized < STAMINA_SOUND_TR2 )
 		{
 			m_BreathMultStamina = 2.0;
 		}
-		else if ( stamina_normalized < STAMINA_SOUND_TR1)
+		else if ( stamina_normalized < STAMINA_SOUND_TR1 )
 		{
 			m_BreathMultStamina = 1.5;
 		}
@@ -550,5 +637,11 @@ class GameplayEffectWidgets extends GameplayEffectWidgets_base
 		{
 			m_BreathMultStamina = 1.0;
 		}
+	}
+	*/
+	override void OnVoiceEvent(float breathing_resistance01)
+	{
+		m_BreathResidue += Math.Lerp(0,0.35,breathing_resistance01);
+		m_BreathResidue = Math.Clamp(m_BreathResidue,0,1);
 	}
 }

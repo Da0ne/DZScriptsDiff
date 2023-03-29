@@ -24,6 +24,7 @@ class ActionGiveBloodSelf: ActionContinuousBase
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONFB_SALINEBLOODBAG;
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
+		m_Text = "#give_blood";
 	}
 	
 	override void CreateConditionComponents()  
@@ -35,11 +36,6 @@ class ActionGiveBloodSelf: ActionContinuousBase
 	override bool HasTarget()
 	{
 		return false;
-	}
-		
-	override string GetText()
-	{
-		return "#give_blood";
 	}
 	
 	override ActionData CreateActionData()

@@ -158,7 +158,7 @@ class BleedingSourcesManagerServer extends BleedingSourcesManagerBase
 		//Print("bleed_threshold = " + bleed_threshold);
 
 		//hackerino for zombino:
-		if (source.IsZombie())
+		if (source && source.IsZombie())
 		{
 			int chance = Math.RandomInt(0,100); //Cast die, probability comes from Blood damage in infected ammo config
 			if (chance <= damage)

@@ -6,6 +6,7 @@ class ActionInjectSelf: ActionSingleUseBase
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_CROUCH;
 		m_SpecialtyWeight = UASoftSkillsWeight.PRECISE_MEDIUM;
+		m_Text = "#inject";
 	}
 	
 	override void CreateConditionComponents()  
@@ -17,11 +18,6 @@ class ActionInjectSelf: ActionSingleUseBase
 	override bool HasTarget()
 	{
 		return false;
-	}
-
-	override string GetText()
-	{
-		return "#inject";
 	}
 
 	override void OnExecuteServer( ActionData action_data )

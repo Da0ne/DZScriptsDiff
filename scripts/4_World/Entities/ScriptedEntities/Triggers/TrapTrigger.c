@@ -9,23 +9,35 @@ class TrapTrigger : Trigger
 	
 	void SetParentObject( TrapBase obj )
 	{
-		if ( GetGame().IsServer() )
+		if (GetGame().IsServer())
+		{
 			m_ParentObj = obj;
+		}
 	}
 	
 	override protected bool CanAddObjectAsInsider(Object object)
 	{
 		return object.IsInherited(EntityAI) && m_ParentObj && m_ParentObj.IsActive();
 	}
-
+	
 	override protected void OnEnterServerEvent(TriggerInsider insider)
 	{
 		#ifdef DEVELOPER
 		m_CanSendDbg = false;
 		#endif
 		
-		if ( m_ParentObj && m_ParentObj.IsActive() )
-			m_ParentObj.SnapOnObject( EntityAI.Cast( insider.GetObject() ) );
+		if (m_ParentObj && m_ParentObj.IsActive())
+		{
+			m_ParentObj.SnapOnObject(EntityAI.Cast(insider.GetObject()));
+		}
+	}
+	
+	override protected void OnLeaveServerEvent(TriggerInsider insider)
+	{
+		if (m_ParentObj && m_ParentObj.IsActive())
+		{
+			m_ParentObj.RemoveFromObject(EntityAI.Cast(insider.GetObject()));
+		}
 	}
 	
 	#ifdef DEVELOPER
@@ -44,27 +56,29 @@ class TripWireTrigger : TrapTrigger
 {
 	override protected void OnEnterServerEvent( TriggerInsider insider )
 	{
-		PlayerBase playerInsider = PlayerBase.Cast( insider.GetObject() );
+		PlayerBase playerInsider = PlayerBase.Cast(insider.GetObject());
 		
-		if ( playerInsider )
+		if (playerInsider)
 		{
 			// If the player is jogging / sprinting while standing with or without hands raised, tripwire will trigger
 			bool isErect = ( playerInsider.m_MovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_ERECT || playerInsider.m_MovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDERECT || playerInsider.m_MovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDCROUCH ); 
 			bool isJogging = ( playerInsider.m_MovementState.m_iMovement == DayZPlayerConstants.MOVEMENTIDX_RUN || playerInsider.m_MovementState.m_iMovement == DayZPlayerConstants.MOVEMENTIDX_SPRINT );
-			if ( isJogging && isErect ) 
+			if (isJogging && isErect) 
 			{
-				super.OnEnterServerEvent( insider );
+				super.OnEnterServerEvent(insider);
 				return;
 			}
 			
 			// Special handling of crouch sprint
 			if ( playerInsider.m_MovementState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_CROUCH && playerInsider.m_MovementState.m_iMovement == DayZPlayerConstants.MOVEMENTIDX_SPRINT )
 			{
-				super.OnEnterServerEvent( insider );
+				super.OnEnterServerEvent(insider);
 				return;
 			}
 		}
 		else
-			super.OnEnterServerEvent( insider );
+		{
+			super.OnEnterServerEvent(insider);
+		}
 	}
 }

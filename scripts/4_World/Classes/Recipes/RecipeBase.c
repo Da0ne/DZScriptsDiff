@@ -172,7 +172,7 @@ class RecipeBase
 	void SpawnItems(ItemBase ingredients[], PlayerBase player, array<ItemBase> spawned_objects/*out*/)
 	{
 		//vector item_position = player.GetPosition() + ( player.GetDirection() * 1 );
-		Debug.Log("SpawnItems called","recipes");
+		//Debug.Log("SpawnItems called","recipes");
 		spawned_objects.Clear();//just to make sure
 		EntityAI object = NULL;
 		
@@ -183,7 +183,7 @@ class RecipeBase
 			if( m_ResultInheritsColor[i] != -1 )
 			{
 				ItemBase item = ingredients[m_ResultInheritsColor[i]];
-				string class_name = item.GetType();
+				//string class_name = item.GetType();
 				string color = item.ConfigGetString("color");
 				string new_class_name = m_ItemsToCreate[i] + color;
 				item_to_spawn = new_class_name;
@@ -224,7 +224,7 @@ class RecipeBase
 				}
 			}
 			spawned_objects.Insert(ItemBase.Cast(object));
-			Debug.Log("spawning item "+item_to_spawn,"recipes");
+			//Debug.Log("spawning item "+item_to_spawn,"recipes");
 			object = null;
 		}
 
@@ -483,8 +483,7 @@ class RecipeBase
 		
 		if( !IsRecipeAnywhere() && (item1 != item_in_hand && item2 != item_in_hand) )
 		{
-			Error("recipe invalid, not 'IsRecipeAnywhere' and neither ingredience is in hands");
-			return false;			
+			return false;
 		}
 		
 		m_IngredientsSorted[0] = item1;

@@ -1,6 +1,12 @@
 typedef ItemBase Inventory_Base;
 
-class DummyItem extends ItemBase {};
+class DummyItem extends ItemBase
+{
+	override bool CanPutAsAttachment(EntityAI parent)
+	{
+		return true;
+	}
+};
 
 //const bool QUANTITY_DEBUG_REMOVE_ME = false;
 
@@ -19,13 +25,15 @@ class ItemBase extends InventoryItem
 	
 	int		m_VariablesMask;//this holds information about which vars have been changed from their default values
 	// Quantity
+	
 	float 	m_VarQuantity;
+	float 	m_VarQuantityPrev;//for client to know quantity changed during synchronization
 	int		m_VarQuantityInit;
 	int		m_VarQuantityMin;
 	int		m_VarQuantityMax;
 	int		m_Count;
 	float	m_VarStackMax;
-	float	m_StoreLoadedQuantity = -1;
+	float	m_StoreLoadedQuantity = float.LOWEST;
 	// Temperature
 	float 	m_VarTemperature;
 	float 	m_VarTemperatureInit;
@@ -33,18 +41,23 @@ class ItemBase extends InventoryItem
 	float 	m_VarTemperatureMax;
 	// Wet
 	float 	m_VarWet;
+	float 	m_VarWetPrev;//for client to know wetness changed during synchronization
 	float 	m_VarWetInit;
 	float 	m_VarWetMin;
 	float 	m_VarWetMax;
 	// Cleanness
-	int	m_Cleanness;
-	int m_CleannessInit;
-	int m_CleannessMin;
-	int m_CleannessMax;
+	int		m_Cleanness;
+	int		m_CleannessInit;
+	int		m_CleannessMin;
+	int		m_CleannessMax;
+	// impact sounds
+	bool	m_WantPlayImpactSound;
+	bool	m_CanPlayImpactSound = true;
+	float	m_ImpactSpeed;
+	int		m_ImpactSoundSurfaceHash;
 	//
 	float	m_HeatIsolation;
 	float 	m_ItemModelLength;
-	float 	m_ConfigWeight = -1;
 	int 	m_VarLiquidType;
 	int 	m_ItemBehaviour = -1; // -1 = not specified; 0 = heavy item; 1= onehanded item; 2 = twohanded item
 	int 	m_QuickBarBonus = 0;
@@ -63,7 +76,8 @@ class ItemBase extends InventoryItem
 	bool	m_IsStoreLoad = false;
 	bool	m_CanShowQuantity;
 	bool	m_HasQuantityBar;
-	protected bool 	m_CanBeDigged;
+	protected bool m_CanBeDigged;
+	protected bool m_IsResultOfSplit //! distinguish if item has been created as new or it came from splitting (server only flag)
 	
 	string	m_SoundAttType;
 	// items color variables
@@ -72,6 +86,9 @@ class ItemBase extends InventoryItem
 	int 	m_ColorComponentB;
 	int 	m_ColorComponentA;
 	//-------------------------------------------------------
+	
+	// light source managing
+	ItemBase m_LightSourceItem;
 	
 	ref TIntArray m_SingleUseActions;
 	ref TIntArray m_ContinuousActions;
@@ -82,7 +99,7 @@ class ItemBase extends InventoryItem
 	private int	m_AttachedAgents;
 
 	// Declarations
-	void TransferModifiers( PlayerBase reciever );
+	void TransferModifiers(PlayerBase reciever);
 	
 	
 	// Weapons & suppressors particle effects
@@ -102,6 +119,7 @@ class ItemBase extends InventoryItem
 	ref array <ref OverheatingParticle> m_OverheatingParticles;
 	
 	protected ref TStringArray m_HeadHidingSelections;
+	protected bool m_HideSelectionsBySlot;
 	
 	// Admin Log
 	PluginAdminLog			m_AdminLog;
@@ -115,6 +133,10 @@ class ItemBase extends InventoryItem
 	protected ref EffectSound 	m_LockingSound;
 	protected string 			m_LockSoundSet = "";
 	
+	protected EffectSound 		m_SoundPlace;
+	protected EffectSound 		m_SoundDeploy;
+	protected EffectSound 		m_SoundDeployFinish;
+	
 	// -------------------------------------------------------------------------
 	void ItemBase()
 	{
@@ -125,37 +147,46 @@ class ItemBase extends InventoryItem
 		m_ContinuousActions = new TIntArray;
 		m_InteractActions = new TIntArray;
 		
-		if (HasMuzzle())
+		if (!GetGame().IsDedicatedServer())
 		{
-			LoadParticleConfigOnFire( GetMuzzleID() );
-			
-			if ( m_ShotsToStartOverheating == 0 )
+			if (HasMuzzle())
 			{
-				LoadParticleConfigOnOverheating( GetMuzzleID() );
+				LoadParticleConfigOnFire(GetMuzzleID());
+				
+				if (m_ShotsToStartOverheating == 0)
+				{
+					LoadParticleConfigOnOverheating(GetMuzzleID());
+				}
 			}
-		}
-
-		if (GetGame().IsClient() || !GetGame().IsMultiplayer())
-		{
+			
 			PreLoadSoundAttachmentType();
 			m_ActionsInitialize = false;
 		}
+		
 		m_OldLocation = null;
 		
-		if ( GetGame().IsServer() )
+		if (GetGame().IsServer())
 		{
-			m_AdminLog = PluginAdminLog.Cast( GetPlugin(PluginAdminLog) );
+			m_AdminLog = PluginAdminLog.Cast(GetPlugin(PluginAdminLog));
 		}
 		
-		if ( ConfigIsExisting("headSelectionsToHide") )
+		if (ConfigIsExisting("headSelectionsToHide"))
 		{
 			m_HeadHidingSelections = new TStringArray;
 			ConfigGetTextArray("headSelectionsToHide",m_HeadHidingSelections);
 		}
 		
-		m_ConfigWeight = ConfigGetInt("weight");
+		m_HideSelectionsBySlot = false;
+		if (ConfigIsExisting("hideSelectionsByinventorySlot"))
+		{
+			m_HideSelectionsBySlot = ConfigGetBool("hideSelectionsByinventorySlot");
+		}
+		
+		
 		
 		m_QuickBarBonus = Math.Max(0, ConfigGetInt("quickBarBonus"));
+
+		m_IsResultOfSplit = false;
 	}
 	
 	void InitItemVariables()
@@ -181,6 +212,8 @@ class ItemBase extends InventoryItem
 		m_CleannessMin = ConfigGetInt("varCleannessMin");
 		m_CleannessMax = ConfigGetInt("varCleannessMax");
 		
+		m_WantPlayImpactSound = false;
+		m_ImpactSpeed = 0.0;
 		
 		m_VarWetInit = ConfigGetFloat("varWetInit");
 		m_VarWet = m_VarWetInit;
@@ -213,11 +246,15 @@ class ItemBase extends InventoryItem
 			m_ItemBehaviour = ConfigGetInt("itemBehaviour");
 		
 		//RegisterNetSyncVariableInt("m_VariablesMask");
-		if ( HasQuantity() ) RegisterNetSyncVariableFloat("m_VarQuantity", GetQuantityMin(), m_VarQuantityMax );
-		RegisterNetSyncVariableFloat("m_VarTemperature", GetTemperatureMin(),GetTemperatureMax() );
-		RegisterNetSyncVariableFloat("m_VarWet", GetWetMin(), GetWetMax(), 2 );
+		if (HasQuantity()) RegisterNetSyncVariableFloat("m_VarQuantity", GetQuantityMin(), m_VarQuantityMax);
+		RegisterNetSyncVariableFloat("m_VarTemperature", GetTemperatureMin(),GetTemperatureMax());
+		RegisterNetSyncVariableFloat("m_VarWet", GetWetMin(), GetWetMax(), 2);
 		RegisterNetSyncVariableInt("m_VarLiquidType");
 		RegisterNetSyncVariableInt("m_Cleanness",0,1);
+		
+		RegisterNetSyncVariableBoolSignal("m_WantPlayImpactSound");
+		RegisterNetSyncVariableFloat("m_ImpactSpeed");
+		RegisterNetSyncVariableInt("m_ImpactSoundSurfaceHash");
 		
 		RegisterNetSyncVariableInt("m_ColorComponentR", 0, 255);
 		RegisterNetSyncVariableInt("m_ColorComponentG", 0, 255);
@@ -228,8 +265,6 @@ class ItemBase extends InventoryItem
 		RegisterNetSyncVariableBool("m_IsTakeable");
 		RegisterNetSyncVariableBool("m_IsHologram");
 		
-		
-		m_LockingSound = new EffectSound;
 		m_LockSoundSet = ConfigGetString("lockSoundSet");
 	}
 	
@@ -240,19 +275,19 @@ class ItemBase extends InventoryItem
 
 	void InitializeActions()
 	{
-		m_InputActionMap = m_ItemTypeActionsMap.Get( this.Type() );
-		if(!m_InputActionMap)
+		m_InputActionMap = m_ItemTypeActionsMap.Get(this.Type());
+		if (!m_InputActionMap)
 		{
 			TInputActionMap iam = new TInputActionMap;
 			m_InputActionMap = iam;
 			SetActions();
-			m_ItemTypeActionsMap.Insert( this.Type(), m_InputActionMap);
+			m_ItemTypeActionsMap.Insert(this.Type(), m_InputActionMap);
 		}
 	}
 	
 	override void GetActions(typename action_input_type, out array<ActionBase_Basic> actions)
 	{
-		if(!m_ActionsInitialize)
+		if (!m_ActionsInitialize)
 		{
 			m_ActionsInitialize = true;
 			InitializeActions();
@@ -266,8 +301,9 @@ class ItemBase extends InventoryItem
 		AddAction(ActionTakeItem);
 		AddAction(ActionTakeItemToHands);
 		AddAction(ActionWorldCraft);
-		AddAction(ActionWorldCraftSwitch);
+		//AddAction(ActionWorldCraftSwitch);
 		AddAction(ActionDropItem);
+		AddAction(ActionAttachWithSwitch);
 		//AddAction();
 		//AddAction();
 	}
@@ -276,30 +312,38 @@ class ItemBase extends InventoryItem
 	{
 		ActionBase action = ActionManagerBase.GetAction(actionName);
 
-		if(!action)
+		if (!action)
 		{
 			Debug.LogError("Action " + actionName + " dosn't exist!");
 			return;
 		}		
 		
 		typename ai = action.GetInputType();
-		if(!ai)
+		if (!ai)
 		{
 			m_ActionsInitialize = false;
 			return;
 		}
-		ref array<ActionBase_Basic> action_array = m_InputActionMap.Get( ai );
 		
-		if(!action_array)
+		array<ActionBase_Basic> action_array = m_InputActionMap.Get(ai);		
+		if (!action_array)
 		{
 			action_array = new array<ActionBase_Basic>;
 			m_InputActionMap.Insert(ai, action_array);
 		}
-		if( LogManager.IsActionLogEnable() )
+		if (LogManager.IsActionLogEnable())
 		{
-			Debug.ActionLog(action.ToString() + " -> " + ai, this.ToString() , "n/a", "Add action" );
+			Debug.ActionLog(action.ToString() + " -> " + ai, this.ToString() , "n/a", "Add action");
 		}
-		action_array.Insert(action);
+		
+		if (action_array.Find(action) != -1)
+		{
+			Debug.Log("Action " + action.Type() + " already added to " + this + ", skipping!");
+		}
+		else
+		{
+			action_array.Insert(action);
+		}
 	}
 	
 	void RemoveAction(typename actionName)
@@ -307,13 +351,17 @@ class ItemBase extends InventoryItem
 		PlayerBase player = PlayerBase.Cast(GetGame().GetPlayer());
 		ActionBase action = player.GetActionManager().GetAction(actionName);
 		typename ai = action.GetInputType();
-		ref array<ActionBase_Basic> action_array = m_InputActionMap.Get( ai );
+		array<ActionBase_Basic> action_array = m_InputActionMap.Get(ai);
 		
-		if(action_array)
+		if (action_array)
 		{
 			action_array.RemoveItem(action);
 		}
 	}
+	
+	void OnItemInHandsPlayerSwimStart(PlayerBase player);
+	
+	ScriptedLightBase GetLight();
 	
 	// Loads muzzle flash particle configuration from config and saves it to a map for faster access
 	void LoadParticleConfigOnFire(int id)
@@ -327,7 +375,7 @@ class ItemBase extends InventoryItem
 		string config_to_search = "CfgVehicles";
 		string muzzle_owner_config;
 		
-		if ( !m_OnFireEffect.Contains(id) )
+		if (!m_OnFireEffect.Contains(id))
 		{
 			if (IsInherited(Weapon))
 				config_to_search = "CfgWeapons";	
@@ -340,7 +388,7 @@ class ItemBase extends InventoryItem
 			
 			if (config_OnFire_subclass_count > 0)
 			{
-				ref array<ref WeaponParticlesOnFire> WPOF_array = new array<ref WeaponParticlesOnFire>;
+				array<ref WeaponParticlesOnFire> WPOF_array = new array<ref WeaponParticlesOnFire>;
 				
 				for (int i = 0; i < config_OnFire_subclass_count; i++)
 				{
@@ -356,7 +404,7 @@ class ItemBase extends InventoryItem
 			}
 		}
 		
-		if ( !m_OnBulletCasingEjectEffect.Contains(id) )
+		if (!m_OnBulletCasingEjectEffect.Contains(id))
 		{
 			config_to_search = "CfgWeapons"; // Bullet Eject efect is supported on weapons only.
 			muzzle_owner_config = config_to_search + " " + GetType() + " ";
@@ -367,7 +415,7 @@ class ItemBase extends InventoryItem
 			
 			if (config_OnBulletCasingEject_count > 0  &&  IsInherited(Weapon))
 			{
-				ref array<ref WeaponParticlesOnBulletCasingEject> WPOBE_array = new array<ref WeaponParticlesOnBulletCasingEject>;
+				array<ref WeaponParticlesOnBulletCasingEject> WPOBE_array = new array<ref WeaponParticlesOnBulletCasingEject>;
 				
 				for (i = 0; i < config_OnBulletCasingEject_count; i++)
 				{
@@ -390,7 +438,7 @@ class ItemBase extends InventoryItem
 		if (!m_OnOverheatingEffect)
 			m_OnOverheatingEffect = new map<int, ref array<ref WeaponParticlesOnOverheating>>;
 		
-		if ( !m_OnOverheatingEffect.Contains(id) )
+		if (!m_OnOverheatingEffect.Contains(id))
 		{
 			string config_to_search = "CfgVehicles";
 			
@@ -419,7 +467,7 @@ class ItemBase extends InventoryItem
 				
 				
 				int config_OnOverheating_subclass_count = GetGame().ConfigGetChildrenCount(config_OnOverheating_class);
-				ref array<ref WeaponParticlesOnOverheating> WPOOH_array = new array<ref WeaponParticlesOnOverheating>;
+				array<ref WeaponParticlesOnOverheating> WPOOH_array = new array<ref WeaponParticlesOnOverheating>;
 				
 				for (int i = 0; i < config_OnOverheating_subclass_count; i++)
 				{
@@ -428,7 +476,7 @@ class ItemBase extends InventoryItem
 					string config_OnOverheating_entry = config_OnOverheating_class + particle_class;
 					int  entry_type = GetGame().ConfigGetType(config_OnOverheating_entry);
 					
-					if ( entry_type == CT_CLASS )
+					if (entry_type == CT_CLASS)
 					{
 						WeaponParticlesOnOverheating WPOF = new WeaponParticlesOnOverheating(this, config_OnOverheating_entry);
 						WPOOH_array.Insert(WPOF);
@@ -453,7 +501,7 @@ class ItemBase extends InventoryItem
 			m_OverheatingShots++;
 			
 			if (!m_CheckOverheating)
-					m_CheckOverheating = new Timer( CALL_CATEGORY_SYSTEM );
+					m_CheckOverheating = new Timer(CALL_CATEGORY_SYSTEM);
 			
 			m_CheckOverheating.Stop();
 			m_CheckOverheating.Run(m_OverheatingDecayInterval, this, "OnOverheatingDecay");
@@ -499,7 +547,7 @@ class ItemBase extends InventoryItem
 		else
 		{
 			if (!m_CheckOverheating)
-				m_CheckOverheating = new Timer( CALL_CATEGORY_GAMEPLAY );
+				m_CheckOverheating = new Timer(CALL_CATEGORY_GAMEPLAY);
 			
 			m_CheckOverheating.Stop();
 			m_CheckOverheating.Run(m_OverheatingDecayInterval, this, "OnOverheatingDecay");
@@ -511,13 +559,13 @@ class ItemBase extends InventoryItem
 	void StartOverheating(ItemBase weapon = null, string ammoType = "", ItemBase muzzle_owner = null, ItemBase suppressor = null, string config_to_search = "")
 	{
 		m_IsOverheatingEffectActive = true;
-		ItemBase.PlayOverheatingParticles(this, ammoType, this, suppressor, "CfgWeapons" );
+		ItemBase.PlayOverheatingParticles(this, ammoType, this, suppressor, "CfgWeapons");
 	}
 	
 	void UpdateOverheating(ItemBase weapon = null, string ammoType = "", ItemBase muzzle_owner = null, ItemBase suppressor = null, string config_to_search = "")
 	{
 		KillAllOverheatingParticles();
-		ItemBase.UpdateOverheatingParticles(this, ammoType, this, suppressor, "CfgWeapons" );
+		ItemBase.UpdateOverheatingParticles(this, ammoType, this, suppressor, "CfgWeapons");
 		UpdateAllOverheatingParticles();
 	}
 	
@@ -530,7 +578,7 @@ class ItemBase extends InventoryItem
 	void RegisterOverheatingParticle(Particle p, float min_heat_coef, float max_heat_coef, int particle_id, Object parent, vector local_pos, vector local_ori)
 	{
 		if (!m_OverheatingParticles)
-			m_OverheatingParticles = new array <ref OverheatingParticle>;
+			m_OverheatingParticles = new array<ref OverheatingParticle>;
 		
 		OverheatingParticle OP = new OverheatingParticle();
 		OP.RegisterParticle(p);
@@ -570,7 +618,7 @@ class ItemBase extends InventoryItem
 					if (p)
 					{
 						p.Stop();
-						OP.RegisterParticle(NULL);
+						OP.RegisterParticle(null);
 					}
 				}
 			}
@@ -616,6 +664,11 @@ class ItemBase extends InventoryItem
 		return 250;//default value
 	}
 	
+	float GetFilterDamageRatio() 
+	{
+		return 0;
+	}
+	
 	//! Returns true if this item has a muzzle (weapons, suppressors)
 	bool HasMuzzle()
 	{
@@ -631,9 +684,9 @@ class ItemBase extends InventoryItem
 		if (!m_WeaponTypeToID)
 			m_WeaponTypeToID = new map<string, int>;
 		
-		if ( m_WeaponTypeToID.Contains( GetType() ) )
+		if (m_WeaponTypeToID.Contains(GetType()))
 		{
-			return m_WeaponTypeToID.Get( GetType() );
+			return m_WeaponTypeToID.Get(GetType());
 		}
 		else 
 		{
@@ -657,31 +710,33 @@ class ItemBase extends InventoryItem
 	// -------------------------------------------------------------------------
 	void ~ItemBase()
 	{
-		if( GetGame() && GetGame().GetPlayer() && ( !GetGame().IsMultiplayer() || GetGame().IsClient() ) )
+		if (GetGame() && GetGame().GetPlayer() && (!GetGame().IsDedicatedServer()))
 		{
-			PlayerBase player = PlayerBase.Cast( GetGame().GetPlayer() );
+			PlayerBase player = PlayerBase.Cast(GetGame().GetPlayer());
 			int r_index = player.GetHumanInventory().FindUserReservedLocationIndex(this);
 
-			if(r_index >= 0)
+			if (r_index >= 0)
 			{
 					InventoryLocation r_il = new InventoryLocation;
 					player.GetHumanInventory().GetUserReservedLocation(r_index,r_il);
 
 					player.GetHumanInventory().ClearUserReservedLocationAtIndex(r_index);
 					int r_type = r_il.GetType();
-					if( r_type == InventoryLocationType.CARGO || r_type == InventoryLocationType.PROXYCARGO )
+					if (r_type == InventoryLocationType.CARGO || r_type == InventoryLocationType.PROXYCARGO)
 					{
-						r_il.GetParent().GetOnReleaseLock().Invoke( this );
+						r_il.GetParent().GetOnReleaseLock().Invoke(this);
 					}
-					else if( r_type == InventoryLocationType.ATTACHMENT )
+					else if (r_type == InventoryLocationType.ATTACHMENT)
 					{
-						r_il.GetParent().GetOnAttachmentReleaseLock().Invoke( this, r_il.GetSlot() );
+						r_il.GetParent().GetOnAttachmentReleaseLock().Invoke(this, r_il.GetSlot());
 					}
 			
 			}
 			
-			player.GetHumanInventory().ClearUserReservedLocation( this );
+			player.GetHumanInventory().ClearUserReservedLocation(this);
 		}
+		
+		SEffectManager.DestroyEffect(m_LockingSound);
 	}
 
 	// -------------------------------------------------------------------------
@@ -690,23 +745,51 @@ class ItemBase extends InventoryItem
 		return ItemBase.m_DebugActionsMask;	
 	}
 	
+	static bool HasDebugActionsMask(int mask)
+	{
+		return ItemBase.m_DebugActionsMask & mask;	
+	}
+	
 	static void SetDebugActionsMask(int mask)
 	{
 		ItemBase.m_DebugActionsMask = mask;
 	}
 	
+	static void AddDebugActionsMask(int mask)
+	{
+		ItemBase.m_DebugActionsMask |= mask;
+	}
+	
+	static void RemoveDebugActionsMask(int mask)
+	{
+		ItemBase.m_DebugActionsMask &= ~mask;
+	}
+	
+	static void ToggleDebugActionsMask(int mask)
+	{
+		if (HasDebugActionsMask(mask))
+		{
+			RemoveDebugActionsMask(mask);
+		}
+		else
+		{
+			AddDebugActionsMask(mask);
+		}
+	}
+	
+	// -------------------------------------------------------------------------
 	void SetCEBasedQuantity()
 	{
-		if( GetEconomyProfile() )
+		if (GetEconomyProfile())
 		{
 			float q_min = GetEconomyProfile().GetQuantityMin();
 			float q_max = GetEconomyProfile().GetQuantityMax();
-			if( q_max > 0 )
+			if (q_max > 0)
 			{
 				float quantity_randomized = Math.RandomFloatInclusive(q_min, q_max);
 				//PrintString("<==> Normalized quantity for item: "+ GetType()+", qmin:"+q_min.ToString()+"; qmax:"+q_max.ToString()+";quantity:" +quantity_randomized.ToString());
 					SetQuantityNormalized(quantity_randomized, false);
-				}
+			}
 		}
 	}
 	
@@ -718,8 +801,8 @@ class ItemBase extends InventoryItem
 		if (parent)
 		{
 			InventoryLocation inventory_location_to_lock = new InventoryLocation;
-			GetInventory().GetCurrentInventoryLocation( inventory_location_to_lock );
-			parent.GetInventory().SetSlotLock( inventory_location_to_lock.GetSlot(), true );
+			GetInventory().GetCurrentInventoryLocation(inventory_location_to_lock);
+			parent.GetInventory().SetSlotLock(inventory_location_to_lock.GetSlot(), true);
 		}
 	}
 	
@@ -731,20 +814,20 @@ class ItemBase extends InventoryItem
 		if (parent)
 		{
 			InventoryLocation inventory_location_to_unlock = new InventoryLocation;
-			GetInventory().GetCurrentInventoryLocation( inventory_location_to_unlock );
-			parent.GetInventory().SetSlotLock( inventory_location_to_unlock.GetSlot(), false );
+			GetInventory().GetCurrentInventoryLocation(inventory_location_to_unlock);
+			parent.GetInventory().SetSlotLock(inventory_location_to_unlock.GetSlot(), false);
 		}
 	}
 	
-	override void CombineItemsClient(EntityAI entity2, bool use_stack_max = true )
+	override void CombineItemsClient(EntityAI entity2, bool use_stack_max = true)
 	{
 		/*
 		ref Param1<EntityAI> item = new Param1<EntityAI>(entity2);
-		RPCSingleParam( ERPCs.RPC_ITEM_COMBINE, item, GetGame().GetPlayer() );
+		RPCSingleParam(ERPCs.RPC_ITEM_COMBINE, item, GetGame().GetPlayer());
 		*/
 		ItemBase item2 = ItemBase.Cast(entity2);
 		
-		if ( GetGame().IsClient() )
+		if (GetGame().IsClient())
 		{
 			if (ScriptInputUserData.CanStoreInputUserData())
 			{
@@ -758,16 +841,13 @@ class ItemBase extends InventoryItem
 				ctx.Write(-1);
 				ctx.Send();
 				
-				if ( IsCombineAll(item2, use_stack_max) )
+				if (IsCombineAll(item2, use_stack_max))
 				{
-					InventoryLocation il = new InventoryLocation;
-					item2.GetInventory().GetCurrentInventoryLocation(il);
-					GetGame().GetPlayer().GetInventory().AddInventoryReservationEx(item2,il,GameInventory.c_InventoryReservationTimeoutShortMS);
-					//entity2.GetInventory().GetCurrentInventoryLocation
+					GetGame().GetPlayer().GetInventory().AddInventoryReservationEx(item2,null,GameInventory.c_InventoryReservationTimeoutShortMS);
 				}
 			}
 		}
-		else if ( !GetGame().IsMultiplayer() )
+		else if (!GetGame().IsMultiplayer())
 		{
 			CombineItems(item2, use_stack_max);
 		}
@@ -776,12 +856,12 @@ class ItemBase extends InventoryItem
 	bool IsLiquidPresent()
 	{
 		
-		return ( GetLiquidType() != 0 && HasQuantity() );
+		return (GetLiquidType() != 0 && HasQuantity());
 	}
 	
 	bool IsLiquidContainer()
 	{
-		return ( ConfigGetFloat("liquidContainerType") != 0 );
+		return (ConfigGetFloat("liquidContainerType") != 0);
 	}
 	
 	bool IsBloodContainer()
@@ -794,10 +874,19 @@ class ItemBase extends InventoryItem
 		return false;
 	}
 	
+	//! explosive 
+	//! ------------
 	bool IsExplosive()
 	{
 		return false;
 	}
+	
+	string GetExplosiveTriggerSlotName()
+	{
+		return "";
+	}
+	
+	//! ------------
 	
 	bool IsLightSource()
 	{
@@ -811,12 +900,12 @@ class ItemBase extends InventoryItem
 	
 	//--- ACTION CONDITIONS
 	//direction
-	bool IsFacingPlayer( PlayerBase player, string selection )
+	bool IsFacingPlayer(PlayerBase player, string selection)
 	{
 		return true;
 	}
 	
-	bool IsPlayerInside( PlayerBase player, string selection )
+	bool IsPlayerInside(PlayerBase player, string selection)
 	{
 		return true;
 	}
@@ -831,7 +920,7 @@ class ItemBase extends InventoryItem
 		return m_IsBeingPlaced;
 	}
 	
-	void SetIsBeingPlaced( bool is_being_placed )
+	void SetIsBeingPlaced(bool is_being_placed)
 	{
 		m_IsBeingPlaced = is_being_placed;
 		if (!is_being_placed)
@@ -857,7 +946,7 @@ class ItemBase extends InventoryItem
 		return false;
 	}
 	
-	void SetIsHologram( bool is_hologram )
+	void SetIsHologram(bool is_hologram)
 	{
 		m_IsHologram = is_hologram;
 		SetSynchDirty();
@@ -865,31 +954,31 @@ class ItemBase extends InventoryItem
 	/*
 	protected float GetNutritionalEnergy()
 	{
-		Edible_Base edible = Edible_Base.Cast( this );
+		Edible_Base edible = Edible_Base.Cast(this);
 		return edible.GetFoodEnergy();
 	}
 	
 	protected float GetNutritionalWaterContent()
 	{
-		Edible_Base edible = Edible_Base.Cast( this );
+		Edible_Base edible = Edible_Base.Cast(this);
 		return edible.GetFoodWater();
 	}
 	
 	protected float GetNutritionalIndex()
 	{
-		Edible_Base edible = Edible_Base.Cast( this );
+		Edible_Base edible = Edible_Base.Cast(this);
 		return edible.GetFoodNutritionalIndex();
 	}
 	
 	protected float GetNutritionalFullnessIndex()
 	{
-		Edible_Base edible = Edible_Base.Cast( this );
+		Edible_Base edible = Edible_Base.Cast(this);
 		return edible.GetFoodTotalVolume();
 	}
 	
 	protected float GetNutritionalToxicity()
 	{
-		Edible_Base edible = Edible_Base.Cast( this );
+		Edible_Base edible = Edible_Base.Cast(this);
 		return edible.GetFoodToxicity();
 
 	}
@@ -909,23 +998,11 @@ class ItemBase extends InventoryItem
 		PlayerBase new_player = null;
 		PlayerBase old_player = null;
 		
-		if ( newLoc.GetParent() )
+		if (newLoc.GetParent())
 			new_player = PlayerBase.Cast(newLoc.GetParent().GetHierarchyRootPlayer());
 		
-		if ( oldLoc.GetParent() )
+		if (oldLoc.GetParent())
 			old_player = PlayerBase.Cast(oldLoc.GetParent().GetHierarchyRootPlayer());
-		
-		/*if ( old_player )
-			old_player.UpdateQuickBarEntityVisibility(this);*/
-		
-		/*if ( old_player != new_player )
-		{
-			if ( old_player )
-				old_player.SetEnableQuickBarEntityShortcut(this, false);
-			
-			if ( new_player )
-				new_player.SetEnableQuickBarEntityShortcut(this, true);
-		}*/
 		
 		if (old_player && oldLoc.GetType() == InventoryLocationType.HANDS)
 		{
@@ -938,18 +1015,16 @@ class ItemBase extends InventoryItem
 
 					old_player.GetHumanInventory().ClearUserReservedLocationAtIndex(r_index);
 					int r_type = r_il.GetType();
-					if ( r_type == InventoryLocationType.CARGO || r_type == InventoryLocationType.PROXYCARGO )
+					if (r_type == InventoryLocationType.CARGO || r_type == InventoryLocationType.PROXYCARGO)
 					{
-						r_il.GetParent().GetOnReleaseLock().Invoke( this );
+						r_il.GetParent().GetOnReleaseLock().Invoke(this);
 					}
-					else if ( r_type == InventoryLocationType.ATTACHMENT )
+					else if (r_type == InventoryLocationType.ATTACHMENT)
 					{
-						r_il.GetParent().GetOnAttachmentReleaseLock().Invoke( this, r_il.GetSlot() );
+						r_il.GetParent().GetOnAttachmentReleaseLock().Invoke(this, r_il.GetSlot());
 					}
 			
 			}
-			//old_player.GetHumanInventory().ClearUserReservedLocation(this);
-			//GetOnReleaseLock().Invoke(this);
 		}
 		
 		if (newLoc.GetType() == InventoryLocationType.HANDS)
@@ -959,21 +1034,32 @@ class ItemBase extends InventoryItem
 			
 			if (new_player == old_player)
 			{
-				if ( oldLoc.GetParent() && !(oldLoc.GetParent() != new_player && oldLoc.GetType() == InventoryLocationType.ATTACHMENT) && new_player.GetHumanInventory().LocationGetEntity(oldLoc) == NULL )
+				
+				if (oldLoc.GetParent() && !(oldLoc.GetParent() != new_player && oldLoc.GetType() == InventoryLocationType.ATTACHMENT) && new_player.GetHumanInventory().LocationGetEntity(oldLoc) == NULL)
 				{
-					new_player.GetHumanInventory().SetUserReservedLocation(this,oldLoc);
+					if (oldLoc.GetType() == InventoryLocationType.CARGO)
+					{
+						if (oldLoc.GetParent().GetInventory().TestAddEntityInCargoExLoc(oldLoc, false, false, false, true, false, false))
+						{
+							new_player.GetHumanInventory().SetUserReservedLocation(this,oldLoc);
+						}
+					}
+					else
+					{
+						new_player.GetHumanInventory().SetUserReservedLocation(this,oldLoc);
+					}
 				}
 				
-				if ( new_player.GetHumanInventory().FindUserReservedLocationIndex( this ) >= 0 )
+				if (new_player.GetHumanInventory().FindUserReservedLocationIndex(this) >= 0)
 				{
 					int type = oldLoc.GetType();
-					if ( type == InventoryLocationType.CARGO || type == InventoryLocationType.PROXYCARGO )
+					if (type == InventoryLocationType.CARGO || type == InventoryLocationType.PROXYCARGO)
 					{
-						oldLoc.GetParent().GetOnSetLock().Invoke( this );
+						oldLoc.GetParent().GetOnSetLock().Invoke(this);
 					}
-					else if ( type == InventoryLocationType.ATTACHMENT )
+					else if (type == InventoryLocationType.ATTACHMENT)
 					{
-						oldLoc.GetParent().GetOnAttachmentSetLock().Invoke( this, oldLoc.GetSlot() );
+						oldLoc.GetParent().GetOnAttachmentSetLock().Invoke(this, oldLoc.GetSlot());
 					}
 				}
 				if (!m_OldLocation)
@@ -996,7 +1082,7 @@ class ItemBase extends InventoryItem
 		{
 			if (new_player)
 			{
-				int res_index = new_player.GetHumanInventory().FindCollidingUserReservedLocationIndex(this, newLoc );
+				int res_index = new_player.GetHumanInventory().FindCollidingUserReservedLocationIndex(this, newLoc);
 				if (res_index >= 0)
 				{
 					InventoryLocation il = new InventoryLocation;
@@ -1004,13 +1090,13 @@ class ItemBase extends InventoryItem
 					ItemBase it = ItemBase.Cast(il.GetItem());
 					new_player.GetHumanInventory().ClearUserReservedLocationAtIndex(res_index);
 					int rel_type = il.GetType();
-					if ( rel_type == InventoryLocationType.CARGO || rel_type == InventoryLocationType.PROXYCARGO )
+					if (rel_type == InventoryLocationType.CARGO || rel_type == InventoryLocationType.PROXYCARGO)
 					{
-						il.GetParent().GetOnReleaseLock().Invoke( it );
+						il.GetParent().GetOnReleaseLock().Invoke(it);
 					}
-					else if ( rel_type == InventoryLocationType.ATTACHMENT )
+					else if (rel_type == InventoryLocationType.ATTACHMENT)
 					{
-						il.GetParent().GetOnAttachmentReleaseLock().Invoke( it, il.GetSlot() );
+						il.GetParent().GetOnAttachmentReleaseLock().Invoke(it, il.GetSlot());
 					}
 					//it.GetOnReleaseLock().Invoke(it);
 				}
@@ -1031,7 +1117,24 @@ class ItemBase extends InventoryItem
 	
 	override void EOnContact(IEntity other, Contact extra)
 	{
-		/*if (m_ItemBeingDroppedPhys)
+		if (m_CanPlayImpactSound)
+		{
+			int liquidType = -1;
+			float impactSpeed = ProcessImpactSoundEx(other, extra, m_ConfigWeight, m_ImpactSoundSurfaceHash, liquidType);
+			if (impactSpeed > 0.0)
+			{
+				m_ImpactSpeed  = impactSpeed;
+				#ifndef SERVER
+				PlayImpactSound(m_ConfigWeight, m_ImpactSpeed, m_ImpactSoundSurfaceHash);
+				#else
+				m_WantPlayImpactSound = true;
+				SetSynchDirty();
+				#endif
+				m_CanPlayImpactSound = (liquidType == -1);// prevents further playing of the sound when the surface is a liquid type
+			}
+		}
+				
+/*		if (m_ItemBeingDroppedPhys)
 		{
 			Print("ItemBase | EOnContact");
 			SetDynamicPhysicsLifeTime(0.5);
@@ -1056,7 +1159,7 @@ class ItemBase extends InventoryItem
 	
 	override void OnCreatePhysics()
 	{
-		if ( m_ItemBeingDroppedPhys )
+		if (m_ItemBeingDroppedPhys)
 		{
 			//GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater(StopItemDynamicPhysics,3000);
 			
@@ -1097,29 +1200,29 @@ class ItemBase extends InventoryItem
 		{
 			if (old_owner.IsMan())
 			{
-				owner_player_old = Man.Cast( old_owner );
+				owner_player_old = Man.Cast(old_owner);
 			}
 			else
 			{
-				owner_player_old = Man.Cast( old_owner.GetHierarchyRootPlayer() );
+				owner_player_old = Man.Cast(old_owner.GetHierarchyRootPlayer());
 			}
 		}
 		
 		if (new_owner)
 		{
-			if ( new_owner.IsMan() )
+			if (new_owner.IsMan())
 			{
-				owner_player_new = Man.Cast( new_owner );
+				owner_player_new = Man.Cast(new_owner);
 			}
 			else
 			{
-				owner_player_new = Man.Cast( new_owner.GetHierarchyRootPlayer() );
+				owner_player_new = Man.Cast(new_owner.GetHierarchyRootPlayer());
 			}
 		}
 		
-		if ( owner_player_old != owner_player_new )
+		if (owner_player_old != owner_player_new)
 		{
-			if ( owner_player_old )
+			if (owner_player_old)
 			{
 				array<EntityAI> subItemsExit = new array<EntityAI>;
 				GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER,subItemsExit);
@@ -1130,7 +1233,7 @@ class ItemBase extends InventoryItem
 				}
 			}
 
-			if ( owner_player_new )
+			if (owner_player_new)
 			{
 				array<EntityAI> subItemsEnter = new array<EntityAI>;
 				GetInventory().EnumerateInventory(InventoryTraversalType.PREORDER,subItemsEnter);
@@ -1151,86 +1254,83 @@ class ItemBase extends InventoryItem
 	override void EEDelete(EntityAI parent)
 	{
 		super.EEDelete(parent);
-		PlayerBase player = PlayerBase.Cast( GetHierarchyRootPlayer() );
-		if(player)
+		PlayerBase player = PlayerBase.Cast(GetHierarchyRootPlayer());
+		if (player)
 		{
 			OnInventoryExit(player);
 			
-			if(player.IsAlive())
+			if (player.IsAlive())
 			{
 				int r_index = player.GetHumanInventory().FindUserReservedLocationIndex(this);
-				if(r_index >= 0 )
+				if (r_index >= 0)
 				{			
 					InventoryLocation r_il = new InventoryLocation;
 					player.GetHumanInventory().GetUserReservedLocation(r_index,r_il);
 	
 					player.GetHumanInventory().ClearUserReservedLocationAtIndex(r_index);
 					int r_type = r_il.GetType();
-					if( r_type == InventoryLocationType.CARGO || r_type == InventoryLocationType.PROXYCARGO )
+					if (r_type == InventoryLocationType.CARGO || r_type == InventoryLocationType.PROXYCARGO)
 					{
-						r_il.GetParent().GetOnReleaseLock().Invoke( this );
+						r_il.GetParent().GetOnReleaseLock().Invoke(this);
 					}
-					else if( r_type == InventoryLocationType.ATTACHMENT )
+					else if (r_type == InventoryLocationType.ATTACHMENT)
 					{
-						r_il.GetParent().GetOnAttachmentReleaseLock().Invoke( this, r_il.GetSlot() );
+						r_il.GetParent().GetOnAttachmentReleaseLock().Invoke(this, r_il.GetSlot());
 					}
 				
 				}
 				
 				player.RemoveQuickBarEntityShortcut(this);
 			}
-			
 		}
 	}
 	// -------------------------------------------------------------------------------
-	override void EEKilled( Object killer)
+	override void EEKilled(Object killer)
 	{
-		super.EEKilled( killer );
-		
-		//if item is able to explode in fire
-		if ( CanExplodeInFire() )
+		super.EEKilled(killer);
+
+		//! item is able to explode in fire
+		if (killer && killer.IsFireplace() && CanExplodeInFire())
 		{
-			float min_temp_to_explode	= 100;		//min temperature for item to explode
-			
-			if ( GetTemperature() >= min_temp_to_explode )		//TODO ? add check for parent -> fireplace
+			if (GetTemperature() >= GameConstants.ITEM_TEMPERATURE_TO_EXPLODE_MIN)
 			{
-				if ( IsMagazine() )
+				if (IsMagazine())
 				{
-					Magazine magazine = Magazine.Cast( this );					
-					
-					//explode ammo
-					if ( magazine.GetAmmoCount() > 0 )
+					if (Magazine.Cast(this).GetAmmoCount() > 0)
 					{
 						ExplodeAmmo();
 					}
 				}
 				else
 				{
-					//explode item
-					Explode(DT_EXPLOSION);
+					Explode(DamageType.EXPLOSION);
 				}
 			}
 		}
 	}
-	override void OnWasAttached( EntityAI parent, int slot_id )
+	override void OnWasAttached(EntityAI parent, int slot_id)
 	{
-		if ( HasQuantity() )
-			UpdateNetSyncVariableFloat( "m_VarQuantity", GetQuantityMin(), m_VarQuantityMax );
+		super.OnWasAttached(parent, slot_id);
+		
+		if (HasQuantity())
+			UpdateNetSyncVariableFloat("m_VarQuantity", GetQuantityMin(), m_VarQuantityMax);
 		
 		PlayAttachSound(InventorySlots.GetSlotName(slot_id));
 	}
 	
-	override void OnWasDetached( EntityAI parent, int slot_id )
+	override void OnWasDetached(EntityAI parent, int slot_id)
 	{
-		if ( HasQuantity() )
-			UpdateNetSyncVariableFloat( "m_VarQuantity", GetQuantityMin(), m_VarQuantityMax );
+		super.OnWasDetached(parent, slot_id);
+		
+		if (HasQuantity())
+			UpdateNetSyncVariableFloat("m_VarQuantity", GetQuantityMin(), m_VarQuantityMax);
 		
 		//PlayDetachSound(InventorySlots.GetSlotName(slot_id));
 		
 		PlayerBase player = PlayerBase.Cast(parent);
 		if (player)
 		{
-			if ( !GetGame().IsServer() )
+			if (!GetGame().IsServer())
 				return;
 		}
 	}
@@ -1301,34 +1401,34 @@ class ItemBase extends InventoryItem
 	void ExplodeAmmo()
 	{
 		//timer
-		ref Timer explode_timer = new Timer( CALL_CATEGORY_SYSTEM );
+		ref Timer explode_timer = new Timer(CALL_CATEGORY_SYSTEM);
 		
 		//min/max time
 		float min_time = 1;
 		float max_time = 3;
-		float delay = Math.RandomFloat( min_time, max_time );
+		float delay = Math.RandomFloat(min_time, max_time);
 		
-		explode_timer.Run( delay, this, "DoAmmoExplosion" );
+		explode_timer.Run(delay, this, "DoAmmoExplosion");
 	}
 	
 	void DoAmmoExplosion()
 	{
-		Magazine magazine = Magazine.Cast( this );
+		Magazine magazine = Magazine.Cast(this);
 		int pop_sounds_count = 6;
 		string pop_sounds[ 6 ] = { "ammopops_1","ammopops_2","ammopops_3","ammopops_4","ammopops_5","ammopops_6" };
 		
 		//play sound
-		int sound_idx = Math.RandomInt( 0, pop_sounds_count - 1 );
+		int sound_idx = Math.RandomInt(0, pop_sounds_count - 1);
 		string sound_name = pop_sounds[ sound_idx ];
-		GetGame().CreateSoundOnObject( this, sound_name, 20, false );
+		GetGame().CreateSoundOnObject(this, sound_name, 20, false);
 		
 		//remove ammo count
-		magazine.ServerAddAmmoCount( -1 );
+		magazine.ServerAddAmmoCount(-1);
 		
 		//if condition then repeat -> ExplodeAmmo
 		float min_temp_to_explode	= 100;		//min temperature for item to explode
 				
-		if ( magazine.GetAmmoCount() > 0 && GetTemperature() >= min_temp_to_explode )	//TODO ? add check for parent -> fireplace
+		if (magazine.GetAmmoCount() > 0 && GetTemperature() >= min_temp_to_explode)	//TODO ? add check for parent -> fireplace
 		{
 			ExplodeAmmo();
 		}
@@ -1343,7 +1443,7 @@ class ItemBase extends InventoryItem
 		const int CHANCE_DAMAGE_ATTACHMENT = 1;
 		const int CHANCE_DAMAGE_NOTHING = 2;
 		
-		if ( IsClothing() || IsContainer() )
+		if (IsClothing() || IsContainer() || IsItemTent())
 		{
 			float dmg = damageResult.GetDamage("","Health") * -0.5;
 			int chances;
@@ -1358,7 +1458,7 @@ class ItemBase extends InventoryItem
 				{
 					DamageItemInCargo(dmg);
 				}
-				else if (rnd < (chances - CHANCE_DAMAGE_NOTHING) )
+				else if (rnd < (chances - CHANCE_DAMAGE_NOTHING))
 				{
 					DamageItemAttachments(dmg);
 				}
@@ -1378,13 +1478,13 @@ class ItemBase extends InventoryItem
 	
 	bool DamageItemInCargo(float damage)
 	{
-		if ( GetInventory().GetCargo() )
+		if (GetInventory().GetCargo())
 		{
 			int item_count = GetInventory().GetCargo().GetItemCount();
-			if ( item_count > 0 )
+			if (item_count > 0)
 			{
 				int random_pick = Math.RandomInt(0, item_count);
-				ItemBase item = ItemBase.Cast( GetInventory().GetCargo().GetItem(random_pick) );
+				ItemBase item = ItemBase.Cast(GetInventory().GetCargo().GetItem(random_pick));
 				if (!item.IsExplosive())
 				{
 					item.AddHealth("","",damage);
@@ -1398,10 +1498,10 @@ class ItemBase extends InventoryItem
 	bool DamageItemAttachments(float damage)
 	{
 		int attachment_count = GetInventory().AttachmentCount();
-		if ( attachment_count > 0 )
+		if (attachment_count > 0)
 		{
 			int random_pick = Math.RandomInt(0, attachment_count);
-			ItemBase attachment = ItemBase.Cast( GetInventory().GetAttachmentFromIndex(random_pick));
+			ItemBase attachment = ItemBase.Cast(GetInventory().GetAttachmentFromIndex(random_pick));
 			if (!attachment.IsExplosive())
 			{
 				attachment.AddHealth("","",damage);
@@ -1412,17 +1512,17 @@ class ItemBase extends InventoryItem
 	}
 	
 	//----------------
-	bool CanBeSplit()
+	override bool CanBeSplit()
 	{
-		if ( m_CanThisBeSplit )
-			return ( GetQuantity() > 1 );
+		if (m_CanThisBeSplit)
+			return (GetQuantity() > 1);
 		
 		return false;
 	}
 	
-	void SplitIntoStackMaxClient( EntityAI destination_entity, int slot_id  )
+	void SplitIntoStackMaxClient(EntityAI destination_entity, int slot_id )
 	{
-		if( GetGame().IsClient() )
+		if (GetGame().IsClient())
 		{
 			if (ScriptInputUserData.CanStoreInputUserData())
 			{
@@ -1437,13 +1537,13 @@ class ItemBase extends InventoryItem
 				ctx.Send();
 			}
 		}
-		else if( !GetGame().IsMultiplayer() )
+		else if (!GetGame().IsMultiplayer())
 		{
-			SplitIntoStackMax( destination_entity, slot_id, PlayerBase.Cast( GetGame().GetPlayer() ) );
+			SplitIntoStackMax(destination_entity, slot_id, PlayerBase.Cast(GetGame().GetPlayer()));
 		}
 	}
 
-	void SplitIntoStackMax( EntityAI destination_entity, int slot_id, PlayerBase player )
+	void SplitIntoStackMax(EntityAI destination_entity, int slot_id, PlayerBase player)
 	{
 		float split_quantity_new;
 		ref ItemBase new_item;
@@ -1451,75 +1551,78 @@ class ItemBase extends InventoryItem
 		float stack_max = GetTargetQuantityMax(slot_id);
 		InventoryLocation loc = new InventoryLocation;
 		
-		if ( destination_entity && slot_id != -1 && InventorySlots.IsSlotIdValid( slot_id ) )
+		if (destination_entity && slot_id != -1 && InventorySlots.IsSlotIdValid(slot_id))
 		{
-			if ( stack_max <= GetQuantity() )
+			if (stack_max <= GetQuantity())
 				split_quantity_new = stack_max;
 			else
 				split_quantity_new = GetQuantity();
-			
-			new_item = ItemBase.Cast( destination_entity.GetInventory().CreateAttachmentEx( this.GetType(), slot_id ) );
-			if ( new_item )
-			{			
-				MiscGameplayFunctions.TransferItemProperties( this, new_item );
-				AddQuantity( -split_quantity_new );
-				new_item.SetQuantity( split_quantity_new );
+
+			new_item = ItemBase.Cast(destination_entity.GetInventory().CreateAttachmentEx(this.GetType(), slot_id));
+			if (new_item)
+			{
+				new_item.SetResultOfSplit(true);
+				MiscGameplayFunctions.TransferItemProperties(this, new_item);
+				AddQuantity(-split_quantity_new);
+				new_item.SetQuantity(split_quantity_new);
 			}
 		}
-		else if ( destination_entity && slot_id == -1 )
+		else if (destination_entity && slot_id == -1)
 		{
-			if ( quantity > stack_max )
+			if (quantity > stack_max)
 				split_quantity_new = stack_max;
 			else
 				split_quantity_new = quantity;
 			
-			if (destination_entity.GetInventory().FindFreeLocationFor( this, FindInventoryLocationType.ANY, loc ))
+			if (destination_entity.GetInventory().FindFreeLocationFor(this, FindInventoryLocationType.ANY, loc))
 			{
-				Object o = destination_entity.GetInventory().LocationCreateEntity( loc, GetType(), ECE_IN_INVENTORY, RF_DEFAULT );
-				new_item = ItemBase.Cast( o );
+				Object o = destination_entity.GetInventory().LocationCreateEntity(loc, GetType(), ECE_IN_INVENTORY, RF_DEFAULT);
+				new_item = ItemBase.Cast(o);
 			}
 
-			if ( new_item )
-			{			
-				MiscGameplayFunctions.TransferItemProperties( this, new_item );
-				AddQuantity( -split_quantity_new );
-				new_item.SetQuantity( split_quantity_new );
+			if (new_item)
+			{
+				new_item.SetResultOfSplit(true);		
+				MiscGameplayFunctions.TransferItemProperties(this, new_item);
+				AddQuantity(-split_quantity_new);
+				new_item.SetQuantity(split_quantity_new);
 			}
 		}
 		else
 		{
-			if ( stack_max != 0 )
+			if (stack_max != 0)
 			{
-				if ( stack_max < GetQuantity() )
+				if (stack_max < GetQuantity())
 				{
 					split_quantity_new = GetQuantity() - stack_max;
 				}
 				
-				if ( split_quantity_new == 0 )
+				if (split_quantity_new == 0)
 				{
-					if ( !GetGame().IsMultiplayer() )
-						player.PhysicalPredictiveDropItem( this );
+					if (!GetGame().IsMultiplayer())
+						player.PhysicalPredictiveDropItem(this);
 					else
-						player.ServerDropEntity( this );
+						player.ServerDropEntity(this);
 					return;
 				}
 				
-					new_item = ItemBase.Cast( GetGame().CreateObjectEx( GetType(), player.GetWorldPosition(), ECE_PLACE_ON_SURFACE ) );
+				new_item = ItemBase.Cast(GetGame().CreateObjectEx(GetType(), player.GetWorldPosition(), ECE_PLACE_ON_SURFACE));
 				
-				if ( new_item )
+				if (new_item)
 				{
-					MiscGameplayFunctions.TransferItemProperties( this, new_item );
-					SetQuantity( split_quantity_new );
-					new_item.SetQuantity( stack_max );
+					new_item.SetResultOfSplit(true);
+					MiscGameplayFunctions.TransferItemProperties(this, new_item);
+					SetQuantity(split_quantity_new);
+					new_item.SetQuantity(stack_max);
 					new_item.PlaceOnSurface();
 				}
 			}
 		}
 	}
 	
-	void SplitIntoStackMaxToInventoryLocationClient( notnull InventoryLocation dst )
+	void SplitIntoStackMaxToInventoryLocationClient(notnull InventoryLocation dst)
 	{
-		if ( GetGame().IsClient() )
+		if (GetGame().IsClient())
 		{
 			if (ScriptInputUserData.CanStoreInputUserData())
 			{
@@ -1532,15 +1635,15 @@ class ItemBase extends InventoryItem
 				ctx.Send();
 			}
 		}
-		else if ( !GetGame().IsMultiplayer() )
+		else if (!GetGame().IsMultiplayer())
 		{
-			SplitIntoStackMaxToInventoryLocation( dst );
+			SplitIntoStackMaxToInventoryLocation(dst);
 		}
 	}
 	
-	void SplitIntoStackMaxCargoClient( EntityAI destination_entity, int idx, int row, int col )
+	void SplitIntoStackMaxCargoClient(EntityAI destination_entity, int idx, int row, int col)
 	{
-		if( GetGame().IsClient() )
+		if (GetGame().IsClient())
 		{
 			if (ScriptInputUserData.CanStoreInputUserData())
 			{
@@ -1557,39 +1660,40 @@ class ItemBase extends InventoryItem
 				ctx.Send();
 			}
 		}
-		else if( !GetGame().IsMultiplayer() )
+		else if (!GetGame().IsMultiplayer())
 		{
-			SplitIntoStackMaxCargo( destination_entity, idx, row, col );
+			SplitIntoStackMaxCargo(destination_entity, idx, row, col);
 		}
 	}
 
-	void SplitIntoStackMaxToInventoryLocation( notnull InventoryLocation dst )
+	void SplitIntoStackMaxToInventoryLocation(notnull InventoryLocation dst)
 	{
-		SplitIntoStackMaxToInventoryLocationEx( dst );
+		SplitIntoStackMaxToInventoryLocationEx(dst);
 	}
 	
-	ItemBase SplitIntoStackMaxToInventoryLocationEx( notnull InventoryLocation dst )
+	ItemBase SplitIntoStackMaxToInventoryLocationEx(notnull InventoryLocation dst)
 	{
 		float quantity = GetQuantity();
 		float split_quantity_new;
-		ref ItemBase new_item;
-		if ( dst.IsValid() )
+		ItemBase new_item;
+		if (dst.IsValid())
 		{
 			int slot_id = dst.GetSlot();
 			float stack_max = GetTargetQuantityMax(slot_id);
 			
-			if ( quantity > stack_max )
+			if (quantity > stack_max)
 				split_quantity_new = stack_max;
 			else
 				split_quantity_new = quantity;
 			
-			new_item = ItemBase.Cast( GameInventory.LocationCreateEntity( dst, this.GetType(), ECE_IN_INVENTORY, RF_DEFAULT ) );
+			new_item = ItemBase.Cast(GameInventory.LocationCreateEntity(dst, this.GetType(), ECE_IN_INVENTORY, RF_DEFAULT));
 			
-			if ( new_item )
-			{			
+			if (new_item)
+			{
+				new_item.SetResultOfSplit(true);
 				MiscGameplayFunctions.TransferItemProperties(this,new_item);
-				AddQuantity( -split_quantity_new );
-				new_item.SetQuantity( split_quantity_new );
+				AddQuantity(-split_quantity_new);
+				new_item.SetQuantity(split_quantity_new);
 			}
 			
 			return new_item;
@@ -1598,32 +1702,33 @@ class ItemBase extends InventoryItem
 		return null;
 	}
 	
-	void SplitIntoStackMaxCargo( EntityAI destination_entity, int idx, int row, int col )
+	void SplitIntoStackMaxCargo(EntityAI destination_entity, int idx, int row, int col)
 	{
 		float quantity = GetQuantity();
 		float split_quantity_new;
 		ref ItemBase new_item;
-		if( destination_entity )
+		if (destination_entity)
 		{
 			float stackable = GetTargetQuantityMax();
-			if( quantity > stackable )
+			if (quantity > stackable)
 				split_quantity_new = stackable;
 			else
 				split_quantity_new = quantity;
 			
-			new_item = ItemBase.Cast( destination_entity.GetInventory().CreateEntityInCargoEx( this.GetType(), idx, row, col, false ) );
-			if( new_item )
-			{			
+			new_item = ItemBase.Cast(destination_entity.GetInventory().CreateEntityInCargoEx(this.GetType(), idx, row, col, false));
+			if (new_item)
+			{
+				new_item.SetResultOfSplit(true);	
 				MiscGameplayFunctions.TransferItemProperties(this,new_item);
-				AddQuantity( -split_quantity_new );
-				new_item.SetQuantity( split_quantity_new );
+				AddQuantity(-split_quantity_new);
+				new_item.SetQuantity(split_quantity_new);
 			}
 		}
 	}
 	
-	void SplitIntoStackMaxHandsClient( PlayerBase player )
+	void SplitIntoStackMaxHandsClient(PlayerBase player)
 	{
-		if( GetGame().IsClient() )
+		if (GetGame().IsClient())
 		{
 			if (ScriptInputUserData.CanStoreInputUserData())
 			{
@@ -1639,55 +1744,55 @@ class ItemBase extends InventoryItem
 				ctx.Send();
 			}
 		}
-		else if( !GetGame().IsMultiplayer() )
+		else if (!GetGame().IsMultiplayer())
 		{
-			SplitIntoStackMaxHands( player );
+			SplitIntoStackMaxHands(player);
 		}
 	}
 
-	void SplitIntoStackMaxHands( PlayerBase player )
+	void SplitIntoStackMaxHands(PlayerBase player)
 	{
 		float quantity = GetQuantity();
 		float split_quantity_new;
 		ref ItemBase new_item;
-		if( player )
+		if (player)
 		{
 			float stackable = GetTargetQuantityMax();
-			if( quantity > stackable )
+			if (quantity > stackable)
 				split_quantity_new = stackable;
 			else
 				split_quantity_new = quantity;
 			
 			EntityAI in_hands = player.GetHumanInventory().CreateInHands(this.GetType());
 			new_item = ItemBase.Cast(in_hands);
-			if( new_item )
-			{			
+			if (new_item)
+			{		
+				new_item.SetResultOfSplit(true);
 				MiscGameplayFunctions.TransferItemProperties(this,new_item);
-				AddQuantity( -split_quantity_new );
-				new_item.SetQuantity( split_quantity_new );
+				AddQuantity(-split_quantity_new);
+				new_item.SetQuantity(split_quantity_new);
 			}
 		}
 	}
 	
-	void SplitItemToInventoryLocation( notnull InventoryLocation dst )
+	void SplitItemToInventoryLocation(notnull InventoryLocation dst)
 	{
-		if ( !CanBeSplit() )
+		if (!CanBeSplit())
 			return;
 		
 		float quantity = GetQuantity();
-		float split_quantity_new = Math.Floor( quantity * 0.5 );
+		float split_quantity_new = Math.Floor(quantity * 0.5);
 		
-		ItemBase new_item = ItemBase.Cast( GameInventory.LocationCreateEntity( dst, GetType(), ECE_IN_INVENTORY, RF_DEFAULT ) );
-		
+		ItemBase new_item = ItemBase.Cast(GameInventory.LocationCreateEntity(dst, GetType(), ECE_IN_INVENTORY, RF_DEFAULT));
 
-		
-		if ( new_item )
+		if (new_item)
 		{
 			if (new_item.GetQuantityMax() < split_quantity_new)
 			{
 				split_quantity_new = new_item.GetQuantityMax();
 			}
 			
+			new_item.SetResultOfSplit(true);
 			MiscGameplayFunctions.TransferItemProperties(this, new_item);
 			
 			if (dst.IsValid() && dst.GetType() == InventoryLocationType.ATTACHMENT && split_quantity_new > 1)
@@ -1698,30 +1803,28 @@ class ItemBase extends InventoryItem
 			else
 			{
 				AddQuantity(-split_quantity_new);
-				new_item.SetQuantity( split_quantity_new );				
+				new_item.SetQuantity(split_quantity_new);				
 			}
 		}	
 	}
 	
-	void SplitItem( PlayerBase player )
+	void SplitItem(PlayerBase player)
 	{
-		if ( !CanBeSplit() )
+		if (!CanBeSplit())
 		{
 			return;
 		}
 		
 		float quantity = GetQuantity();
-		float split_quantity_new = Math.Floor( quantity / 2 );
+		float split_quantity_new = Math.Floor(quantity / 2);
 		
 		InventoryLocation invloc = new InventoryLocation;
 		bool found = player.GetInventory().FindFirstFreeLocationForNewEntity(GetType(), FindInventoryLocationType.ATTACHMENT, invloc);
 		
 		ItemBase new_item;
-		new_item = player.CreateCopyOfItemInInventoryOrGround(this);
+		new_item = player.CreateCopyOfItemInInventoryOrGroundEx(this, true);
 		
-
-		
-		if( new_item )
+		if (new_item)
 		{
 			if (new_item.GetQuantityMax() < split_quantity_new)
 			{
@@ -1735,7 +1838,7 @@ class ItemBase extends InventoryItem
 			else
 			{
 				AddQuantity(-split_quantity_new);
-				new_item.SetQuantity( split_quantity_new );
+				new_item.SetQuantity(split_quantity_new);
 			}
 		}
 	}
@@ -1743,66 +1846,83 @@ class ItemBase extends InventoryItem
 	//! Called on server side when this item's quantity is changed. Call super.OnQuantityChanged(); first when overriding this event.
 	void OnQuantityChanged(float delta)
 	{
-		ItemBase parent = ItemBase.Cast( GetHierarchyParent() );
+		SetWeightDirty();
+		ItemBase parent = ItemBase.Cast(GetHierarchyParent());
 		
 		if (parent)
 		{
-			parent.OnAttachmentQuantityChanged(this);
-		}
-		
-		if (m_CanThisBeSplit && delta > 0 && GetUnitWeight(false) != -1)
-		{
-			UpdateWeight(WeightUpdateType.RECURSIVE_ADD, GetUnitWeight(false) * delta);
-		}
-		else if (m_CanThisBeSplit && delta < 0 && GetUnitWeight(false) != -1)
-		{
-			UpdateWeight(WeightUpdateType.RECURSIVE_REMOVE, -GetUnitWeight(false) * delta);
-		}
-		else
-		{
-			UpdateWeight();
+			parent.OnAttachmentQuantityChangedEx(this, delta);
 		}
 	}
 	
 	//! Called on server side when some attachment's quantity is changed. Call super.OnAttachmentQuantityChanged(item); first when overriding this event.
-	void OnAttachmentQuantityChanged( ItemBase item )
+	void OnAttachmentQuantityChanged(ItemBase item)
 	{
 		// insert code here
 	}
 	
-	
+	//! Called on server side when some attachment's quantity is changed. Call super.OnAttachmentQuantityChanged(item); first when overriding this event.
+	void OnAttachmentQuantityChangedEx(ItemBase item , float delta)
+	{
+		OnAttachmentQuantityChanged(item);
+	}
+
 	override void EEHealthLevelChanged(int oldLevel, int newLevel, string zone)
 	{
 		super.EEHealthLevelChanged(oldLevel,newLevel,zone);
 		
-		if ( GetGame().IsServer())
+		if (GetGame().IsServer())
 		{
-			if ( m_Cleanness != 0 && oldLevel < newLevel && newLevel != 0 )
+			if (newLevel == GameConstants.STATE_RUINED)
+			{
+				//! drops content of container when ruined in fireplace
+				EntityAI parent = GetHierarchyParent();
+				if (parent && parent.IsFireplace())
+				{
+					CargoBase cargo = GetInventory().GetCargo();
+					if (cargo)
+					{
+						for (int i = 0; i < cargo.GetItemCount(); ++i)
+						{
+							parent.GetInventory().TakeEntityToInventory(InventoryMode.SERVER, FindInventoryLocationType.CARGO, cargo.GetItem(i));
+						}
+					}
+				}
+			}
+			
+			if (IsResultOfSplit())
+			{
+				// reset the splitting result flag, return to normal item behavior
+				SetResultOfSplit(false);
+				return;
+			}
+
+			if (m_Cleanness != 0 && oldLevel < newLevel && newLevel != 0)
 			{
 				SetCleanness(0);//unclean the item upon damage dealt
 			}
 		}
 	}
 		
-	
+	// just the split? TODO: verify
 	override void OnRightClick()
 	{
 		super.OnRightClick();
 		
-		if ( CanBeSplit() && !GetDayZGame().IsLeftCtrlDown() && !GetGame().GetPlayer().GetInventory().HasInventoryReservation(this,null) )
+		if (CanBeSplit() && !GetDayZGame().IsLeftCtrlDown() && !GetGame().GetPlayer().GetInventory().HasInventoryReservation(this,null))
 		{
-			if ( GetGame().IsClient() )
+			if (GetGame().IsClient())
 			{
-				if ( ScriptInputUserData.CanStoreInputUserData() )
+				if (ScriptInputUserData.CanStoreInputUserData())
 				{
 					vector m4[4];
-					PlayerBase player = PlayerBase.Cast( GetGame().GetPlayer() );
+					PlayerBase player = PlayerBase.Cast(GetGame().GetPlayer());
+					
+					EntityAI root = GetHierarchyRoot();
 					
 					InventoryLocation dst = new InventoryLocation;
-					if ( !player.GetInventory().FindFirstFreeLocationForNewEntity(GetType(), FindInventoryLocationType.CARGO, dst) )
-					{
-						EntityAI root = GetHierarchyRoot();
-						
+					if (!player.GetInventory().FindFirstFreeLocationForNewEntity(GetType(), FindInventoryLocationType.CARGO, dst))
+					{						
 						if (root)
 						{
 							root.GetTransform(m4);
@@ -1813,15 +1933,20 @@ class ItemBase extends InventoryItem
 					}
 					else
 					{
-						dst.SetCargo( dst.GetParent(), this, dst.GetIdx(), dst.GetRow(), dst.GetCol(), dst.GetFlip());
-						if ( GetGame().GetPlayer().GetInventory().HasInventoryReservation( null, dst) )
+						dst.SetCargo(dst.GetParent(), this, dst.GetIdx(), dst.GetRow(), dst.GetCol(), dst.GetFlip());
+						if (GetGame().GetPlayer().GetInventory().HasInventoryReservation(null, dst))
 						{
-							root.GetTransform(m4);
-							dst.SetGround(this, m4);
+							if (root)
+							{
+								root.GetTransform(m4);
+								dst.SetGround(this, m4);
+							}
+							else
+								GetInventory().GetCurrentInventoryLocation(dst);
 						}
 						else
 						{
-							GetGame().GetPlayer().GetInventory().AddInventoryReservationEx( null, dst, GameInventory.c_InventoryReservationTimeoutShortMS);
+							GetGame().GetPlayer().GetInventory().AddInventoryReservationEx(null, dst, GameInventory.c_InventoryReservationTimeoutShortMS);
 						}
 					}
 					
@@ -1835,40 +1960,40 @@ class ItemBase extends InventoryItem
 					ctx.Send();
 				}
 			}
-			else if ( !GetGame().IsMultiplayer() )
+			else if (!GetGame().IsMultiplayer())
 			{
-				SplitItem( PlayerBase.Cast( GetGame().GetPlayer() ) );
+				SplitItem(PlayerBase.Cast(GetGame().GetPlayer()));
 			}
 		}
 	}
 	
-	override bool CanBeCombined( EntityAI other_item, bool reservation_check = true, bool stack_max_limit = false )
+	override bool CanBeCombined(EntityAI other_item, bool reservation_check = true, bool stack_max_limit = false)
 	{
-//S		Print("CanBeCombined - " + this + ": " + GetQuantity() + " + " + other_item + ": " + other_item.GetQuantity());
+		//Print("CanBeCombined - " + this + ": " + GetQuantity() + " + " + other_item + ": " + other_item.GetQuantity());
 		//TODO: delete check zero quantity check after fix double posts hands fsm events
-		if ( !other_item || GetType() != other_item.GetType() || (IsFullQuantity() && other_item.GetQuantity() > 0) || other_item == this)
+		if (!other_item || GetType() != other_item.GetType() || (IsFullQuantity() && other_item.GetQuantity() > 0) || other_item == this)
 			return false;
 
-		if ( GetHealthLevel() == GameConstants.STATE_RUINED || other_item.GetHealthLevel() == GameConstants.STATE_RUINED )	
+		if (GetHealthLevel() == GameConstants.STATE_RUINED || other_item.GetHealthLevel() == GameConstants.STATE_RUINED)	
 			return false;
 		
 		//can_this_be_combined = ConfigGetBool("canBeSplit");
-		if ( !can_this_be_combined )
+		if (!can_this_be_combined)
 			return false;
 
 		
 		Magazine mag = Magazine.Cast(this);
 		if (mag)
 		{
-			if ( mag.GetAmmoCount() >= mag.GetAmmoMax())
+			if (mag.GetAmmoCount() >= mag.GetAmmoMax())
 				return false;
 			
-			if(stack_max_limit)
+			if (stack_max_limit)
 			{
 				Magazine other_mag = Magazine.Cast(other_item);
-				if(other_item)
+				if (other_item)
 				{
-					if(mag.GetAmmoCount() + other_mag.GetAmmoCount() > mag.GetAmmoMax())
+					if (mag.GetAmmoCount() + other_mag.GetAmmoCount() > mag.GetAmmoMax())
 						return false;
 				}
 			
@@ -1877,7 +2002,7 @@ class ItemBase extends InventoryItem
 		else
 		{
 			//TODO: delete check zero quantity check after fix double posts hands fsm events
-			if ( GetQuantity() >= GetQuantityMax() && other_item.GetQuantity() > 0  )	
+			if (GetQuantity() >= GetQuantityMax() && other_item.GetQuantity() > 0 )	
 				return false;
 			
 			if (stack_max_limit && (GetQuantity() + other_item.GetQuantity()  > GetQuantityMax()))
@@ -1885,32 +2010,47 @@ class ItemBase extends InventoryItem
 		}
 
 		PlayerBase player = null;
-		if ( CastTo( player, GetHierarchyRootPlayer() ) ) //false when attached to player's attachment slot
+		if (CastTo(player, GetHierarchyRootPlayer())) //false when attached to player's attachment slot
 		{
-			if ( player.GetInventory().HasAttachment( this ) )
+			if (player.GetInventory().HasAttachment(this))
 				return false;
 			
-			if ( player.IsItemsToDelete())
+			if (player.IsItemsToDelete())
 				return false;
 		}
 
-		if ( reservation_check && (GetInventory().HasInventoryReservation( this, null ) || other_item.GetInventory().HasInventoryReservation( other_item, null )))
+		if (reservation_check && (GetInventory().HasInventoryReservation(this, null) || other_item.GetInventory().HasInventoryReservation(other_item, null)))
+			return false;
+		
+		int slotID;
+		string slotName;
+		if (GetInventory().GetCurrentAttachmentSlotInfo(slotID,slotName) && GetHierarchyParent().GetInventory().GetSlotLock(slotID))
 			return false;
 
 		return true;
 	}
 	
-	bool IsCombineAll( ItemBase other_item, bool use_stack_max = false )
+	bool IsCombineAll(ItemBase other_item, bool use_stack_max = false)
 	{
-		return ComputeQuantityUsed( other_item, use_stack_max ) == other_item.GetQuantity();
+		return ComputeQuantityUsed(other_item, use_stack_max) == other_item.GetQuantity();
 	}
 	
-	int ComputeQuantityUsed( ItemBase other_item, bool use_stack_max = true )
+	bool IsResultOfSplit()
+	{
+		return m_IsResultOfSplit;
+	}
+	
+	void SetResultOfSplit(bool value)
+	{
+		m_IsResultOfSplit = value;
+	}
+	
+	int ComputeQuantityUsed(ItemBase other_item, bool use_stack_max = true)
 	{
 		return ComputeQuantityUsedEx(other_item, use_stack_max);
 	}
 	
-	float ComputeQuantityUsedEx( ItemBase other_item, bool use_stack_max = true )
+	float ComputeQuantityUsedEx(ItemBase other_item, bool use_stack_max = true)
 	{
 		float other_item_quantity = other_item.GetQuantity();
 		float this_free_space;
@@ -1919,7 +2059,7 @@ class ItemBase extends InventoryItem
 		
 		this_free_space = stack_max - GetQuantity();
 			
-		if( other_item_quantity > this_free_space )
+		if (other_item_quantity > this_free_space)
 		{
 			return this_free_space;
 		}
@@ -1929,24 +2069,24 @@ class ItemBase extends InventoryItem
 		}
 	}
 	
-	void CombineItems( ItemBase other_item, bool use_stack_max = true )
+	void CombineItems(ItemBase other_item, bool use_stack_max = true)
 	{
-		if( !CanBeCombined(other_item, false) )
+		if (!CanBeCombined(other_item, false))
 			return;
 		
-		if( !IsMagazine() && other_item )
+		if (!IsMagazine() && other_item)
 		{
 			float quantity_used = ComputeQuantityUsedEx(other_item,use_stack_max);
-			if( quantity_used != 0 )
+			if (quantity_used != 0)
 			{
 				float hp1 = GetHealth01("","");
 				float hp2 = other_item.GetHealth01("","");
 				float hpResult = ((hp1*GetQuantity()) + (hp2*quantity_used));
-				hpResult = hpResult / ( GetQuantity() + quantity_used );
+				hpResult = hpResult / (GetQuantity() + quantity_used);
 
 				hpResult *= GetMaxHealth();
-				Math.Round( hpResult );
-				SetHealth("", "Health", hpResult );
+				Math.Round(hpResult);
+				SetHealth("", "Health", hpResult);
 
 				AddQuantity(quantity_used);
 				other_item.AddQuantity(-quantity_used);
@@ -1954,94 +2094,94 @@ class ItemBase extends InventoryItem
 		}
 		OnCombine(other_item);
 	}
-	
-	
-	void OnCombine(ItemBase other_item)
+
+	void OnCombine(ItemBase other_item);
+
+	void GetRecipesActions(Man player, out TSelectableActionInfoArray outputList)
 	{
-		
-	}
-	// -------------------------------------------------------------------------
-	// Mirek: whole user action system moved to script
-	// -------------------------------------------------------------------------	
-	void GetRecipesActions( Man player, out TSelectableActionInfoArray outputList )
-	{
-		PlayerBase p = PlayerBase.Cast( player );
+		PlayerBase p = PlayerBase.Cast(player);
 			
-		array<int> recipes_ids = p.m_Recipes;
-		PluginRecipesManager module_recipes_manager = PluginRecipesManager.Cast( GetPlugin(PluginRecipesManager) );
-		if( module_recipes_manager )
+		array<int> recipesIds = p.m_Recipes;
+		PluginRecipesManager moduleRecipesManager = PluginRecipesManager.Cast(GetPlugin(PluginRecipesManager));
+		if (moduleRecipesManager)
 		{
-			EntityAI item_in_hands = player.GetHumanInventory().GetEntityInHands();
-			module_recipes_manager.GetValidRecipes( ItemBase.Cast( this ), ItemBase.Cast( item_in_hands ),recipes_ids, PlayerBase.Cast( player ) );
+			EntityAI itemInHands = player.GetHumanInventory().GetEntityInHands();
+			moduleRecipesManager.GetValidRecipes(ItemBase.Cast(this), ItemBase.Cast(itemInHands), recipesIds, p);
 		}
-		for(int i = 0;i < recipes_ids.Count();i++)
+
+		for (int i = 0;i < recipesIds.Count(); i++)
 		{
-			int key = recipes_ids.Get(i);
-			string recipe_name = module_recipes_manager.GetRecipeName(key);
-			outputList.Insert( new TSelectableActionInfo( SAT_CRAFTING, key, recipe_name ) );
+			int key = recipesIds.Get(i);
+			string recipeName = moduleRecipesManager.GetRecipeName(key);
+			outputList.Insert(new TSelectableActionInfo(SAT_CRAFTING, key, recipeName));
 		}
 	}
 	
 	// -------------------------------------------------------------------------	
-	void GetDebugActions(out TSelectableActionInfoArray outputList)
+	void GetDebugActions(out TSelectableActionInfoArrayEx outputList)
 	{
 		//weight
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.GET_TOTAL_WEIGHT, "Print Weight"));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.GET_TOTAL_WEIGHT, "Print Weight", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.GET_TOTAL_WEIGHT_RECALC, "Print Weight Verbose", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.GET_PLAYER_WEIGHT, "Print Player Weight", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.GET_PLAYER_WEIGHT_RECALC, "Print Player Weight Verbose", FadeColors.LIGHT_GREY));
 		
 		//quantity
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.REMOVE_QUANTITY, "Quantity -20%"));
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.ADD_QUANTITY, "Quantity +20%"));
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.SET_QUANTITY_0, "Set Quantity 0"));
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.SET_MAX_QUANTITY, "Set Quantity Max"));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.ADD_QUANTITY, "Quantity +20%", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.REMOVE_QUANTITY, "Quantity -20%", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.SET_QUANTITY_0, "Set Quantity 0", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.SET_MAX_QUANTITY, "Set Quantity Max", FadeColors.LIGHT_GREY));
 		
 		//health
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.ADD_HEALTH, "Health +20%"));
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.REMOVE_HEALTH, "Health -20%"));
-
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.ADD_HEALTH, "Health +20%", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.REMOVE_HEALTH, "Health -20%", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.DESTROY_HEALTH, "Health 0", FadeColors.LIGHT_GREY));
 		//temperature
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.ADD_TEMPERATURE, "Temperature +20"));
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.REMOVE_TEMPERATURE, "Temperature -20"));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.ADD_TEMPERATURE, "Temperature +20", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.REMOVE_TEMPERATURE, "Temperature -20", FadeColors.LIGHT_GREY));
 		
 		//wet
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.ADD_WETNESS, "Wetness +20"));
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.REMOVE_WETNESS, "Wetness -20"));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.ADD_WETNESS, "Wetness +20", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.REMOVE_WETNESS, "Wetness -20", FadeColors.LIGHT_GREY));
 
 		//liquidtype
-		if( IsLiquidContainer() )
+		if (IsLiquidContainer())
 		{
-			outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.LIQUIDTYPE_UP, "LiquidType Next"));
-			outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.LIQUIDTYPE_DOWN, "LiquidType Previous"));
+			outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.LIQUIDTYPE_UP, "LiquidType Next", FadeColors.LIGHT_GREY));
+			outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.LIQUIDTYPE_DOWN, "LiquidType Previous", FadeColors.LIGHT_GREY));
 		}
 		
-		//strings
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.INJECT_STRING_TIGER, "Inject String Tiger"));
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.INJECT_STRING_RABBIT, "Inject String Rabbit"));
-		
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.SPIN, "Spin"));
-		
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.MAKE_SPECIAL, "Make Special", FadeColors.LIGHT_GREY));
 		// watch
-		outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.WATCH_ITEM, "Watch"));
-
-		// print bullets
-		//outputList.Insert(new TSelectableActionInfo(SAT_DEBUG_ACTION, EActions.PRINT_BULLETS, "Print Bullets"));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.WATCH_ITEM, "Watch", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.WATCH_PLAYER, "Watch Player", FadeColors.LIGHT_GREY));
 		
-		//ctx.AddAction("ShowID",USE_ENUM_HERE,NULL,2000,false,false);
-		//ctx.AddAction("Predend Consume",USE_ENUM_HERE,NULL, 1011,false,false);
-		//ctx.AddAction("IsEmpty",USE_ENUM_HERE,NULL, 1012,false,false);
-		//ctx.AddAction("HasAnyCargo",USE_ENUM_HERE,NULL, 1013,false,false);
-		//ctx.AddAction("LightOn",USE_ENUM_HERE,NULL, 1013,false,false);
-		//ctx.AddAction("Set Health 200", USE_ENUM_HERE, NULL, 1003, false, false);
-		//ctx.AddAction("PrintQuantityMax", USE_ENUM_HERE, NULL, 1000, false, false);
-		//ctx.AddAction("Print Classname", USE_ENUM_HERE, NULL, 1000, false, false);
-		//ctx.AddAction("Has In Cargo", USE_ENUM_HERE, NULL, 1000, false, false);
-		//ctx.AddAction("Print Health(new)", USE_ENUM_HERE, NULL, 1000, false, false);
-		//ctx.AddAction("Quantity -1", USE_ENUM_HERE, NULL, 1004, false, false);
-		//ctx.AddAction("IsMagazine", USE_ENUM_HERE, NULL, 1005, false, false);
-		//ctx.AddAction("Ammo +1", USE_ENUM_HERE, NULL, 1006, false, false);
-		//ctx.AddAction("Set Health 1", USE_ENUM_HERE, NULL, 1002, false, false);
-		//ctx.AddAction("Ammo -1", USE_ENUM_HERE, NULL, 1007, false, false);
-		//ctx.AddAction("Ammo SetMax", USE_ENUM_HERE, NULL, 1008, false, false);
-		//ctx.AddAction("LightOff",USE_ENUM_HERE,NULL, 1022,false,false);
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.SEPARATOR, "", FadeColors.RED));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.DELETE, "Delete", FadeColors.RED));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.SEPARATOR, "", FadeColors.RED));
+
+		string button1, button2, button3, button4;
+		GetDebugButtonNames(button1, button2, button3, button4);
+		
+		if (button1)
+		{
+			outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.DEBUG_ITEM_WATCH_BUTTON_RANGE_START, button1, FadeColors.LIGHT_GREY));
+		}
+
+		if (button2)
+		{
+			outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.DEBUG_ITEM_WATCH_BUTTON_RANGE_START+1, button2, FadeColors.LIGHT_GREY));
+		}
+
+		if (button3)
+		{
+			outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.DEBUG_ITEM_WATCH_BUTTON_RANGE_START+2, button3, FadeColors.LIGHT_GREY));
+		}
+
+		if (button4)
+		{
+			outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.DEBUG_ITEM_WATCH_BUTTON_RANGE_START+3, button4, FadeColors.LIGHT_GREY));
+		}
 	}
 	
 	// -------------------------------------------------------------------------	
@@ -2051,193 +2191,189 @@ class ItemBase extends InventoryItem
 	{
 		if (action_id >= EActions.RECIPES_RANGE_START && action_id < EActions.RECIPES_RANGE_END)
 		{
-			PluginRecipesManager plugin_recipes_manager = PluginRecipesManager.Cast( GetPlugin(PluginRecipesManager) );
+			PluginRecipesManager plugin_recipes_manager = PluginRecipesManager.Cast(GetPlugin(PluginRecipesManager));
 			int idWithoutOffset = action_id - EActions.RECIPES_RANGE_START;
-			PlayerBase p = PlayerBase.Cast( player );
-			if ( EActions.RECIPES_RANGE_START  < 1000 )
+			PlayerBase p = PlayerBase.Cast(player);
+			if (EActions.RECIPES_RANGE_START  < 1000)
 			{
 				float anim_length = plugin_recipes_manager.GetRecipeLengthInSecs(idWithoutOffset);
 				float specialty_weight = plugin_recipes_manager.GetRecipeSpecialty(idWithoutOffset);
-				//p.SetUpCrafting( idWithoutOffset, this, player.GetHierarchyRootPlayer().GetHumanInventory().GetEntityInHands(),anim_length, specialty_weight);
-			}
-			else//this part is for the [DEBUG] actions
-			{
-				//plugin_recipes_manager.PerformRecipeClientRequest( idWithoutOffset, this, player.GetHierarchyRootPlayer().GetHumanInventory().GetEntityInHands() );
 			}
 		}
-		
-		if ( GetGame().IsServer() )
+		else if (action_id == EActions.GET_TOTAL_WEIGHT) //Prints total weight of item + its contents
 		{
-			if (action_id >= EActions.DEBUG_AGENTS_RANGE_INJECT_START && action_id < EActions.DEBUG_AGENTS_RANGE_INJECT_END)
+			WeightDebug.ClearWeightDebug();
+			#ifndef SERVER
+			Debug.Log("======================== "+  GetType() +" =================================");
+			#endif
+			Debug.Log("Weight:" + GetWeightEx().ToString());
+			Debug.Log("Weight excluding cargo and attachments:" + GetSingleInventoryItemWeightEx());
+			Debug.Log("----------------------------------------------------------------------------------------------");
+		}
+		else if (action_id == EActions.GET_TOTAL_WEIGHT_RECALC) //Prints total weight of item + its contents
+		{
+			WeightDebug.ClearWeightDebug();
+			WeightDebug.SetVerbosityFlags(WeightDebugType.RECALC_FORCED);
+			#ifndef SERVER
+			Debug.Log("======================== "+  GetType() +" RECALC ===========================");
+			#endif
+			Debug.Log("Weight:" + GetWeightEx(true).ToString());
+			Debug.Log("Weight excluding cargo and attachments:" + GetSingleInventoryItemWeightEx());
+			WeightDebug.PrintAll(this);
+			Debug.Log("----------------------------------------------------------------------------------------------");
+			WeightDebug.SetVerbosityFlags(0);
+		}
+		else if (action_id == EActions.GET_PLAYER_WEIGHT) //Prints total weight of item + its contents
+		{
+			WeightDebug.ClearWeightDebug();
+			#ifndef SERVER
+			Debug.Log("======================== PLAYER: "+player+" ===========================");
+			#endif
+			Debug.Log("New overall weight Player:"+player.GetWeightEx().ToString());
+
+			Debug.Log("----------------------------------------------------------------------------------------------");
+		}
+		else if (action_id == EActions.GET_PLAYER_WEIGHT_RECALC) //Prints total weight of item + its contents
+		{
+			WeightDebug.ClearWeightDebug();
+			WeightDebug.SetVerbosityFlags(WeightDebugType.RECALC_FORCED);
+			#ifndef SERVER
+			Debug.Log("======================== PLAYER RECALC: "+player+" ===========================");
+			#endif
+			Debug.Log("New overall weight Player:"+player.GetWeightEx(true).ToString());
+			WeightDebug.PrintAll(player);
+			Debug.Log("----------------------------------------------------------------------------------------------");
+			WeightDebug.SetVerbosityFlags(0);
+		}
+		#ifndef SERVER
+		else if (action_id == EActions.WATCH_PLAYER)
+		{
+			PluginDeveloper.SetDeveloperItemClientEx(player);
+		}
+		#endif
+		if (GetGame().IsServer())
+		{
+			if (action_id >= EActions.DEBUG_ITEM_WATCH_BUTTON_RANGE_START && action_id < EActions.DEBUG_ITEM_WATCH_BUTTON_RANGE_END)
+			{
+				int id = action_id - EActions.DEBUG_ITEM_WATCH_BUTTON_RANGE_START;
+				OnDebugButtonPressServer(id + 1);
+			}
+			
+			else if (action_id >= EActions.DEBUG_AGENTS_RANGE_INJECT_START && action_id < EActions.DEBUG_AGENTS_RANGE_INJECT_END)
 			{
 				int agent_id = action_id - EActions.DEBUG_AGENTS_RANGE_INJECT_START;
 				InsertAgent(agent_id,100);
 			}
 	
-			if (action_id >= EActions.DEBUG_AGENTS_RANGE_REMOVE_START && action_id < EActions.DEBUG_AGENTS_RANGE_REMOVE_END)
+			else if (action_id >= EActions.DEBUG_AGENTS_RANGE_REMOVE_START && action_id < EActions.DEBUG_AGENTS_RANGE_REMOVE_END)
 			{
 				int agent_id2 = action_id - EActions.DEBUG_AGENTS_RANGE_REMOVE_START;
 				RemoveAgent(agent_id2);
 			}
 			
-			if ( action_id == EActions.ADD_QUANTITY )
+			else if (action_id == EActions.ADD_QUANTITY)
 			{
-				if(IsMagazine())
+				if (IsMagazine())
 				{
 					Magazine mag = Magazine.Cast(this);
-					mag.ServerSetAmmoCount( mag.GetAmmoCount() + mag.GetAmmoMax() * 0.2 );
+					mag.ServerSetAmmoCount(mag.GetAmmoCount() + mag.GetAmmoMax() * 0.2);
 				}
 				else
 				{
 					AddQuantity(GetQuantityMax() * 0.2);
 				}
 				
-				if ( m_EM )
+				if (m_EM)
 				{
 					m_EM.AddEnergy(m_EM.GetEnergyMax() * 0.2);
 				}
 				//PrintVariables();
 			}
 						
-			if ( action_id == EActions.REMOVE_QUANTITY ) //Quantity -20%
+			else if (action_id == EActions.REMOVE_QUANTITY) //Quantity -20%
 			{
-				if(IsMagazine())
+				if (IsMagazine())
 				{
 					Magazine mag2 = Magazine.Cast(this);
-					mag2.ServerSetAmmoCount( mag2.GetAmmoCount() - mag2.GetAmmoMax() * 0.2 );
+					mag2.ServerSetAmmoCount(mag2.GetAmmoCount() - mag2.GetAmmoMax() * 0.2);
 				}
 				else
 				{
 					AddQuantity(- GetQuantityMax() * 0.2);
 				}
-				if ( m_EM )
+				if (m_EM)
 				{
 					m_EM.AddEnergy(- m_EM.GetEnergyMax() * 0.2);
 				}
 				//PrintVariables();
 			}
 			
-			if ( action_id == EActions.SET_QUANTITY_0 ) //SetMaxQuantity
+			else if (action_id == EActions.SET_QUANTITY_0) //SetMaxQuantity
 			{
 				SetQuantity(0);
 				
-				if ( m_EM )
+				if (m_EM)
 				{
 					m_EM.SetEnergy(0);
 				}
 			}
 			
-			if ( action_id == EActions.SET_MAX_QUANTITY ) //SetMaxQuantity
+			else if (action_id == EActions.SET_MAX_QUANTITY) //SetMaxQuantity
 			{
 				SetQuantityMax();
 				
-				if ( m_EM )
+				if (m_EM)
 				{
 					m_EM.SetEnergy(m_EM.GetEnergyMax());
 				}
 			}
-			
-			if ( action_id == EActions.GET_TOTAL_WEIGHT ) //Prints total weight of item + its contents
-			{
-				Print(GetWeight());
-			}
 	
-			/*
-			if( action_id == EActions.INJECT_STRING_TIGER ) 
+			else if (action_id == EActions.ADD_HEALTH) 
 			{
-				SetItemVariableString("varNote", "The tiger (Panthera tigris) is the largest cat species, most recognisable for their pattern of dark vertical stripes on reddish-orange fur with a lighter underside. The largest tigers have reached a total body length of up to 3.38 m (11.1 ft) over curves and have weighed up to 388.7 kg (857 lb) in the wild. The species is classified in the genus Panthera with the lion, leopard, jaguar and snow leopard. Tigers are apex predators, primarily preying on ungulates such as deer and bovids. They are territorial and generally solitary but social animals, often requiring large contiguous areas of habitat that support their prey requirements. This, coupled with the fact that they are indigenous to some of the more densely populated places on Earth, has caused significant conflicts with humans.");
+				AddHealth("","",GetMaxHealth("","Health")/5);
 			}
-			if( action_id == EActions.INJECT_STRING_RABBIT ) 
+			else if (action_id == EActions.REMOVE_HEALTH) 
 			{
-				SetItemVariableString("varNote", "Rabbits are small mammals in the family Leporidae of the order Lagomorpha, found in several parts of the world. There are eight different genera in the family classified as rabbits, including the European rabbit (Oryctolagus cuniculus), cottontail rabbits (genus Sylvilagus; 13 species), and the Amami rabbit (Pentalagus furnessi, an endangered species on Amami ?shima, Japan). There are many other species of rabbit, and these, along with pikas and hares, make up the order Lagomorpha. The male is called a buck and the female is a doe; a young rabbit is a kitten or kit.");
+				AddHealth("","",-GetMaxHealth("","Health")/5);
 			}
-			*/
-	
-			if ( action_id == EActions.ADD_HEALTH ) 
+			else if (action_id == EActions.DESTROY_HEALTH) 
 			{
-				this.AddHealth("","",GetMaxHealth("","Health")/5);
+				SetHealth01("","",0);
 			}
-			if ( action_id == EActions.REMOVE_HEALTH ) 
+			else if (action_id == EActions.WATCH_ITEM)
 			{
-				this.AddHealth("","",-GetMaxHealth("","Health")/5);
-			}
-			
-			if ( action_id == EActions.SPIN ) //SetMaxQuantity
-			{
-				
-				Magnum_Cylinder cylinder = Magnum_Cylinder.Cast(GetAttachmentByType(Magnum_Cylinder));
-				Magnum_Ejector ejector = Magnum_Ejector.Cast(GetAttachmentByType(Magnum_Ejector));
-		
-		//Magnum_Base magnum = Magnum_Base.Cast(m_weapon);
-		
-		//Magazine mag = m_weapon.GetMagazine(0);
-				if (cylinder)
-				{
-					float a  = cylinder.GetAnimationPhase("Rotate_Cylinder");
-					if (a + 0.167 > 1.0)
-					{
-						Print("-----RESET-----");
-						a -= 1.0;
-						cylinder.ResetAnimationPhase("Rotate_Cylinder", a );
-						ejector.ResetAnimationPhase("Rotate_Ejector", a );
-						
-					}
-					a += 0.167;
-					Print(a);
-					cylinder.SetAnimationPhase("Rotate_Cylinder", a );
-					ejector.ResetAnimationPhase("Rotate_Ejector", a );
-				}
-				/*Weapon_Base wpn = Weapon_Base.Cast(this);
-				if(wpn)
-				{
-					Magazine mag = wpn.GetMagazine(0);
-					if(mag)
-					{
-						float a  = mag.GetAnimationPhase("rotate");
-						a += 0.3;
-						if(a > 1.0)
-							a -= 1.0;
-						mag.SetAnimationPhase("rotate", a );
-					
-					}
-				}*/
-				
-				/*if(a > 1.0)
-					a -= 1.0;
-				SetAnimationPhase("cylinder_rotate", a + 0.2);*/
+				PluginItemDiagnostic mid = PluginItemDiagnostic.Cast(GetPlugin(PluginItemDiagnostic));
+				mid.RegisterDebugItem(ItemBase.Cast(this), PlayerBase.Cast(player));
+				#ifdef DEVELOPER
+				SetDebugDeveloper_item(this);
+				#endif
 			}
 			
-			if ( action_id == EActions.WATCH_ITEM ) //SetMaxQuantity
-			{
-				PluginItemDiagnostic mid = PluginItemDiagnostic.Cast( GetPlugin(PluginItemDiagnostic) );
-				mid.RegisterDebugItem( ItemBase.Cast( this ), PlayerBase.Cast( player ));
-			}
-			
-			if ( action_id == EActions.ADD_TEMPERATURE )
+			else if (action_id == EActions.ADD_TEMPERATURE)
 			{
 				AddTemperature(20);
 				//PrintVariables();
 			}
 			
-			if ( action_id == EActions.REMOVE_TEMPERATURE )
+			else if (action_id == EActions.REMOVE_TEMPERATURE)
 			{
 				AddTemperature(-20);
 				//PrintVariables();
 			}
 			
-			if ( action_id == EActions.ADD_WETNESS )
+			else if (action_id == EActions.ADD_WETNESS)
 			{
 				AddWet(GetWetMax()/5);
 				//PrintVariables();
 			}
 			
-			if ( action_id == EActions.REMOVE_WETNESS )
+			else if (action_id == EActions.REMOVE_WETNESS)
 			{
 				AddWet(-GetWetMax()/5);
 				//PrintVariables();
 			}
 	
-			if ( action_id == EActions.LIQUIDTYPE_UP )
+			else if (action_id == EActions.LIQUIDTYPE_UP)
 			{
 				int curr_type = GetLiquidType();
 				SetLiquidType(curr_type * 2);
@@ -2245,27 +2381,22 @@ class ItemBase extends InventoryItem
 				//PrintVariables();
 			}
 			
-			if ( action_id == EActions.LIQUIDTYPE_DOWN )
+			else if (action_id == EActions.LIQUIDTYPE_DOWN)
 			{
 				int curr_type2 = GetLiquidType();
 				SetLiquidType(curr_type2 / 2);
 			}
 
-			if ( action_id == EActions.PRINT_BULLETS )
+			else if (action_id == EActions.MAKE_SPECIAL)
 			{
-				if ( IsMagazine() )
-				{
-					Magazine this_mag;
-					Class.CastTo(this_mag, this);
-					for (int i = 0; i < this_mag.GetAmmoCount(); i++)
-					{
-						float damage;
-						string class_name;
-						this_mag.GetCartridgeAtIndex(i, damage, class_name);
-						PrintString("Bullet: " + class_name +", " + "Damage: "+ damage.ToString() );
-					}					
-				}
+				OnDebugSpawn();
 			}
+			
+			else if (action_id == EActions.DELETE)
+			{
+				Delete();
+			}
+			
 		}
 
 		
@@ -2275,11 +2406,12 @@ class ItemBase extends InventoryItem
 	// -------------------------------------------------------------------------
 	
 	
+	//! DEPRECATED use OnActivatedByItem below
 	//! Called when this item is activated from a trip wire that was stepped on.
-	void OnActivatedByTripWire()
-	{
-		// Override this method for Trip Wire functionality
-	}
+	void OnActivatedByTripWire();
+	
+	//! Called when this item is activated by other
+	void OnActivatedByItem(notnull ItemBase item);
 
 	//----------------------------------------------------------------
 	//returns true if item is able to explode when put in fire
@@ -2305,7 +2437,7 @@ class ItemBase extends InventoryItem
 	bool HasFoodStage()
 	{
 		string config_path = string.Format("CfgVehicles %1 Food FoodStages", GetType());
-		return GetGame().ConfigIsExisting( config_path );
+		return GetGame().ConfigIsExisting(config_path);
 	}
 	
 	bool CanBeCooked()
@@ -2321,14 +2453,14 @@ class ItemBase extends InventoryItem
 	//----------------------------------------------------------------
 	bool CanRepair(ItemBase item_repair_kit)
 	{
-		PluginRepairing module_repairing = PluginRepairing.Cast( GetPlugin(PluginRepairing) );
+		PluginRepairing module_repairing = PluginRepairing.Cast(GetPlugin(PluginRepairing));
 		return module_repairing.CanRepair(this, item_repair_kit);
 	}
 
 	//----------------------------------------------------------------
 	bool Repair(PlayerBase player, ItemBase item_repair_kit, float specialty_weight)
 	{
-		PluginRepairing module_repairing = PluginRepairing.Cast( GetPlugin(PluginRepairing) );
+		PluginRepairing module_repairing = PluginRepairing.Cast(GetPlugin(PluginRepairing));
 		return module_repairing.Repair(player, this, item_repair_kit, specialty_weight);
 	}
 
@@ -2368,13 +2500,13 @@ class ItemBase extends InventoryItem
 			item_stone.MessageToOwnerStatus("Some Status Message");
 		@endcode
 	*/
-	void MessageToOwnerStatus( string text )
+	void MessageToOwnerStatus(string text)
 	{
-		PlayerBase player = PlayerBase.Cast( this.GetHierarchyRootPlayer() );
+		PlayerBase player = PlayerBase.Cast(this.GetHierarchyRootPlayer());
 		
-		if ( player )
+		if (player)
 		{
-			player.MessageStatus( text );
+			player.MessageStatus(text);
 		}
 	}
 
@@ -2386,13 +2518,13 @@ class ItemBase extends InventoryItem
 			item_stone.MessageToOwnerAction("Some Action Message");
 		@endcode
 	*/
-	void MessageToOwnerAction( string text )
+	void MessageToOwnerAction(string text)
 	{
-		PlayerBase player = PlayerBase.Cast( this.GetHierarchyRootPlayer() );
+		PlayerBase player = PlayerBase.Cast(this.GetHierarchyRootPlayer());
 		
-		if ( player )
+		if (player)
 		{
-			player.MessageAction( text );
+			player.MessageAction(text);
 		}
 	}
 
@@ -2404,13 +2536,13 @@ class ItemBase extends InventoryItem
 			item_stone.MessageToOwnerFriendly("Some Friendly Message");
 		@endcode
 	*/
-	void MessageToOwnerFriendly( string text )
+	void MessageToOwnerFriendly(string text)
 	{
-		PlayerBase player = PlayerBase.Cast( this.GetHierarchyRootPlayer() );
+		PlayerBase player = PlayerBase.Cast(this.GetHierarchyRootPlayer());
 		
-		if ( player )
+		if (player)
 		{
-			player.MessageFriendly( text );
+			player.MessageFriendly(text);
 		}
 	}
 
@@ -2422,13 +2554,13 @@ class ItemBase extends InventoryItem
 			item_stone.MessageToOwnerImportant("Some Important Message");
 		@endcode
 	*/
-	void MessageToOwnerImportant( string text )
+	void MessageToOwnerImportant(string text)
 	{
-		PlayerBase player = PlayerBase.Cast( this.GetHierarchyRootPlayer() );
+		PlayerBase player = PlayerBase.Cast(this.GetHierarchyRootPlayer());
 		
-		if ( player )
+		if (player)
 		{
-			player.MessageImportant( text );
+			player.MessageImportant(text);
 		}
 	}
 
@@ -2438,7 +2570,7 @@ class ItemBase extends InventoryItem
 	}
 
 	// Checks if item is of questioned kind
-	override bool KindOf( string tag )
+	override bool KindOf(string tag)
 	{
 		bool found = false;
 		string item_name = this.GetType();
@@ -2448,7 +2580,7 @@ class ItemBase extends InventoryItem
 		int array_size = item_tag_array.Count();
 		for (int i = 0; i < array_size; i++)
 		{
-			if ( item_tag_array.Get(i) == tag )
+			if (item_tag_array.Get(i) == tag)
 			{
 				found = true;
 				break;
@@ -2458,77 +2590,51 @@ class ItemBase extends InventoryItem
 	}
 
 	
-	override void OnRPC( PlayerIdentity sender, int rpc_type,ParamsReadContext ctx ) 
+	override void OnRPC(PlayerIdentity sender, int rpc_type,ParamsReadContext ctx) 
 	{
 		//Debug.Log("OnRPC called");
-		super.OnRPC( sender, rpc_type,ctx );
-		//if( rpc_type == ERPCs.RPC_ITEM_SPLIT ) SplitItem();
-		/*
-		if( rpc_type == ERPCs.RPC_ITEM_COMBINE ) 
-		{
-
-			ref Param1<EntityAI> item = new Param1<EntityAI>(NULL);
-
-			ctx.Read(item);
-			ItemBase item_other = item.param1;
+		super.OnRPC(sender, rpc_type,ctx);
 			
-			CombineItems( item_other );
-		}
-		*/
-		
-		//Play soundset for attachment locking ( ActionLockAttachment.c )
-		switch ( rpc_type )
+		//Play soundset for attachment locking (ActionLockAttachment.c)
+		switch (rpc_type)
 		{
+			#ifndef SERVER
 			case ERPCs.RPC_SOUND_LOCK_ATTACH:
-				ref Param2<bool, string> p = new Param2<bool, string>(false, "");
+				Param2<bool, string> p = new Param2<bool, string>(false, "");
 					
-				if ( ctx.Read( p ) )
-				{
-					bool play = p.param1;
-					string soundSet = p.param2;
-				}
+				if (!ctx.Read(p))
+					return;
+			
+				bool play = p.param1;
+				string soundSet = p.param2;
 				
-				if ( play )
+				if (play)
 				{
-					if ( m_LockingSound )
+					if (m_LockingSound)
 					{
-						if ( !m_LockingSound.IsSoundPlaying() )
+						if (!m_LockingSound.IsSoundPlaying())
 						{
-							m_LockingSound = SEffectManager.PlaySound( soundSet, GetPosition(), 0, 0, true );
+							m_LockingSound = SEffectManager.PlaySound(soundSet, GetPosition(), 0, 0, true);
 						}
 					}
 					else
 					{
-						m_LockingSound = new EffectSound;
-						
-						if ( m_LockingSound )
-							m_LockingSound = SEffectManager.PlaySound( soundSet, GetPosition(), 0, 0, true );
+						m_LockingSound = SEffectManager.PlaySound(soundSet, GetPosition(), 0, 0, true);
 					}
 				}
 				else
 				{
-					if ( m_LockingSound )
-					{
-						SEffectManager.DestroySound( m_LockingSound );
-					}
+					SEffectManager.DestroyEffect(m_LockingSound);
 				}
 			
 			break;
+			#endif
 		
 		}
 		
-		if ( GetGame().IsDebug() )
+		if (GetWrittenNoteData())
 		{
-			if ( rpc_type == ERPCs.RPC_ITEM_DIAG )
-			{	
-				PluginItemDiagnostic mid = PluginItemDiagnostic.Cast( GetPlugin( PluginItemDiagnostic ) );
-				mid.OnRPC( this, ctx );
-			}
-		}
-		
-		if ( GetWrittenNoteData() )
-		{
-			GetWrittenNoteData().OnRPC( sender, rpc_type,ctx );
+			GetWrittenNoteData().OnRPC(sender, rpc_type,ctx);
 		}
 	}
 
@@ -2550,13 +2656,13 @@ class ItemBase extends InventoryItem
 
 	int NameToID(string name)
 	{
-		PluginVariables plugin = PluginVariables.Cast( GetPlugin(PluginVariables) );
+		PluginVariables plugin = PluginVariables.Cast(GetPlugin(PluginVariables));
 		return plugin.GetID(name);
 	}
 
 	string IDToName(int id)
 	{
-		PluginVariables plugin = PluginVariables.Cast( GetPlugin(PluginVariables) );
+		PluginVariables plugin = PluginVariables.Cast(GetPlugin(PluginVariables));
 		return plugin.GetName(id);
 	}
 
@@ -2566,7 +2672,7 @@ class ItemBase extends InventoryItem
 		//read the flags
 		//ref Param1<int> pflags = new Param1<int>(0);
 		int varFlags;
-		if( !ctx.Read(varFlags) )
+		if (!ctx.Read(varFlags))
 			return;
 		
 		//ctx.Read(CachedObjectsParams.PARAM1_INT);
@@ -2575,12 +2681,12 @@ class ItemBase extends InventoryItem
 		//--------------
 		
 		
-		if( varFlags & ItemVariableFlags.FLOAT )
+		if (varFlags & ItemVariableFlags.FLOAT)
 		{
 			ReadVarsFromCTX(ctx);
 		}
 		/*
-		if( varFlags & ItemVariableFlags.STRING )
+		if (varFlags & ItemVariableFlags.STRING)
 		{
 			OnSyncStrings(ctx);
 		}
@@ -2592,27 +2698,27 @@ class ItemBase extends InventoryItem
 		// the order of serialization must be the same as the order of de-serialization
 		floats_out.Insert(m_VariablesMask);
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_QUANTITY) )
+		if (IsVariableSet(VARIABLE_QUANTITY))
 		{
 			floats_out.Insert(m_VarQuantity);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_TEMPERATURE) )
+		if (IsVariableSet(VARIABLE_TEMPERATURE))
 		{
 			floats_out.Insert(m_VarTemperature);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_WET) )
+		if (IsVariableSet(VARIABLE_WET))
 		{
 			floats_out.Insert(m_VarWet);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_LIQUIDTYPE) )
+		if (IsVariableSet(VARIABLE_LIQUIDTYPE))
 		{
 			floats_out.Insert(m_VarLiquidType);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_COLOR) )
+		if (IsVariableSet(VARIABLE_COLOR))
 		{
 			floats_out.Insert(m_ColorComponentR);
 			floats_out.Insert(m_ColorComponentG);
@@ -2620,7 +2726,7 @@ class ItemBase extends InventoryItem
 			floats_out.Insert(m_ColorComponentA);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_CLEANNESS) )
+		if (IsVariableSet(VARIABLE_CLEANNESS))
 		{
 			floats_out.Insert(m_Cleanness);
 		}
@@ -2635,42 +2741,42 @@ class ItemBase extends InventoryItem
 		
 		index++;
 		//--------------------------------------------
-		if( mask & VARIABLE_QUANTITY )
+		if (mask & VARIABLE_QUANTITY)
 		{
-			if ( m_IsStoreLoad )
+			if (m_IsStoreLoad)
 			{
 				m_StoreLoadedQuantity = floats.Get(index);
 			}
 			else
 			{
 				float quantity = floats.Get(index);
-				SetQuantity(quantity, true, false, false, false );
+				SetQuantity(quantity, true, false, false, false);
 			}
 			index++;
 		}
 		//--------------------------------------------
-		if( mask & VARIABLE_TEMPERATURE )
+		if (mask & VARIABLE_TEMPERATURE)
 		{
 			float temperature = floats.Get(index);
 			SetTemperature(temperature);
 			index++;
 		}
 		//--------------------------------------------
-		if( mask & VARIABLE_WET )
+		if (mask & VARIABLE_WET)
 		{
 			float wet = floats.Get(index);
 			SetWet(wet);
 			index++;
 		}
 		//--------------------------------------------
-		if( mask & VARIABLE_LIQUIDTYPE )
+		if (mask & VARIABLE_LIQUIDTYPE)
 		{
 			int liquidtype = Math.Round(floats.Get(index));
 			SetLiquidType(liquidtype);
 			index++;
 		}
 		//--------------------------------------------
-		if( mask & VARIABLE_COLOR )
+		if (mask & VARIABLE_COLOR)
 		{
 			m_ColorComponentR = Math.Round(floats.Get(index));
 			index++;
@@ -2681,7 +2787,7 @@ class ItemBase extends InventoryItem
 			m_ColorComponentA = Math.Round(floats.Get(index));
 			index++;
 		}
-		if( mask & VARIABLE_CLEANNESS )
+		if (mask & VARIABLE_CLEANNESS)
 		{
 			int cleanness = Math.Round(floats.Get(index));
 			SetCleanness(cleanness);
@@ -2696,27 +2802,27 @@ class ItemBase extends InventoryItem
 		ctx.Write(m_VariablesMask);
 
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_QUANTITY) )
+		if (IsVariableSet(VARIABLE_QUANTITY))
 		{
 			ctx.Write(m_VarQuantity);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_TEMPERATURE) )
+		if (IsVariableSet(VARIABLE_TEMPERATURE))
 		{
 			ctx.Write(m_VarTemperature);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_WET) )
+		if (IsVariableSet(VARIABLE_WET))
 		{
 			ctx.Write(m_VarWet);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_LIQUIDTYPE) )
+		if (IsVariableSet(VARIABLE_LIQUIDTYPE))
 		{
 			ctx.Write(m_VarLiquidType);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_COLOR) )
+		if (IsVariableSet(VARIABLE_COLOR))
 		{
 			ctx.Write(m_ColorComponentR);
 			ctx.Write(m_ColorComponentG);
@@ -2724,7 +2830,7 @@ class ItemBase extends InventoryItem
 			ctx.Write(m_ColorComponentA);
 		}
 		//--------------------------------------------
-		if( IsVariableSet(VARIABLE_CLEANNESS) )
+		if (IsVariableSet(VARIABLE_CLEANNESS))
 		{
 			ctx.Write(m_Cleanness);
 		}
@@ -2735,17 +2841,17 @@ class ItemBase extends InventoryItem
 		int numOfItems;
 		int intValue;
 		float value;
-		if( version <= 108 && version!= -1 )
+		if (version <= 108 && version!= -1)
 		{
-			if(!ctx.Read(CachedObjectsParams.PARAM1_INT))
+			if (!ctx.Read(CachedObjectsParams.PARAM1_INT))
 				return false;
 		
 			numOfItems = CachedObjectsParams.PARAM1_INT.param1;
 			CachedObjectsArrays.ARRAY_FLOAT.Clear();
 		
-			for(int i = 0; i < numOfItems; i++)
+			for (int i = 0; i < numOfItems; i++)
 			{
-				if(!ctx.Read(CachedObjectsParams.PARAM1_FLOAT))
+				if (!ctx.Read(CachedObjectsParams.PARAM1_FLOAT))
 					return false;
 				value = CachedObjectsParams.PARAM1_FLOAT.param1;
 			
@@ -2755,16 +2861,16 @@ class ItemBase extends InventoryItem
 			DeSerializeNumericalVars(CachedObjectsArrays.ARRAY_FLOAT);
 			return true;
 		}
-		else if( version <= 116 && version!= -1)
+		else if (version <= 116 && version!= -1)
 		{
-			if(!ctx.Read(numOfItems))
+			if (!ctx.Read(numOfItems))
 				return false;
 		
 			CachedObjectsArrays.ARRAY_FLOAT.Clear();
 		
-			for(int j = 0; j < numOfItems; j++)
+			for (int j = 0; j < numOfItems; j++)
 			{
-				if(!ctx.Read(value))
+				if (!ctx.Read(value))
 					return false;
 				CachedObjectsArrays.ARRAY_FLOAT.Insert(value);
 			}
@@ -2775,68 +2881,68 @@ class ItemBase extends InventoryItem
 		else
 		{			
 			int mask;
-			if ( !ctx.Read(mask) )
+			if (!ctx.Read(mask))
 				return false;
 			
-			if( mask & VARIABLE_QUANTITY )
+			if (mask & VARIABLE_QUANTITY)
 			{
-				if ( !ctx.Read(value) )
+				if (!ctx.Read(value))
 					return false;
 				
-				if ( m_IsStoreLoad )
+				if (m_IsStoreLoad)
 				{
 					m_StoreLoadedQuantity = value;
 				}
 				else
 				{
-					SetQuantity(value, true, false, false, false );
+					SetQuantity(value, true, false, false, false);
 				}
 			}
 			//--------------------------------------------
-			if( mask & VARIABLE_TEMPERATURE )
+			if (mask & VARIABLE_TEMPERATURE)
 			{
-				if ( !ctx.Read(value) )
+				if (!ctx.Read(value))
 					return false;
 				SetTemperature(value);
 			}
 			//--------------------------------------------
-			if( mask & VARIABLE_WET )
+			if (mask & VARIABLE_WET)
 			{
-				if ( !ctx.Read(value) )
+				if (!ctx.Read(value))
 					return false;
 				SetWet(value);
 			}
 			//--------------------------------------------
-			if( mask & VARIABLE_LIQUIDTYPE )
+			if (mask & VARIABLE_LIQUIDTYPE)
 			{
-				if ( !ctx.Read(intValue) )
+				if (!ctx.Read(intValue))
 					return false;
 				SetLiquidType(intValue);
 			}
 			//--------------------------------------------
-			if( mask & VARIABLE_COLOR )
+			if (mask & VARIABLE_COLOR)
 			{
-				if ( !ctx.Read(intValue) )
+				if (!ctx.Read(intValue))
 					return false;
 				
 				m_ColorComponentR = intValue;
-				if ( !ctx.Read(value) )
+				if (!ctx.Read(value))
 					return false;
 				
 				m_ColorComponentG = intValue;
-				if ( !ctx.Read(value) )
+				if (!ctx.Read(value))
 					return false;
 				
 				m_ColorComponentB = intValue;
-				if ( !ctx.Read(value) )
+				if (!ctx.Read(value))
 					return false;
 	
 				m_ColorComponentA = intValue;
 			}
 			//--------------------------------------------
-			if( mask & VARIABLE_CLEANNESS )
+			if (mask & VARIABLE_CLEANNESS)
 			{
-				if ( !ctx.Read(intValue) )
+				if (!ctx.Read(intValue))
 					return false;
 				SetCleanness(intValue);
 			}
@@ -2852,7 +2958,7 @@ class ItemBase extends InventoryItem
 
 		int varFlags = 0;
 		
-		if ( m_VariablesMask )
+		if (m_VariablesMask)
 			varFlags = ItemVariableFlags.FLOAT;
 
 		ctx.Write(varFlags);
@@ -2861,7 +2967,7 @@ class ItemBase extends InventoryItem
 		//now serialize the variables
 		
 		//floats
-		if ( m_VariablesMask )
+		if (m_VariablesMask)
 			WriteVarsToCTX(ctx);
 	}
 
@@ -2870,10 +2976,10 @@ class ItemBase extends InventoryItem
 	bool LoadVariables(ParamsReadContext ctx, int version = -1)
 	{
 		int varFlags;
-		if( version <= 108 && version != -1 )
+		if (version <= 108 && version != -1)
 		{
 			//read the flags
-			if(!ctx.Read(CachedObjectsParams.PARAM1_INT))
+			if (!ctx.Read(CachedObjectsParams.PARAM1_INT))
 			{
 				return false;
 			}
@@ -2881,9 +2987,9 @@ class ItemBase extends InventoryItem
 			{
 				varFlags = CachedObjectsParams.PARAM1_INT.param1;
 				//--------------
-				if( varFlags & ItemVariableFlags.FLOAT )
+				if (varFlags & ItemVariableFlags.FLOAT)
 				{
-					if(!ReadVarsFromCTX(ctx, version))
+					if (!ReadVarsFromCTX(ctx, version))
 						return false;
 				}
 			}
@@ -2891,16 +2997,16 @@ class ItemBase extends InventoryItem
 		else
 		{
 			//read the flags
-			if(!ctx.Read(varFlags))
+			if (!ctx.Read(varFlags))
 			{
 				return false;
 			}
 			else
 			{
 				//--------------
-				if( varFlags & ItemVariableFlags.FLOAT )
+				if (varFlags & ItemVariableFlags.FLOAT)
 				{
-					if(!ReadVarsFromCTX(ctx, version))
+					if (!ReadVarsFromCTX(ctx, version))
 						return false;
 				}
 			}		
@@ -2919,7 +3025,7 @@ class ItemBase extends InventoryItem
 			m_FixDamageSystemInit = true;
 		}
 		
-		if ( !super.OnStoreLoad(ctx, version) )
+		if (!super.OnStoreLoad(ctx, version))
 		{
 			m_IsStoreLoad = false;
 			return false;
@@ -2947,7 +3053,7 @@ class ItemBase extends InventoryItem
 				}
 				
 				PlayerBase parentPlayer = PlayerBase.Cast(GetHierarchyRootPlayer());				
-				if ( itmQBIndex != -1 && parentPlayer )
+				if (itmQBIndex != -1 && parentPlayer)
 					parentPlayer.SetLoadedQuickBarItemBind(this, itmQBIndex);
 			}
 		}
@@ -2964,7 +3070,7 @@ class ItemBase extends InventoryItem
 					return false;
 				}
 			}
-			else if ( Class.CastTo(player, GetHierarchyRootPlayer()) )
+			else if (Class.CastTo(player, GetHierarchyRootPlayer()))
 			{
 				//Load quickbar item bind
 				if (!ctx.Read(itemQBIndex))
@@ -2972,20 +3078,20 @@ class ItemBase extends InventoryItem
 					m_IsStoreLoad = false;
 					return false;
 				}
-				if ( itemQBIndex != -1 && player )
+				if (itemQBIndex != -1 && player)
 					player.SetLoadedQuickBarItemBind(this,itemQBIndex);
 			}
 		}
 		
 		// variable management system
-		if ( !LoadVariables(ctx, version) )
+		if (!LoadVariables(ctx, version))
 		{
 			m_IsStoreLoad = false;
 			return false;
 		}
 
 		//agent trasmission system
-		if ( !LoadAgents(ctx, version) )
+		if (!LoadAgents(ctx, version))
 		{
 			m_IsStoreLoad = false;
 			return false;
@@ -3027,8 +3133,11 @@ class ItemBase extends InventoryItem
 			PerformDamageSystemReinit();
 		}
 
-		if ( m_StoreLoadedQuantity != -1 )
+		if (m_StoreLoadedQuantity != float.LOWEST)
+		{
 			SetQuantity(m_StoreLoadedQuantity);
+			m_StoreLoadedQuantity = float.LOWEST;//IMPORTANT to do this !! we use 'm_StoreLoadedQuantity' inside SetQuantity to distinguish between initial quantity setting and the consequent(normal gameplay) calls
+		}
 	}
 	
 	override void EEOnAfterLoad()
@@ -3050,24 +3159,38 @@ class ItemBase extends InventoryItem
 	//----------------------------------------------------------------
 	override void OnVariablesSynchronized()
 	{
-		/*
-		if(QUANTITY_DEBUG_REMOVE_ME)
-		{
-			PrintString("==================== CLIENT ==========================");
-			int low, high;
-			GetNetworkID(low, high);
-			PrintString("entity:"+low.ToString()+"| high:"+high.ToString());
-			PrintString("getting quantity, current:"+m_VarQuantity.ToString());
-		}
-		*/
-		
 		if (m_Initialized)
-		{
-			UpdateWeight();
-			if (GetHierarchyParent())
-				GetHierarchyParent().UpdateWeight();
+		{	
+			#ifdef PLATFORM_CONSOLE
+			//bruteforce it is
+			if (m_CanThisBeSplit)
+			{
+				UIScriptedMenu menu = GetGame().GetUIManager().FindMenu(MENU_INVENTORY);
+				if (menu)
+				{
+					menu.Refresh();
+				}
+			}
+			#endif
 		}
 		
+		if (!dBodyIsDynamic(this) && m_WantPlayImpactSound)
+		{
+			PlayImpactSound(m_ConfigWeight, m_ImpactSpeed, m_ImpactSoundSurfaceHash);
+			m_WantPlayImpactSound = false;
+		}
+		
+		if (m_VarQuantity != m_VarQuantityPrev)
+		{
+			SetWeightDirty();
+			m_VarQuantityPrev = m_VarQuantity;
+		}
+		if (m_VarWet != m_VarWetPrev)
+		{
+			OnWetChanged(m_VarWet,m_VarWetPrev);
+			m_VarWetPrev = m_VarWet;
+		}
+	
 		super.OnVariablesSynchronized();
 	}
 	
@@ -3078,14 +3201,13 @@ class ItemBase extends InventoryItem
 	//! Set item quantity[related to varQuantity... config entry], destroy_config = true > if the quantity reaches varQuantityMin or lower and the item config contains the varQuantityDestroyOnMin = true entry, the item gets destroyed. destroy_forced = true means item gets destroyed when quantity reaches varQuantityMin or lower regardless of config setting, returns true if the item gets deleted
 	bool SetQuantity(float value, bool destroy_config = true, bool destroy_forced = false, bool allow_client = false, bool clamp_to_stack_max = true)
 	{
-		float delta = 0;
-		if ( !IsServerCheck(allow_client) )
+		if (!IsServerCheck(allow_client))
 			return false;
 		
-		if ( !HasQuantity() ) 
+		if (!HasQuantity()) 
 			return false;
 		
-		if ( IsLiquidContainer() && GetLiquidType() == 0 )
+		if (IsLiquidContainer() && GetLiquidType() == 0)
 		{
 			Debug.LogError("No LiquidType specified, try setting 'varLiquidTypeInit' to a particular liquid type");
 			return false;
@@ -3096,19 +3218,19 @@ class ItemBase extends InventoryItem
 		
 		bool on_min_value = value <= (min + 0.001); //workaround, items with "varQuantityDestroyOnMin = true;" get destroyed
 		
-		if ( on_min_value )
+		if (on_min_value)
 		{
-			if ( destroy_config )
+			if (destroy_config)
 			{
 				bool dstr = ConfigGetBool("varQuantityDestroyOnMin");
-				if ( dstr )
+				if (dstr)
 				{
 					m_VarQuantity = Math.Clamp(value, min, max);
 					this.Delete();
 					return true;
 				}
 			}
-			else if ( destroy_forced )
+			else if (destroy_forced)
 			{
 				m_VarQuantity = Math.Clamp(value, min, max);
 				this.Delete();
@@ -3118,31 +3240,21 @@ class ItemBase extends InventoryItem
 			RemoveAllAgents();//we remove all agents when we got to the min value, but the item is not getting deleted
 		}
 		
-
-		/*
-		if(QUANTITY_DEBUG_REMOVE_ME)
-		{
-			PrintString("======================== SERVER ========================");
-			int low, high;
-			GetNetworkID(low, high);
-			PrintString("entity:"+low.ToString()+"| high:"+high.ToString());
-			PrintString("setting quantity, current:"+m_VarQuantity.ToString());
-			PrintString("setting quantity, new:"+value.ToString());
-		}*/
+		float delta = m_VarQuantity;
+		m_VarQuantity = Math.Clamp(value, min, max);
 		
-		delta = m_VarQuantity;
-		//if(clamp_to_stack_max)
-		//{
-			m_VarQuantity = Math.Clamp(value, min, max);
-		//}
-		//else
-		//{
-		//	m_VarQuantity = value;
-		//}
-		delta = m_VarQuantity - delta;
+		if (m_StoreLoadedQuantity == float.LOWEST)//any other value means we are setting quantity from storage
+		{
+			delta = m_VarQuantity - delta;
+			
+			if (delta)
+			{
+				OnQuantityChanged(delta);
+			}
+		}
+		
 		SetVariableMask(VARIABLE_QUANTITY);
-		if(delta != 0)
-			OnQuantityChanged(delta);
+		
 		return false;
 	}
 
@@ -3166,11 +3278,18 @@ class ItemBase extends InventoryItem
 		int result = Math.Round(Math.Lerp(GetQuantityMin(), GetQuantityMax(), value_clamped));
 		SetQuantity(result, destroy_config, destroy_forced);
 	}
+	
+	//----------------------------------------------------------------
+	//! Gets quantity in normalized 0..1 form between the item's Min a Max values as defined by item's config(for Min 0 and Max 5000, value 2500  will result in 0.5)
+	float GetQuantityNormalized()
+	{
+		return Math.InverseLerp(GetQuantityMin(), GetQuantityMax(),m_VarQuantity);
+	}
 
 	/*void SetAmmoNormalized(float value)
 	{
 		float value_clamped = Math.Clamp(value, 0, 1);
-		Magazine this_mag = Magazine.Cast( this );
+		Magazine this_mag = Magazine.Cast(this);
 		int max_rounds = this_mag.GetAmmoMax();
 		int result = value * max_rounds;//can the rounded if higher precision is required
 		this_mag.SetAmmoCount(result);
@@ -3186,13 +3305,13 @@ class ItemBase extends InventoryItem
 		
 		int slot = il.GetSlot();
 		
-		if ( slot != -1 )
-			max = InventorySlots.GetStackMaxForSlotId( slot );
+		if (slot != -1)
+			max = InventorySlots.GetStackMaxForSlotId(slot);
 		
-		if ( max <= 0 )
+		if (max <= 0)
 			max = m_VarStackMax;
 		
-		if ( max <= 0 )
+		if (max <= 0)
 			max = m_VarQuantityMax;
 		
 		return max;
@@ -3203,12 +3322,12 @@ class ItemBase extends InventoryItem
 		float quantity_max = 0;
 		
 		if (attSlotID != -1)
-			quantity_max = InventorySlots.GetStackMaxForSlotId( attSlotID );
+			quantity_max = InventorySlots.GetStackMaxForSlotId(attSlotID);
 		
-		if ( quantity_max <= 0 )
+		if (quantity_max <= 0)
 			quantity_max = m_VarStackMax;
 		
-		if ( quantity_max <= 0 )
+		if (quantity_max <= 0)
 			quantity_max = m_VarQuantityMax;
 
 		return quantity_max;
@@ -3226,7 +3345,7 @@ class ItemBase extends InventoryItem
 	//----------------------------------------------------------------
 	bool HasQuantity()
 	{
-		if( GetQuantityMax() - GetQuantityMin() == 0 )
+		if (GetQuantityMax() - GetQuantityMin() == 0)
 		{
 			return false;			
 		}
@@ -3246,193 +3365,56 @@ class ItemBase extends InventoryItem
 		return GetQuantity() >= GetQuantityMax();
 	}
 	
-	//Calculates weight of single item without attachments
+	//Calculates weight of single item without attachments and cargo
+	float GetSingleInventoryItemWeightEx()
+	{
+		//this needs to be first stored inside local variables, when returned directly during inside  return call, the result is completely different due to enforce script bug
+		float weightEx = GetWeightEx();//overall weight of the item
+		float special = GetInventoryAndCargoWeight();//cargo and attachment weight
+		return weightEx - special;
+	}
+
+	// Obsolete, use GetSingleInventoryItemWeightEx() instead
 	float GetSingleInventoryItemWeight()
 	{
-		float item_wetness = GetWet();
-		float itemQuantity = 0;
-		float Weight = 0;
-		if (GetQuantity() != 0)
-		{
-			itemQuantity = GetQuantity();
-		}
-
-		if ( m_CanThisBeSplit ) //quantity determines size of the stack
-		{
-			Weight = ((item_wetness + 1) * m_ConfigWeight * itemQuantity);
-		}
-		else if (ConfigGetString("stackedUnit") == "cm") //duct tape, at the moment
-		{
-			int MaxLength = ConfigGetInt("varQuantityMax");
-			Weight = ((item_wetness + 1) * m_ConfigWeight * itemQuantity/MaxLength);
-		}
-		else if (itemQuantity != 1) //quantity determines weight of item without container (i.e. sardines in a can)
-		{
-			Weight = ((item_wetness + 1) * (m_ConfigWeight + itemQuantity));
-		}
-		else
-		{
-			Weight = ((item_wetness + 1) * m_ConfigWeight);
-		}
-		return Math.Round(Weight);
+		return GetSingleInventoryItemWeightEx();
 	}
 	
-	override void UpdateWeight(WeightUpdateType updateType = WeightUpdateType.FULL, float weightAdjustment = 0)
+	override protected float GetWeightSpecialized(bool forceRecalc = false)
 	{
-		//float itemWetness = GetWet() + 1;
-		float current_quantity = GetQuantity();
-		/*DumpStack();
-		Print(this);
-		Print("Initial weight: " + m_Weight);
-		Print("Initial adjustement: " + weightAdjustment);
-		Print("current_quantity: " + current_quantity);
-		Print("updateType: " + updateType);*/	
-
-		switch (updateType)
+		if (m_CanThisBeSplit) //quantity determines size of the stack
 		{
-			case WeightUpdateType.FULL:
-				{
-					int i = 0;
-					float totalWeight;
-					//float item_wetness = this.GetWet();
-		
-					int AttachmentsCount = 0;
-					CargoBase cargo;
-		
-					/*Print("this: " + this);
-					Print("GetInventory() " + GetInventory());		
-					Print("-----------------------------");*/
-					if (GetInventory())
-					{
-						AttachmentsCount = GetInventory().AttachmentCount();
-						cargo = GetInventory().GetCargo();
-					}
-		
-					//attachments?
-					if (AttachmentsCount > 0)
-					{
-						for (i = 0; i < AttachmentsCount; i++)
-						{
-							totalWeight += GetInventory().GetAttachmentFromIndex(i).GetWeight();
-						}
-					}
-		
-					//cargo?
-					if (cargo != NULL )
-					{
-						for (i = 0; i < cargo.GetItemCount(); i++)
-						{
-							totalWeight += cargo.GetItem(i).GetWeight();
-						}
-					}
-
-					//other
-					{					
-						if ( m_CanThisBeSplit ) //quantity determines size of the stack
-						{
-							totalWeight += /*Math.Round((item_wetness + 1) **/ this.GetQuantity() * m_ConfigWeight;
-							//Print("this: " + this);
-							//Print("this.GetQuantity(): " + this.GetQuantity());
-							//Print("totalWeight: " + totalWeight);
-							//Print("-----------------------------");
-						}
-						else if (this.ConfigGetString("stackedUnit") == "cm") //duct tape, at the moment
-						{
-							int MaxLength = GetQuantityMax();
-							totalWeight += /*Math.Round(((item_wetness + 1) **/ m_ConfigWeight * (this.GetQuantity() / MaxLength);
-						}
-						else //quantity determines weight of item without container (i.e. sardines in a can)
-						{
-							totalWeight += /*Math.Round((item_wetness + 1) **/ (this.GetQuantity() + m_ConfigWeight);
-						}
-					}
-		
-					m_Weight = Math.Round(totalWeight);
-				
-					//Print("FULL");
-					//Print("weightAdjustment: " + weightAdjustment);
-					//Print("m_Weight: " + m_Weight);
-				}
-				break;
-			case WeightUpdateType.ADD:
-				m_Weight += weightAdjustment;
-				//Print("ADD");
-				//Print("weightAdjustment: " + weightAdjustment);
-				//Print("m_Weight: " + m_Weight);
-				break;
-			case WeightUpdateType.REMOVE:
-				m_Weight -= weightAdjustment;
-				//Print("REMOVE");
-				//Print("weightAdjustment: " + weightAdjustment);
-				//Print("m_Weight: " + m_Weight);
-				break;
-			case WeightUpdateType.RECURSIVE_ADD:
-				{
-					if (weightAdjustment == 0) //First one in hierarchy
-					{
-						current_quantity = GetQuantity();
-
-						if ( m_CanThisBeSplit ) //quantity determines size of the stack
-						{
-							weightAdjustment = /*itemWetness **/ current_quantity * m_ConfigWeight;
-						}
-						else if (ConfigGetString("stackedUnit") == "cm") //duct tape, at the moment
-						{
-							weightAdjustment = /*itemWetness **/ m_ConfigWeight * (current_quantity / GetQuantityMax());
-						}
-						else //quantity determines weight of item without container (i.e. sardines in a can)
-						{
-							weightAdjustment = /*itemWetness **/ (current_quantity + m_ConfigWeight);
-						}
-					
-						weightAdjustment = Math.Round(weightAdjustment);
-					}
-					m_Weight += weightAdjustment;
-				
-					//Print("RECURSIVE_ADD");
-					//Print("weightAdjustment: " + weightAdjustment);
-					//Print("m_Weight: " + m_Weight);
-								
-					EntityAI hierarchyParent = GetHierarchyParent();
-					if (hierarchyParent && !hierarchyParent.IsInherited(PlayerBase))
-						hierarchyParent.UpdateWeight(WeightUpdateType.RECURSIVE_ADD, weightAdjustment);
-				}
-				break;
-			case WeightUpdateType.RECURSIVE_REMOVE:
-				{
-					if (weightAdjustment == 0) //First one in hierarchy
-					{
-						current_quantity = GetQuantity();
-
-						if ( m_CanThisBeSplit ) //quantity determines size of the stack
-						{
-							weightAdjustment = /*itemWetness **/ current_quantity * m_ConfigWeight;
-						}
-						else if (ConfigGetString("stackedUnit") == "cm") //duct tape, at the moment
-						{
-							weightAdjustment = /*itemWetness **/ m_ConfigWeight * (current_quantity/GetQuantityMax());
-						}
-						else //quantity determines weight of item without container (i.e. sardines in a can)
-						{
-							weightAdjustment = /*itemWetness **/ (current_quantity + m_ConfigWeight);
-						}
-					
-						weightAdjustment = Math.Round(weightAdjustment);
-					}
-					
-					m_Weight -= weightAdjustment;
-				
-					//Print("RECURSIVE_REMOVE");
-					//Print("weightAdjustment: " + weightAdjustment);
-					//Print("m_Weight: " + m_Weight);
-				
-					EntityAI hp = GetHierarchyParent();
-					if (hp && !hp.IsInherited(PlayerBase))
-						hp.UpdateWeight(WeightUpdateType.RECURSIVE_REMOVE, weightAdjustment);
-				}
-				break;
-			default:
-				break;
+			#ifdef DEVELOPER
+			if (WeightDebug.m_VerbosityFlags & WeightDebugType.RECALC_FORCED)
+			{
+				WeightDebugData data1 = WeightDebug.GetWeightDebug(this);
+				data1.SetCalcDetails("TIB1: " + GetConfigWeightModifiedDebugText() +" * " + GetQuantity()+"(quantity)");
+			}
+			#endif
+			
+			return GetQuantity() * GetConfigWeightModified();
+		}
+		else if (HasEnergyManager())// items with energy manager
+		{
+			#ifdef DEVELOPER
+			if (WeightDebug.m_VerbosityFlags & WeightDebugType.RECALC_FORCED)
+			{
+				WeightDebugData data2 = WeightDebug.GetWeightDebug(this);
+				data2.SetCalcDetails("TIB2: "+super.GetWeightSpecialized(forceRecalc)+"(contents weight) + " + GetConfigWeightModifiedDebugText() +" + " + GetCompEM().GetEnergy()+"(energy) * " + ConfigGetFloat("weightPerQuantityUnit") +"(weightPerQuantityUnit)");
+			}
+			#endif
+			return super.GetWeightSpecialized(forceRecalc) + (GetCompEM().GetEnergy() * ConfigGetFloat("weightPerQuantityUnit")) + GetConfigWeightModified());
+		}
+		else//everything else
+		{
+			#ifdef DEVELOPER
+			if (WeightDebug.m_VerbosityFlags & WeightDebugType.RECALC_FORCED)
+			{
+				WeightDebugData data3 = WeightDebug.GetWeightDebug(this);
+				data3.SetCalcDetails("TIB3: "+super.GetWeightSpecialized(forceRecalc)+"(contents weight) + " + GetConfigWeightModifiedDebugText() +" + " + GetQuantity()+"(quantity) * " + ConfigGetFloat("weightPerQuantityUnit") +"(weightPerQuantityUnit))");
+			}
+			#endif
+			return super.GetWeightSpecialized(forceRecalc) + (GetQuantity() * ConfigGetFloat("weightPerQuantityUnit")) + GetConfigWeightModified());
 		}
 	}
 
@@ -3442,28 +3424,28 @@ class ItemBase extends InventoryItem
 		int item_count = 0;
 		ItemBase item;
 		
-		if ( GetInventory().GetCargo() != NULL )
+		if (GetInventory().GetCargo() != NULL)
 		{
 			item_count = GetInventory().GetCargo().GetItemCount();
 		}
 		
-		for ( int i = 0; i < GetInventory().AttachmentCount(); i++ )
+		for (int i = 0; i < GetInventory().AttachmentCount(); i++)
 		{
 			Class.CastTo(item,GetInventory().GetAttachmentFromIndex(i));
-			if ( item )
+			if (item)
 				item_count += item.GetNumberOfItems();
 		}
 		return item_count;
 	}
 	
-	//! Returns weight of unit, useful for stackable items
+	//! Obsolete, use GetWeightEx instead
 	float GetUnitWeight(bool include_wetness = true)
 	{
 		float weight = 0;
 		float wetness = 1;
 		if (include_wetness)
 			wetness += GetWet();
-		if ( m_CanThisBeSplit ) //quantity determines size of the stack
+		if (m_CanThisBeSplit) //quantity determines size of the stack
 		{
 			weight = wetness * m_ConfigWeight;
 		}
@@ -3477,7 +3459,7 @@ class ItemBase extends InventoryItem
 	void SetVariableMask(int variable)
 	{
 		m_VariablesMask = variable | m_VariablesMask; 
-		if( GetGame().IsServer() ) 
+		if (GetGame().IsServer()) 
 		{
 			SetSynchDirty();
 		}
@@ -3501,7 +3483,7 @@ class ItemBase extends InventoryItem
 	float GetEnergy()
 	{
 		float energy = 0;
-		if ( this.HasEnergyManager() )
+		if (this.HasEnergyManager())
 		{
 			energy = this.GetCompEM().GetEnergy();
 		}
@@ -3526,19 +3508,19 @@ class ItemBase extends InventoryItem
 	// Converts energy (from Energy Manager) to quantity, if enabled.
 	void ConvertEnergyToQuantity()
 	{
-		if ( GetGame().IsServer()  &&  HasEnergyManager()  &&  GetCompEM().HasConversionOfEnergyToQuantity() )
+		if (GetGame().IsServer()  &&  HasEnergyManager()  &&  GetCompEM().HasConversionOfEnergyToQuantity())
 		{
-			if ( HasQuantity() )
+			if (HasQuantity())
 			{
 				float energy_0to1 = GetCompEM().GetEnergy0To1();
-				SetQuantityNormalized( energy_0to1 );
+				SetQuantityNormalized(energy_0to1);
 			}
 		}
 	}
 
-	void SetTemperature(float value, bool allow_client = false)
+	override void SetTemperature(float value, bool allow_client = false)
 	{
-		if ( !IsServerCheck(allow_client) ) 
+		if (!IsServerCheck(allow_client)) 
 			return;
 		float min = GetTemperatureMin();
 		float max = GetTemperatureMax();
@@ -3547,36 +3529,36 @@ class ItemBase extends InventoryItem
 		
 		m_VarTemperature = Math.Clamp(value, min, max);
 		
-		if ( previousValue != m_VarTemperature )
+		if (previousValue != m_VarTemperature)
 			SetVariableMask(VARIABLE_TEMPERATURE);
 	}
 	//----------------------------------------------------------------
-	void AddTemperature(float value)
+	override void AddTemperature(float value)
 	{
-		SetTemperature( value + GetTemperature() );
+		SetTemperature(value + GetTemperature());
 	}
 	//----------------------------------------------------------------
-	void SetTemperatureMax()
+	override void SetTemperatureMax()
 	{
 		SetTemperature(m_VarTemperatureMax);
 	}
 	//----------------------------------------------------------------
-	float GetTemperature()
+	override float GetTemperature()
 	{
 		return m_VarTemperature;
 	}
 	
-	float GetTemperatureInit()
+	override float GetTemperatureInit()
 	{
 		return m_VarTemperatureInit;
 	}
 	
-	float GetTemperatureMin()
+	override float GetTemperatureMin()
 	{
 		return m_VarTemperatureMin;
 	}
 
-	float GetTemperatureMax()
+	override float GetTemperatureMax()
 	{
 		return m_VarTemperatureMax;
 	}
@@ -3590,9 +3572,9 @@ class ItemBase extends InventoryItem
 		return m_HeatIsolation;
 	}
 	//----------------------------------------------------------------
-	void SetWet(float value, bool allow_client = false)
+	override void SetWet(float value, bool allow_client = false)
 	{
-		if ( !IsServerCheck(allow_client) )
+		if (!IsServerCheck(allow_client))
 			return;
 		
 		float min = GetWetMin();
@@ -3602,18 +3584,19 @@ class ItemBase extends InventoryItem
 		
 		m_VarWet = Math.Clamp(value, min, max);
 		
-		//UpdateWeight();
-		
-		if ( previousValue != m_VarWet )
+		if (previousValue != m_VarWet)
+		{
 			SetVariableMask(VARIABLE_WET);
+			OnWetChanged(m_VarWet, previousValue);
+		}
 	}
 	//----------------------------------------------------------------
-	void AddWet(float value)
+	override void AddWet(float value)
 	{
-		SetWet( GetWet() + value );
+		SetWet(GetWet() + value);
 	}
 	//----------------------------------------------------------------
-	void SetWetMax()
+	override void SetWetMax()
 	{
 		SetWet(m_VarWetMax);
 	}
@@ -3623,28 +3606,49 @@ class ItemBase extends InventoryItem
 		return m_VarWet;
 	}
 	//----------------------------------------------------------------
-	float GetWetMax()
+	override float GetWetMax()
 	{
 		return m_VarWetMax;
 	}
 	//----------------------------------------------------------------
-	float GetWetMin()
+	override float GetWetMin()
 	{
 		return m_VarWetMin;
 	}
 	//----------------------------------------------------------------
-	float GetWetInit()
+	override float GetWetInit()
 	{
 		return m_VarWetInit;
 	}
+	//----------------------------------------------------------------
+	override void OnWetChanged(float newVal, float oldVal)
+	{
+		EWetnessLevel newLevel = GetWetLevelInternal(newVal);
+		EWetnessLevel oldLevel = GetWetLevelInternal(oldVal);
+		if (newLevel != oldLevel)
+		{
+			OnWetLevelChanged(newLevel,oldLevel);
+		}
+	}
+	
+	override void OnWetLevelChanged(EWetnessLevel newLevel, EWetnessLevel oldLevel)
+	{
+		SetWeightDirty();
+	}
+	
+	override EWetnessLevel GetWetLevel()
+	{
+		return GetWetLevelInternal(m_VarWet);
+	}
+
 	//----------------------------------------------------------------
 	bool IsServerCheck(bool allow_client)
 	{
 		if (g_Game.IsServer())
 			return true;
 		
-		if(allow_client) return true;
-		if( GetGame().IsClient() && GetGame().IsMultiplayer() ) 
+		if (allow_client) return true;
+		if (GetGame().IsClient() && GetGame().IsMultiplayer()) 
 		{
 			Error("Attempting to change variable client side, variables are supposed to be changed on server only !!");
 			return false;
@@ -3666,14 +3670,14 @@ class ItemBase extends InventoryItem
 	
 	void SetCleanness(int value, bool allow_client = false)
 	{
-		if ( !IsServerCheck(allow_client) ) 
+		if (!IsServerCheck(allow_client)) 
 			return;
 		
 		int previousValue = m_Cleanness;
 		
 		m_Cleanness = Math.Clamp(value, m_CleannessMin, m_CleannessMax);
 		
-		if ( previousValue != m_Cleanness )
+		if (previousValue != m_Cleanness)
 			SetVariableMask(VARIABLE_CLEANNESS);
 	}
 	
@@ -3737,7 +3741,7 @@ class ItemBase extends InventoryItem
 
 	void SetLiquidType(int value, bool allow_client = false)
 	{
-		if( !IsServerCheck(allow_client) ) return;
+		if (!IsServerCheck(allow_client)) return;
 		m_VarLiquidType = value;
 		SetVariableMask(VARIABLE_LIQUIDTYPE);
 	}
@@ -3757,8 +3761,9 @@ class ItemBase extends InventoryItem
 	void OnInventoryEnter(Man player)
 	{
 		PlayerBase nplayer;
-		if ( PlayerBase.CastTo(nplayer, player) )
+		if (PlayerBase.CastTo(nplayer, player))
 		{
+			m_CanPlayImpactSound = true;
 			//nplayer.OnItemInventoryEnter(this);
 			nplayer.SetEnableQuickBarEntityShortcut(this,true);	
 		}
@@ -3769,48 +3774,48 @@ class ItemBase extends InventoryItem
 	void OnInventoryExit(Man player)
 	{
 		PlayerBase nplayer;
-		if ( PlayerBase.CastTo(nplayer,player) )
+		if (PlayerBase.CastTo(nplayer,player))
 		{		
 			//nplayer.OnItemInventoryExit(this);
 			nplayer.SetEnableQuickBarEntityShortcut(this,false);
 
 		}
 		
-		//if(GetGame().IsClient() || !GetGame().IsMultiplayer())
+		//if (!GetGame().IsDedicatedServer())
 		player.GetHumanInventory().ClearUserReservedLocationForContainer(this);
 		
 		
-		if ( HasEnergyManager() )
+		if (HasEnergyManager())
 		{
 			GetCompEM().UpdatePlugState(); // Unplug the el. device if it's necesarry.
 		}
 	}
 
 	// ADVANCED PLACEMENT EVENTS
-	override void OnPlacementStarted( Man player ) 
+	override void OnPlacementStarted(Man player) 
 	{
-		super.OnPlacementStarted( player );
+		super.OnPlacementStarted(player);
 		
 		SetTakeable(false);
 	}
 	
-	override void OnPlacementComplete( Man player, vector position = "0 0 0", vector orientation = "0 0 0" )
+	override void OnPlacementComplete(Man player, vector position = "0 0 0", vector orientation = "0 0 0")
 	{
-		if ( m_AdminLog )
+		if (m_AdminLog)
 		{
-			m_AdminLog.OnPlacementComplete( player, this );
+			m_AdminLog.OnPlacementComplete(player, this);
 		}
 		
-		super.OnPlacementComplete( player, position, orientation );
+		super.OnPlacementComplete(player, position, orientation);
 	}
 		
 	//-----------------------------
 	// AGENT SYSTEM
 	//-----------------------------
 	//--------------------------------------------------------------------------
-	bool ContainsAgent( int agent_id )
+	bool ContainsAgent(int agent_id)
 	{
-		if( agent_id & m_AttachedAgents )
+		if (agent_id & m_AttachedAgents)
 		{
 			return true;
 		}
@@ -3821,9 +3826,9 @@ class ItemBase extends InventoryItem
 	}
 
 	//--------------------------------------------------------------------------
-	override void RemoveAgent( int agent_id )
+	override void RemoveAgent(int agent_id)
 	{
-		if( ContainsAgent(agent_id) )
+		if (ContainsAgent(agent_id))
 		{
 			m_AttachedAgents = ~agent_id & m_AttachedAgents;
 		}
@@ -3842,7 +3847,7 @@ class ItemBase extends InventoryItem
 	// -------------------------------------------------------------------------
 	override void InsertAgent(int agent, float count = 1)
 	{
-		if( count < 1 )
+		if (count < 1)
 			return;
 		//Debug.Log("Inserting Agent on item: " + agent.ToString() +" count: " + count.ToString());
 		m_AttachedAgents = (agent | m_AttachedAgents);
@@ -3872,28 +3877,28 @@ class ItemBase extends InventoryItem
 		
 		Edible_Base edible = Edible_Base.Cast(this);
 		int agents = GetAgents();
-		if(edible)
+		if (edible)
 		{
 			NutritionalProfile profile = Edible_Base.GetNutritionalProfile(edible);
-			if(profile)
+			if (profile)
 			{
 				//Print("profile agents:" +profile.GetAgents());
 				agents = agents | profile.GetAgents();//merge item's agents with nutritional agents
 			}
 		}
-		if( agents & CONTAMINATED_MASK )
+		if (agents & CONTAMINATED_MASK)
 		{
 			contamination_type = contamination_type | EContaminationTypes.ITEM_BADGE_CONTAMINATED;
 		}
-		if( agents & POISONED_MASK )
+		if (agents & POISONED_MASK)
 		{
 			contamination_type = contamination_type | EContaminationTypes.ITEM_BADGE_POISONED;
 		}
-		if( agents & NERVE_GAS_MASK )
+		if (agents & NERVE_GAS_MASK)
 		{
 			contamination_type = contamination_type | EContaminationTypes.ITEM_BADGE_NERVE_GAS;
 		}
-		if( agents & DIRTY_MASK )
+		if (agents & DIRTY_MASK)
 		{
 			contamination_type = contamination_type | EContaminationTypes.ITEM_BADGE_DIRTY;
 		}
@@ -3904,7 +3909,7 @@ class ItemBase extends InventoryItem
 	// -------------------------------------------------------------------------
 	bool LoadAgents(ParamsReadContext ctx, int version)
 	{
-		if(!ctx.Read(m_AttachedAgents))
+		if (!ctx.Read(m_AttachedAgents))
 			return false;
 		return true;
 	}
@@ -3920,15 +3925,15 @@ class ItemBase extends InventoryItem
 	// returns item's protection level against enviromental hazard, for masks with filters, returns the filters protection for valid filter, otherwise 0
 	float GetProtectionLevel(int type, bool consider_filter = false, int system = 0)
 	{
-		if (IsDamageDestroyed() || (HasQuantity() && GetQuantity() <= 0) )
+		if (IsDamageDestroyed() || (HasQuantity() && GetQuantity() <= 0))
 		{
 			return 0;
 		}
 		
-		if( GetInventory().GetAttachmentSlotsCount() != 0 )//is it an item with attachable filter ?
+		if (GetInventory().GetAttachmentSlotsCount() != 0)//is it an item with attachable filter ?
 		{
 			ItemBase filter = ItemBase.Cast(FindAttachmentBySlotName("GasMaskFilter"));
-			if (filter )
+			if (filter)
 			{
 				return filter.GetProtectionLevel(type, false, system);//it's a valid filter, return the protection
 			}
@@ -3961,7 +3966,7 @@ class ItemBase extends InventoryItem
 	override void EEOnCECreate()
 	{
 		//Print("EEOnCECreate");
-		if( !IsMagazine() && HasQuantity() ) SetCEBasedQuantity();
+		if (!IsMagazine() && HasQuantity()) SetCEBasedQuantity();
 		//SetCEBasedQuantity();
 		SetZoneDamageCEInit();
 	}
@@ -3973,46 +3978,55 @@ class ItemBase extends InventoryItem
 	//! Implementations only
 	void Open() {}
 	void Close() {}
-	bool IsOpen() {return false;}
+	bool IsOpen() {return true;}
+	override bool CanDisplayCargo() {return IsOpen();}
 	
 	
 	// ------------------------------------------------------------
 	// CONDITIONS
 	// ------------------------------------------------------------
-	override bool CanPutInCargo( EntityAI parent )
+	override bool CanPutInCargo(EntityAI parent)
 	{
-		if ( parent )
+		if (parent)
 		{
-			if ( parent.IsInherited(DayZInfected) )
+			if (parent.IsInherited(DayZInfected))
 				return true;
 
-			if ( !parent.IsRuined() )
+			if (!parent.IsRuined())
 				return true;
 		}
 		
 		return true;
 	}	
 	
-	override bool CanPutAsAttachment( EntityAI parent )
+	override bool CanPutAsAttachment(EntityAI parent)
 	{
-		if ( !IsRuined() && parent.!IsRuined() )
+		if (!super.CanPutAsAttachment(parent))
+		{
+			return false;
+		}
+		
+		if (!IsRuined() && !parent.IsRuined())
+		{
 			return true;
+		}
+
 		return false;
 	}
 
-	override bool CanReceiveItemIntoCargo( EntityAI item )
+	override bool CanReceiveItemIntoCargo(EntityAI item)
 	{
 		//removed 15.06. coz of loading from storage -> after load items in cargo was lost -> waiting for proper solution
-		//if ( GetHealthLevel() == GameConstants.STATE_RUINED )
+		//if (GetHealthLevel() == GameConstants.STATE_RUINED)
 		//	return false;
 		
-		return super.CanReceiveItemIntoCargo( item );
+		return super.CanReceiveItemIntoCargo(item);
 	}
 
-	override bool CanReceiveAttachment( EntityAI attachment, int slotId )
+	override bool CanReceiveAttachment(EntityAI attachment, int slotId)
 	{
 		//removed 15.06. coz of loading from storage -> after load items in cargo was lost -> waiting for proper solution
-		//if ( GetHealthLevel() == GameConstants.STATE_RUINED )
+		//if (GetHealthLevel() == GameConstants.STATE_RUINED)
 		//	return false;
 		
 		GameInventory attachmentInv = attachment.GetInventory();
@@ -4022,25 +4036,28 @@ class ItemBase extends InventoryItem
 				return false;
 		}
 		
-		return super.CanReceiveAttachment( attachment, slotId );
+		return super.CanReceiveAttachment(attachment, slotId);
 	}
 	
-	override bool CanLoadAttachment( EntityAI attachment )
+	/*override bool CanLoadAttachment(EntityAI attachment)
 	{
 		//removed 15.06. coz of loading from storage -> after load items in cargo was lost -> waiting for proper solution
-		//if ( GetHealthLevel() == GameConstants.STATE_RUINED )
+		//if (GetHealthLevel() == GameConstants.STATE_RUINED)
 		//	return false;
 		
 		GameInventory attachmentInv = attachment.GetInventory();
 		if (attachmentInv && attachmentInv.GetCargo() && attachmentInv.GetCargo().GetItemCount() > 0)
 		{
+			bool boo = (GetHierarchyParent() && !GetHierarchyParent().IsInherited(PlayerBase));
+			ErrorEx("CanLoadAttachment | this: " + this + " | attachment: " + attachment + " | boo: " + boo,ErrorExSeverity.INFO);
+			
 			if (GetHierarchyParent() && !GetHierarchyParent().IsInherited(PlayerBase))
 				return false;
 		}
 		
-		return super.CanLoadAttachment( attachment );
-	}
-
+		return super.CanLoadAttachment(attachment);
+	}*/
+	
 	// Plays muzzle flash particle effects
 	static void PlayFireParticles(ItemBase weapon, int muzzle_index, string ammoType, ItemBase muzzle_owner, ItemBase suppressor, string config_to_search)
 	{
@@ -4177,16 +4194,23 @@ class ItemBase extends InventoryItem
 	{
 		return false;
 	}
+	
+	//!how long it takes to deploy this item in seconds
+	float GetDeployTime()
+	{
+		return UATimeSpent.DEFAULT_DEPLOY;
+	}
+	
 
 	//----------------------------------------------------------------
 	// Item Targeting (User Actions)
-	void SetTakeable(bool pState)
+	override void SetTakeable(bool pState)
 	{
 		m_IsTakeable = pState;
 		SetSynchDirty();
 	}
 
-	bool IsTakeable()
+	override bool IsTakeable()
 	{
 		return m_IsTakeable;
 	}
@@ -4196,7 +4220,7 @@ class ItemBase extends InventoryItem
 	{
 		string att_type = "None";
 
-		if( ConfigIsExisting("soundAttType") )
+		if (ConfigIsExisting("soundAttType"))
 		{
 			att_type = ConfigGetString("soundAttType");
 		}
@@ -4232,27 +4256,12 @@ class ItemBase extends InventoryItem
 		return m_IsSoundSynchRemote;
 	}
 	
-	string GetDeploySoundset()
-	{
-		
-	}
+	string GetDeploySoundset();	
+	string GetPlaceSoundset();
+	string GetLoopDeploySoundset();
+	string GetDeployFinishSoundset();
 	
-	string GetPlaceSoundset()
-	{
-		
-	}
-	
-	string GetLoopDeploySoundset()
-	{
-		
-	}
-	
-	string GetDeployFinishSoundset()
-	{
-	
-	}
-	
-	void SetIsPlaceSound( bool is_place_sound )
+	void SetIsPlaceSound(bool is_place_sound)
 	{
 		m_IsPlaceSound = is_place_sound;
 	}
@@ -4262,7 +4271,7 @@ class ItemBase extends InventoryItem
 		return m_IsPlaceSound;
 	}
 	
-	void SetIsDeploySound( bool is_deploy_sound )
+	void SetIsDeploySound(bool is_deploy_sound)
 	{
 		m_IsDeploySound = is_deploy_sound;
 	}
@@ -4273,29 +4282,29 @@ class ItemBase extends InventoryItem
 	}
 	
 	void PlayDeploySound()
-	{		
-		if ( GetGame().IsMultiplayer() && GetGame().IsClient() || !GetGame().IsMultiplayer() )
-		{		
-			EffectSound sound =	SEffectManager.PlaySound( GetDeploySoundset(), GetPosition() );
-			sound.SetSoundAutodestroy( true );
+	{
+		if (!GetGame().IsDedicatedServer() && !m_SoundDeploy)
+		{
+			m_SoundDeploy = SEffectManager.PlaySound(GetDeploySoundset(), GetPosition());
+			m_SoundDeploy.SetAutodestroy(true);
 		}
 	}
 	
 	void PlayDeployFinishSound()
 	{
-		if ( GetGame().IsMultiplayer() && GetGame().IsClient() || !GetGame().IsMultiplayer() )
+		if (!GetGame().IsDedicatedServer() && !m_SoundDeployFinish)
 		{
-			EffectSound sound =	SEffectManager.PlaySound( GetDeployFinishSoundset(), GetPosition() );
-			sound.SetSoundAutodestroy( true );
+			m_SoundDeployFinish = SEffectManager.PlaySound(GetDeployFinishSoundset(), GetPosition());
+			m_SoundDeployFinish.SetAutodestroy(true);
 		}
 	}
 	
 	void PlayPlaceSound()
-	{		
-		if ( GetGame().IsMultiplayer() && GetGame().IsClient() || !GetGame().IsMultiplayer() )
-		{		
-			EffectSound sound =	SEffectManager.PlaySound( GetPlaceSoundset(), GetPosition() );
-			sound.SetSoundAutodestroy( true );
+	{
+		if (!GetGame().IsDedicatedServer() && !m_SoundPlace)
+		{
+			m_SoundPlace = SEffectManager.PlaySound(GetPlaceSoundset(), GetPosition());
+			m_SoundPlace.SetAutodestroy(true);
 		}
 	}
 	
@@ -4307,7 +4316,7 @@ class ItemBase extends InventoryItem
 	//! Plays sound on item attach. Be advised, the config structure may slightly change in 1.11 update to allow for more complex use.
 	void PlayAttachSound(string slot_type)
 	{
-		if ( GetGame().IsMultiplayer() && GetGame().IsClient() || !GetGame().IsMultiplayer() )
+		if (!GetGame().IsDedicatedServer())
 		{
 			if (ConfigIsExisting("attachSoundSet"))
 			{
@@ -4335,7 +4344,7 @@ class ItemBase extends InventoryItem
 				if (soundset != "")
 				{
 					EffectSound sound =	SEffectManager.PlaySound(soundset, GetPosition());
-					sound.SetSoundAutodestroy( true );
+					sound.SetAutodestroy(true);
 				}
 			}
 		}
@@ -4356,6 +4365,11 @@ class ItemBase extends InventoryItem
 	array<string> GetHeadHidingSelection()
 	{
 		return m_HeadHidingSelections;
+	}
+	
+	bool HidesSelectionBySlot()
+	{
+		return m_HideSelectionsBySlot;
 	}
 	
 	WrittenNoteData GetWrittenNoteData() {};
@@ -4390,62 +4404,77 @@ class ItemBase extends InventoryItem
 		}
 	}
 	
-	void ProcessItemWetness( float delta, bool hasParent, bool hasRootAsPlayer, ItemBase refParentIB )
+	bool IsCoverFaceForShave(string slot_name)
 	{
-		if ( !hasRootAsPlayer )
+		if (slot_name == "Mask")
 		{
-			if ( !hasParent )
+			return true;
+		}
+
+		if (ConfigGetBool("noMask"))
+		{
+			return true;
+		}
+
+		return false;
+	}
+	
+	void ProcessItemWetness(float delta, bool hasParent, bool hasRootAsPlayer, ItemBase refParentIB)
+	{
+		if (!hasRootAsPlayer)
+		{
+			if (!hasParent)
 			{
 				// drying on ground
-				if ( m_VarWet > m_VarWetMin )
-					AddWet( delta * GameConstants.WETNESS_RATE_DRYING_GROUND );
+				if (m_VarWet > m_VarWetMin)
+					AddWet(delta * GameConstants.WETNESS_RATE_DRYING_GROUND);
 			}
-			else if ( refParentIB )
+			else if (refParentIB)
 			{
 				// parent is wet
-				if ( ( refParentIB.GetWet() >= GameConstants.STATE_SOAKING_WET ) && ( m_VarWet < m_VarWetMax ) )
-					AddWet( delta * GameConstants.WETNESS_RATE_WETTING_INSIDE );
+				if ((refParentIB.GetWet() >= GameConstants.STATE_SOAKING_WET) && (m_VarWet < m_VarWetMax))
+					AddWet(delta * GameConstants.WETNESS_RATE_WETTING_INSIDE);
 				// parent has liquid inside
-				else if ( ( refParentIB.GetLiquidType() != 0 ) && ( refParentIB.GetQuantity() > 0 ) && ( m_VarWet < m_VarWetMax ) )
-					AddWet( delta * GameConstants.WETNESS_RATE_WETTING_LIQUID );
+				else if ((refParentIB.GetLiquidType() != 0) && (refParentIB.GetQuantity() > 0) && (m_VarWet < m_VarWetMax))
+					AddWet(delta * GameConstants.WETNESS_RATE_WETTING_LIQUID);
 				// drying
-				else if ( m_VarWet > m_VarWetMin )						
-					AddWet( delta * GameConstants.WETNESS_RATE_DRYING_INSIDE );
+				else if (m_VarWet > m_VarWetMin)						
+					AddWet(delta * GameConstants.WETNESS_RATE_DRYING_INSIDE);
 			}
 		}
 	}
 	
-	void ProcessItemTemperature( float delta, bool hasParent, bool hasRootAsPlayer, ItemBase refParentIB )
+	void ProcessItemTemperature(float delta, bool hasParent, bool hasRootAsPlayer, ItemBase refParentIB)
 	{
-		if ( !hasRootAsPlayer )
+		if (!hasRootAsPlayer)
 		{
-			if ( !hasParent )
+			if (!hasParent)
 			{
 				// cooling on ground
-				if ( ( GetTemperature() > GetTemperatureMin() ) && !IsFireplace() )
-					AddTemperature( delta * GameConstants.TEMPERATURE_RATE_COOLING_GROUND );
+				if ((GetTemperature() > GetTemperatureMin()) && !IsFireplace())
+					AddTemperature(delta * GameConstants.TEMPERATURE_RATE_COOLING_GROUND);
 			}
-			else if ( refParentIB )
+			else if (refParentIB)
 			{
 				// cooling of an item inside other
-				if ( ( GetTemperature() > GetTemperatureMin() ) && !IsFireplace() && ( GetTemperature() > refParentIB.GetTemperature() ) )
-					AddTemperature( delta * GameConstants.TEMPERATURE_RATE_COOLING_INSIDE );
+				if ((GetTemperature() > GetTemperatureMin()) && !IsFireplace() && (GetTemperature() > refParentIB.GetTemperature()))
+					AddTemperature(delta * GameConstants.TEMPERATURE_RATE_COOLING_INSIDE);
 			}
 		}
 	}
 	
 	// Backwards compatibility
-	void ProcessItemWetnessAndTemperature( float delta, bool hasParent, bool hasRootAsPlayer, ItemBase refParentIB )
+	void ProcessItemWetnessAndTemperature(float delta, bool hasParent, bool hasRootAsPlayer, ItemBase refParentIB)
 	{
 		ProcessItemWetness(delta, hasParent, hasRootAsPlayer, refParentIB);
 		ProcessItemTemperature(delta, hasParent, hasRootAsPlayer, refParentIB);
 	}
 	
-	void HierarchyCheck( out bool hasParent, out bool hasRootAsPlayer, out ItemBase refParentIB )
+	void HierarchyCheck(out bool hasParent, out bool hasRootAsPlayer, out ItemBase refParentIB)
 	{
 		// hierarchy check for an item to decide whether it has some parent and it is in some player inventory
 		EntityAI parent = GetHierarchyParent();
-		if ( !parent )
+		if (!parent)
 		{
 			hasParent = false;
 			hasRootAsPlayer = false;
@@ -4454,11 +4483,11 @@ class ItemBase extends InventoryItem
 		{
 			hasParent = true;
 			hasRootAsPlayer = (GetHierarchyRootPlayer() != null);
-			refParentIB = ItemBase.Cast( parent );
+			refParentIB = ItemBase.Cast(parent);
 		}
 	}
 	
-	protected void ProcessDecay( float delta, bool hasRootAsPlayer )
+	protected void ProcessDecay(float delta, bool hasRootAsPlayer)
 	{
 		// this is stub, implemented on Edible_Base
 	}
@@ -4498,38 +4527,76 @@ class ItemBase extends InventoryItem
 		bool wwtu = g_Game.IsWorldWetTempUpdateEnabled();
 		bool foodDecay = g_Game.IsFoodDecayEnabled();
 		
-		if ( wwtu || foodDecay )
+		if (wwtu || foodDecay)
 		{
 			bool processWetness = wwtu && CanHaveWetness();
 			bool processTemperature = wwtu && CanHaveTemperature();
 			bool processDecay  = foodDecay && CanDecay() && CanProcessDecay();
 			
-			if ( processWetness || processTemperature || processDecay)
+			if (processWetness || processTemperature || processDecay)
 			{
-				HierarchyCheck( hasParent, hasRootAsPlayer, refParentIB );
+				HierarchyCheck(hasParent, hasRootAsPlayer, refParentIB);
 			
-				if ( processWetness )
-					ProcessItemWetness( m_ElapsedSinceLastUpdate, hasParent, hasRootAsPlayer, refParentIB );
+				if (processWetness)
+					ProcessItemWetness(m_ElapsedSinceLastUpdate, hasParent, hasRootAsPlayer, refParentIB);
 				
-				if ( processTemperature )
-					ProcessItemTemperature( m_ElapsedSinceLastUpdate, hasParent, hasRootAsPlayer, refParentIB );
+				if (processTemperature)
+					ProcessItemTemperature(m_ElapsedSinceLastUpdate, hasParent, hasRootAsPlayer, refParentIB);
 			
-				if ( processDecay )
-					ProcessDecay( m_ElapsedSinceLastUpdate, hasRootAsPlayer );	
+				if (processDecay)
+					ProcessDecay(m_ElapsedSinceLastUpdate, hasRootAsPlayer);	
 			}
 		}
 	}
 	
-	bool IsCargoException4x3( EntityAI item )
+	bool IsCargoException4x3(EntityAI item)
 	{
-		return ( item.IsKindOf( "Cauldron" ) || item.IsKindOf( "Pot" ) || item.IsKindOf( "FryingPan" ) || item.IsKindOf( "SmallProtectorCase" ) || ( item.IsKindOf( "PortableGasStove" ) && item.FindAttachmentBySlotName("CookingEquipment") ) );
+		return (item.IsKindOf("Cauldron") || item.IsKindOf("Pot") || item.IsKindOf("FryingPan") || item.IsKindOf("SmallProtectorCase") || (item.IsKindOf("PortableGasStove") && item.FindAttachmentBySlotName("CookingEquipment")));
 	}
 	
-		
 	void CopyScriptPropertiesFrom(EntityAI oldItem)
 	{
 		MiscGameplayFunctions.TransferItemProperties(oldItem, this);
 	}
+	
+	//! Adds a light source child
+	void AddLightSourceItem(ItemBase lightsource)
+	{
+		m_LightSourceItem = lightsource;
+	}
+	
+	void RemoveLightSourceItem()
+	{
+		m_LightSourceItem = null;
+	}
+	
+	ItemBase GetLightSourceItem()
+	{
+		return m_LightSourceItem;
+	}
+	
+	//! returns an array of possible finishers
+	array<int> GetValidFinishers()
+	{
+		return null;
+	}
+	
+	//! If we need a different (handheld)item action widget displayed, the logic goes in here
+	bool GetActionWidgetOverride(out typename name)
+	{
+		return false;
+	}
+	
+	//! Remotely controlled devices helpers
+	RemotelyActivatedItemBehaviour GetRemotelyActivatedItemBehaviour();
+	
+	#ifdef DEVELOPER
+	override void SetDebugItem()
+	{
+		super.SetDebugItem();
+		_itemBase = this;
+	}
+	#endif
 }
 
 EntityAI SpawnItemOnLocation (string object_name, notnull InventoryLocation loc, bool full_quantity)
@@ -4537,10 +4604,10 @@ EntityAI SpawnItemOnLocation (string object_name, notnull InventoryLocation loc,
 	EntityAI entity = SpawnEntity(object_name, loc, ECE_IN_INVENTORY, RF_DEFAULT);
 	if (entity)
 	{
-		bool is_item = entity.IsInherited( ItemBase );
-		if ( is_item && full_quantity )
+		bool is_item = entity.IsInherited(ItemBase);
+		if (is_item && full_quantity)
 		{
-			ItemBase item = ItemBase.Cast( entity );
+			ItemBase item = ItemBase.Cast(entity);
 			item.SetQuantity(item.GetQuantityInit());
 		}
 	}
@@ -4556,18 +4623,22 @@ void SetupSpawnedItem (ItemBase item, float health, float quantity)
 {
 	if (item)
 	{
-		if ( quantity == -1 )
+		if (quantity == -1)
 		{
 			if (item.HasQuantity())
 				quantity = item.GetQuantityInit();
 		}
 		
-		if ( health > 0 )
+		if (health > 0)
 			item.SetHealth("", "", health);
 
-		if ( quantity > 0 )
+		if (quantity > 0)
 		{
-				item.SetQuantity(quantity);
+			item.SetQuantity(quantity);
 		}
 	}
 }
+
+#ifdef DEVELOPER
+ItemBase _itemBase;//watched item goes here(LCTRL+RMB->Watch)
+#endif

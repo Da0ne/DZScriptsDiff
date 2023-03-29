@@ -7,6 +7,7 @@ class ActionInjectTarget: ActionSingleUseBase
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONFB_INJECTIONTARGET;
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
+		m_Text = "#inject_target";
 	}
 	
 	override void CreateConditionComponents()  
@@ -14,18 +15,16 @@ class ActionInjectTarget: ActionSingleUseBase
 		m_ConditionItem = new CCINonRuined;
 		m_ConditionTarget = new CCTMan(UAMaxDistances.DEFAULT);
 	}
-		
-	override string GetText()
-	{
-		return "#inject_target";
-	}
 
 	override void OnExecuteServer( ActionData action_data )
 	{	
-		if (action_data.m_MainItem)
+		if (CanReceiveAction(action_data.m_Target))
 		{
-			ApplyModifiers(action_data);
-			action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+			if (action_data.m_MainItem)
+			{
+				ApplyModifiers(action_data);
+				action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+			}
 		}
 	}
 	

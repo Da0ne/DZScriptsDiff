@@ -1,4 +1,4 @@
-class HandsPreview: LayoutHolder
+class HandsPreview: Container
 {
 	protected ref Icon	m_Icon;
 	protected EntityAI	m_AttachmentsInitialized;
@@ -26,10 +26,36 @@ class HandsPreview: LayoutHolder
 			m_Icon.SetQuantity();
 		}
 	}
+	
+	override EntityAI GetFocusedItem()
+	{
+		return m_Item;
+	}
 
 	Icon GetIcon()
 	{
 		return m_Icon;
+	}
+	
+	override void SetDefaultFocus(bool while_micromanagment_mode = false)
+	{
+		super.SetDefaultFocus(while_micromanagment_mode);
+		if ( m_Icon )
+			m_Icon.SetActive(true);
+	}
+	
+	override void SetLastFocus()
+	{
+		super.SetLastFocus();
+		if ( m_Icon )
+			m_Icon.SetActive(true);
+	}
+	
+	override void Unfocus()
+	{
+		super.Unfocus();
+		if ( m_Icon )
+			m_Icon.SetActive(false);
 	}
 	
 	float GetIconSize()
@@ -45,6 +71,7 @@ class HandsPreview: LayoutHolder
 	void RemoveItem()
 	{
 		delete m_Icon;
+		m_Item = null;
 	}
 
 	override void UpdateInterval()
@@ -109,5 +136,55 @@ class HandsPreview: LayoutHolder
 		m_RootWidget.SetColor( ARGB( 166, 80, 80, 80 ) );
 		m_Parent.GetParent().Refresh();
 		Inventory.GetInstance().UpdateConsoleToolbar();
+	}
+	
+	override bool SelectItem()
+	{
+		if( m_Item )
+		{
+			ItemManager.GetInstance().SetSelectedItem( m_Item, null, null, null );
+			return true;
+		}
+		return false;
+	}
+	
+	override bool Select()
+	{
+		Man player = GetGame().GetPlayer();
+		EntityAI item_in_hands = m_Item;
+		if( ItemManager.GetInstance().IsMicromanagmentMode() )
+		{
+			EntityAI selected_item = ItemManager.GetInstance().GetSelectedItem();
+			if( selected_item && selected_item.GetInventory().CanRemoveEntity() )
+			{
+				if(item_in_hands && item_in_hands.GetInventory().CanRemoveEntity())
+				{
+					if( GameInventory.CanSwapEntitiesEx( item_in_hands, selected_item ) )
+					{
+						player.PredictiveSwapEntities( item_in_hands, selected_item );
+						return true;
+					}
+				}
+				else
+				{
+					if ( player.GetHumanInventory().CanAddEntityInHands( selected_item ) && selected_item.GetInventory().CanRemoveEntity())
+					{
+			 			ItemBase item_base = ItemBase.Cast( selected_item );
+						float stackable = item_base.GetTargetQuantityMax();
+						if (stackable == 0 || item_base.GetQuantity() <= stackable)
+						{
+							GetGame().GetPlayer().PredictiveTakeEntityToHands( item_base );		
+							return true;
+						}
+						else if( stackable != 0 && stackable <= item_base.GetQuantity() )
+						{
+							item_base.SplitIntoStackMaxHandsClient(PlayerBase.Cast( GetGame().GetPlayer() ));
+							return true;
+						}
+					}
+				}
+			}
+		}
+		return false;
 	}
 }

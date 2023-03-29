@@ -34,6 +34,12 @@ class MissionBase extends MissionBaseWorld
 			GetDayZGame().GetAnalyticsClient().RegisterEvents();
 			m_WorldLighting	= new WorldLighting;
 		}
+		
+		GetOnInputDeviceConnected().Insert(UpdateInputDevicesAvailability);
+		GetOnInputDeviceDisconnected().Insert(UpdateInputDevicesAvailability);
+		
+		// There is a possibility different maps/servers may be using different effects
+		SEffectManager.Cleanup();
 	}
 
 	void ~MissionBase()
@@ -105,9 +111,6 @@ class MissionBase extends MissionBaseWorld
 		case MENU_OPTIONS:
 			menu = new OptionsMenu;
 			break;
-//		case MENU_***: removed - can be recycled to something else
-//			menu = new ***;
-//			break;
 		case MENU_STARTUP:
 			menu = new StartupMenu;
 			break;
@@ -163,7 +166,7 @@ class MissionBase extends MissionBaseWorld
 			menu = new TitleScreenMenu;
 			break;
 		case MENU_XBOX_CONTROLS:
-			menu = new ControlsXbox;
+			menu = new ControlsXboxNew;
 			break;
 		case MENU_RADIAL_QUICKBAR:
 			menu = new RadialQuickbarMenu;
@@ -198,11 +201,20 @@ class MissionBase extends MissionBaseWorld
 		case MENU_WARNING_ITEMDROP:
 			menu = new ItemDropWarningMenu;
 			break;
+		case MENU_WARNING_INPUTDEVICE_DISCONNECT:
+			menu = new InputDeviceDisconnectWarningMenu;
+			break;
 		case MENU_WARNING_TELEPORT:
 			menu = new PlayerRepositionWarningMenu;
 			break;
 		case MENU_RESPAWN_DIALOGUE:
 			menu = new RespawnDialogue;
+			break;
+		case MENU_CONNECT_ERROR:
+			menu = new ConnectErrorScriptModuleUI;
+			break;
+		case MENU_LOC_ADD:
+			menu = new ScriptConsoleAddLocation;
 			break;
 		}
 
@@ -228,61 +240,19 @@ class MissionBase extends MissionBaseWorld
 		return window;
 	}
 
-	void SpawnItems()
-	{
-		/*vector player_pos = "2558 16 2854";
-		if (g_Game.GetPlayer())
-		{
-			g_Game.GetPlayer().GetPosition();
-		}
-
-		Print(player_pos);
-		
-		Print("Spawning items.");
-		ref TStringArray items = new TStringArray;
-		items.Insert("Hoodie_Blue");
-		items.Insert("WoolCoat_Red"); 
-		items.Insert("Raincoat_Orange"); 
-		items.Insert("PressVest_Blue"); 
-		items.Insert("Gorka_pants_summer"); 
-		items.Insert("MilitaryBoots_Black");
-		items.Insert("WoodAxe");
-		items.Insert("Container_FirstAidKit");
-		items.Insert("Consumable_DuctTape");
-		items.Insert("Fruit_AppleFresh");
-		items.Insert("ItemBookHunger");
-		
-		for (int i = 0; i < items.Count(); i++)
-		{
-			string item = items.Get(i);
-			vector item_pos = player_pos;
-			int x = i % 4;
-			int z = i / 4;
-			item_pos[0] = item_pos[0] + (x * 1);
-			item_pos[2] = item_pos[2] + (z * 1);
-			g_Game.CreateObject(item, item_pos, false);
-		}*/
-	}
+	void SpawnItems();
+	
+	void UpdateInputDevicesAvailability();
 
 	override void OnKeyPress(int key)
 	{
 		super.OnKeyPress(key);
 		
-#ifdef DEVELOPER
-		if ( GetGame().IsDebug() )
+#ifdef DIAG_DEVELOPER
+		if ( PluginKeyBinding.instance )
 		{
-			if ( PluginKeyBinding.instance != NULL )
-			{
-				PluginKeyBinding.instance.OnKeyPress(key);
-			}
+			PluginKeyBinding.instance.OnKeyPress(key);
 		}
-		/*
-		if ( key == KeyCode.KC_Q )
-		{
-			DumpCurrentUILayout();
-			
-		}
-		*/
 #endif
 	}
 	
@@ -392,25 +362,6 @@ class MissionBase extends MissionBaseWorld
 		}
 	}
 
-	override void OnEvent(EventType eventTypeId, Param params)
-	{
-		super.OnEvent(eventTypeId, params);
-		
-		/*
-		switch(eventTypeId)
-		{
-		case ScriptLogEventTypeID:
-			if ( GetGame().IsDebug() )
-			{
-				Param1<string> log_params = params;
-				OnLog(log_params.param1);
-			}
-			
-			break;
-		}
-		*/
-	}
-
 	void OnLog(string msg_log)
 	{
 		if ( PluginDeveloper.GetInstance() )
@@ -446,12 +397,4 @@ class MissionBase extends MissionBaseWorld
 
 class MissionDummy extends MissionBase
 {
-	override void OnKeyPress(int key)
-	{
-		super.OnKeyPress(key);
-		if (key == KeyCode.KC_Q)
-		{
-			// PlayerBase player = GetGame().GetPlayer();
-		}
-	}
 }

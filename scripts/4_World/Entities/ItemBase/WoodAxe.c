@@ -6,6 +6,7 @@ class WoodAxe extends ToolBase
 		
 		//AddAction(ActionBuildPartSwitch);
 		AddAction(ActionMineTree);
+		AddAction(ActionMineTreeBark);
 		AddAction(ActionMineBush);
 		//AddAction(ActionRepairPart);
 		AddAction(ActionDismantlePart);

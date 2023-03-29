@@ -8,7 +8,7 @@ class DayZIntroScene : Managed
 	protected Weather					m_Weather;	
 	protected vector 					m_Target;
 
-	protected ref OptionsMenu	m_OptionsMenu = new OptionsMenu;
+	protected ref OptionsMenu	m_OptionsMenu;
 
 	void DayZIntroScene()
 	{

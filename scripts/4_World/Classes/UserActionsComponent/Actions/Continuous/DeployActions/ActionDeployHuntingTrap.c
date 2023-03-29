@@ -10,7 +10,7 @@ class ActionDeployHuntingTrap : ActionDeployBase
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
 	{
 		// Client
-		if ( GetGame().IsClient() || !GetGame().IsMultiplayer() )
+		if ( !GetGame().IsDedicatedServer() )
 			return item.CanBePlaced( player, player.GetPosition() );
 		
 		// Server

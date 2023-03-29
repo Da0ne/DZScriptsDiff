@@ -30,9 +30,9 @@ class PPESSAO: PPEClassBase
 	override string GetDefaultMaterialPath()
 	{
 		//return "Graphics/Materials/postprocess/hbao"; //"default-default", with no option taken into account (c++)
+		GameOptions options = new GameOptions;
 		
-		GameOptions m_Options = new GameOptions();
-		ListOptionsAccess loa = ListOptionsAccess.Cast( m_Options.GetOptionByType( AT_POSTPROCESS_EFFECTS ) );
+		ListOptionsAccess loa = ListOptionsAccess.Cast( options.GetOptionByType( OptionAccessType.AT_POSTPROCESS_EFFECTS ) );
 		string ret = "";
 		switch (loa.GetIndex())
 		{

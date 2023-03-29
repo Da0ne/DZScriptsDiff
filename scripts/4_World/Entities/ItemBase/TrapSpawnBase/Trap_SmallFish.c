@@ -11,7 +11,7 @@ class Trap_SmallFish extends TrapSpawnBase
 		m_AnimationPhaseTriggered 				= "placing";
 		m_AnimationPhaseUsed 					= "triggered";
 		
-		m_MinimalDistanceFromPlayersToCatch 	= 25;
+		m_MinimalDistanceFromPlayersToCatch 	= 15;
 		
 		m_BaitCatchProb 						= 85;
 		m_NoBaitCatchProb						= 15;
@@ -101,12 +101,12 @@ class Trap_SmallFish extends TrapSpawnBase
 		return super.CanReceiveAttachment( attachment, slotId );
 	}
 	
+	#ifdef PLATFORM_WINDOWS
 	// How one sees the tripwire when in vicinity
 	override int GetViewIndex()
 	{
 		if ( MemoryPointExists( "invView2" ) )
-		{
-			#ifdef PLATFORM_WINDOWS
+		{			
 			InventoryLocation il = new InventoryLocation;
 			GetInventory().GetCurrentInventoryLocation( il );
 			InventoryLocationType type = il.GetType();
@@ -146,13 +146,10 @@ class Trap_SmallFish extends TrapSpawnBase
 					return 0;
 				}
 			}
-			#ifdef PLATFORM_CONSOLE
-			return 1;
-			#endif
-			#endif
 		}
 		return 0;
 	}
+	#endif
 }
 
 class SmallFishTrap extends Trap_SmallFish 

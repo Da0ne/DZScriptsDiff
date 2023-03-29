@@ -53,8 +53,9 @@ class PrepareCarp extends PrepareFish
 		InsertIngredient(1,"Sword");
 		InsertIngredient(1,"AK_Bayonet");
 		InsertIngredient(1,"M9A1_Bayonet");
-		InsertIngredient(1,"Mosin_Bayonet");
 		InsertIngredient(1,"SKS_Bayonet");
+		InsertIngredient(1,"BoneKnife");
+		InsertIngredient(1,"Screwdriver");
 		
 		m_IngredientAddHealth[1] = -12;// 0 = do nothing
 		m_IngredientSetHealth[1] = -1; // -1 = do nothing
@@ -105,11 +106,5 @@ class PrepareCarp extends PrepareFish
 	override bool CanDo(ItemBase ingredients[], PlayerBase player)//final check for recipe's validity
 	{
 		return true;
-	}
-
-	override void Do(ItemBase ingredients[], PlayerBase player,array<ItemBase> results, float specialty_weight)//gets called upon recipe's completion
-	{
-		// Adjusts quantity of results to the quantity of the 1st ingredient
-		super.Do(ingredients, player, results, specialty_weight);
 	}
 };

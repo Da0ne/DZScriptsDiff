@@ -66,6 +66,7 @@ class OpenCan extends RecipeBase
 		InsertIngredient(1,"SledgeHammer");
 		InsertIngredient(1,"BaseballBat");
 		InsertIngredient(1,"NailedBaseballBat");
+		InsertIngredient(1,"BarbedBaseballBat");
 		InsertIngredient(1,"PipeWrench");
 		InsertIngredient(1,"Pickaxe");
 		InsertIngredient(1,"WoodAxe");
@@ -73,6 +74,11 @@ class OpenCan extends RecipeBase
 		InsertIngredient(1,"Hatchet");
 		InsertIngredient(1,"HandSaw");
 		InsertIngredient(1,"Pliers");
+		InsertIngredient(1,"Spear");
+		InsertIngredient(1,"Pitchfork");
+		InsertIngredient(1,"BoneKnife");
+		InsertIngredient(1,"MeatTenderizer");
+		InsertIngredient(1,"Cleaver");
 		
 		m_IngredientAddHealth[1] = -0.5;// 0 = do nothing
 		m_IngredientSetHealth[1] = -1; // -1 = do nothing

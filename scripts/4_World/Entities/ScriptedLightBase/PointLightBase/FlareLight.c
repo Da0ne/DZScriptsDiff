@@ -1,7 +1,7 @@
 class FlareLight extends PointLightBase
 {
 	static float 	m_FlareRadius = 100;
-	static float 	m_FlareBrightness = 4.5;
+	static float 	m_FlareBrightness = 10.0;
 	static string 	m_MemoryPoint = "light";
 	
 	void FlareLight()
@@ -64,6 +64,6 @@ class FlareLightContamination extends FlareLightRed
 {
 	void FlareLightContamination()
 	{
-		SetLifetime(10);
+		SetLifetime( 20 );
 	}
 }

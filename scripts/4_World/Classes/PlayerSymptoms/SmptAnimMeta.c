@@ -149,6 +149,10 @@ class SmptAnimMetaADD extends SmptAnimMetaBase
 		}
 		if( !callback )
 		{
+			HumanCommandWeapons hcw = m_Player.GetCommandModifier_Weapons();
+			if (hcw && !hcw.IsActionFinished())
+				return EAnimPlayState.FAILED;
+			
 			HumanCommandAdditives ad = m_Player.GetCommandModifier_Additives();
 			if(ad)
 			{

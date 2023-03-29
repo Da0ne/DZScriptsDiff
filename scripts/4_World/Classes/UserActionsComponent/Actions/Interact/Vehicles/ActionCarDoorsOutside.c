@@ -7,26 +7,27 @@ class ActionCarDoorsOutside: ActionInteractBase
 	{
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONMOD_OPENDOORFW;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ALL;
-		//m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
+		m_LockTargetOnUse = false;
 	}
 
 	override void CreateConditionComponents()
 	{
-		m_ConditionItem = new CCINone;
-		m_ConditionTarget = new CCTNone;
+		m_ConditionItem		= new CCINone;
+		m_ConditionTarget	= new CCTNone;
 	}
 
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
 	{		
 		CarScript car = null;
-		string animSource = "";
 		
 		//! reach check from outside of car
-		if ( !IsInReach(player, target, UAMaxDistances.DEFAULT) )
+		if (!IsInReach(player, target, UAMaxDistances.DEFAULT))
+		{
 			return false;
+		}
 
 		//! player is outside of vehicle
-		if ( Class.CastTo(car, target.GetParent()) )
+		if (Class.CastTo(car, target.GetParent()))
 		{
 			array<string> selections = new array<string>();
 				
@@ -34,25 +35,26 @@ class ActionCarDoorsOutside: ActionInteractBase
 			if (carDoor)
 			{
 				carDoor.GetActionComponentNameList(target.GetComponentIndex(), selections);
-					
+				
+				string animSource	= "";
+				
 				for (int i = 0; i < selections.Count(); i++)
 				{
 					animSource = car.GetAnimSourceFromSelection(selections[i]);
-					if ( animSource != "" )
+					if (animSource != "")
 					{
-						//Print(i);
-						//Print(animSource);
-							
 						int idx = car.GetSeatIndexFromDoor(animSource);
-						if (idx != -1 && !car.IsAreaAtDoorFree( idx ))
+						if (idx != -1 && !car.IsAreaAtDoorFree(idx))
+						{
 							return false;	//! player is looking at one of the doors, can't open if obstructed
+						}
 							
 						//! if player is in car and cannot reach doors
 						m_CommandUID = DayZPlayerConstants.CMD_ACTIONMOD_OPENDOORFW;
 							
 						float animationPhase = car.GetAnimationPhase(animSource);	
 						//! is in reach, should open the door
-						return ( m_IsOpening && animationPhase <= 0.5 ) || ( !m_IsOpening && animationPhase > 0.5 );
+						return (m_IsOpening && animationPhase <= 0.5 ) || ( !m_IsOpening && animationPhase > 0.5);
 					}
 				}
 			}
@@ -60,37 +62,19 @@ class ActionCarDoorsOutside: ActionInteractBase
 		
 		return false;
 	}
-
-	override void OnStart( ActionData action_data )
-	{
-		super.OnStart(action_data);
-		
-		CarScript car = CarScript.Cast(action_data.m_Target.GetParent());
-
-		if ( car )
-		{
-			if ( GetGame().IsClient() || !GetGame().IsMultiplayer() )
-			{
-				EffectSound sound;
-				
-				if ( m_IsOpening )
-					sound = SEffectManager.PlaySound( car.m_CarDoorOpenSound, car.GetPosition());
-				else
-					sound = SEffectManager.PlaySound( car.m_CarDoorCloseSound, car.GetPosition());
-				
-				sound.SetSoundAutodestroy( true );
-			}
-		}
-	}
 	
 	override void OnStartServer( ActionData action_data )
 	{
 		float phase;
 			
 		if (m_IsOpening)
+		{
 			phase = 1.0;
+		}
 		else
+		{
 			phase = 0.0;
+		}
 		
 		string animSource = "";
 		
@@ -106,26 +90,31 @@ class ActionCarDoorsOutside: ActionInteractBase
 				{
 					animSource = car.GetAnimSourceFromSelection(selections[i]);
 					if (animSource != "")
+					{
 						break;
+					}
 				}
 			}
 		}
 		
-		if ( car )
+		if (car)
 		{
 			car.ForceUpdateLightsStart();
 			car.SetAnimationPhase(animSource, phase);
 		}
 	}
 	
-	override void OnEndServer( ActionData action_data )
+	override void OnEndServer(ActionData action_data)
 	{
 		CarScript car = CarScript.Cast(action_data.m_Target.GetParent());
-		if ( car )
+		if (car)
+		{
 			car.ForceUpdateLightsEnd();
+		}
 	}
 	
-	protected void FillCommandUIDPerCrewIdx( int crewIdx0, int crewIdx1, int crewIdx2, int crewIdx3 )
+	//--------- Not used for this class
+	protected void FillCommandUIDPerCrewIdx(int crewIdx0, int crewIdx1, int crewIdx2, int crewIdx3)
 	{
 		m_CommandUIDPerCrewIdx[0] = crewIdx0;
 		m_CommandUIDPerCrewIdx[1] = crewIdx1;
@@ -133,8 +122,9 @@ class ActionCarDoorsOutside: ActionInteractBase
 		m_CommandUIDPerCrewIdx[3] = crewIdx3;
 	}
 	
-	protected void FillCommandUIDPerCrewIdx( int evenCrewIdx0, int unevenCrewIdx1 )
+	protected void FillCommandUIDPerCrewIdx(int evenCrewIdx0, int unevenCrewIdx1)
 	{
 		FillCommandUIDPerCrewIdx(evenCrewIdx0, unevenCrewIdx1, evenCrewIdx0, unevenCrewIdx1);
 	}
+	//-----------------------------------
 };

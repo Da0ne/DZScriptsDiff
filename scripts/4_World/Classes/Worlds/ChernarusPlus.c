@@ -47,8 +47,26 @@ class ChernarusPlusData extends WorldData
 		m_Sunset_Jan = 15.52;
 		m_Sunrise_Jul = 3.26;
 		m_Sunset_Jul = 20.73;
-		m_MaxTemps = {3,5,7,14,19,24,26,25,21,16,10,5};
+
+		int tempIdx;
 		m_MinTemps = {-3,-2,0,4,9,14,18,17,12,7,4,0};
+		if (CfgGameplayHandler.GetEnvironmentMinTemps() && CfgGameplayHandler.GetEnvironmentMinTemps().Count() == 12)
+		{
+			for (tempIdx = 0; tempIdx < CfgGameplayHandler.GetEnvironmentMinTemps().Count(); tempIdx++)
+			{
+				m_MinTemps[tempIdx] = CfgGameplayHandler.GetEnvironmentMinTemps().Get(tempIdx);
+			}
+		}
+
+		m_MaxTemps = {3,5,7,14,19,24,26,25,21,16,10,5};
+		if (CfgGameplayHandler.GetEnvironmentMaxTemps() && CfgGameplayHandler.GetEnvironmentMaxTemps().Count() == 12)
+		{
+			for (tempIdx = 0; tempIdx < CfgGameplayHandler.GetEnvironmentMaxTemps().Count(); tempIdx++)
+			{
+				m_MaxTemps[tempIdx] = CfgGameplayHandler.GetEnvironmentMaxTemps().Get(tempIdx);
+			}
+		}
+
 		m_FiringPos = CHERNARUS_ARTY_STRIKE_POS;
 	}
 	
@@ -153,8 +171,8 @@ class ChernarusPlusData extends WorldData
 
 				m_Weather.GetOvercast().Set( phmnValue, phmnTime, phmnLength );
 
-				Print( "Chernarus::Weather::Overcast:: " + "( " + g_Game.GetDayTime() + " ) " + " overcast: " + actual );
-				Print( "Chernarus::Weather::Overcast::Rain:: " + "( " + g_Game.GetDayTime() + " ) " + m_Weather.GetRain().GetActual() );
+				Debug.Log(string.Format("Chernarus::Weather::Overcast:: (%1) overcast: %2", g_Game.GetDayTime(), actual));
+				Debug.Log(string.Format("Chernarus::Weather::Overcast::Rain:: (%1) %2", g_Game.GetDayTime(), m_Weather.GetRain().GetActual()));
 
 				return true;
 
@@ -171,7 +189,7 @@ class ChernarusPlusData extends WorldData
 				if ( actualOvercast <= RAIN_THRESHOLD )
 				{
 					m_Weather.GetRain().Set( 0.0, RAIN_TIME_MIN, RAIN_TIME_MAX );
-					Print( "Chernarus::Weather::Rain::ForceEnd:: " + "( " + g_Game.GetDayTime() + " ) " + actual + " -> " + "0" );
+					Debug.Log(string.Format("Chernarus::Weather::Rain::ForceEnd:: (%1) %2 -> 0", g_Game.GetDayTime(), actual));
 					return true;
 				}
 			
@@ -182,7 +200,7 @@ class ChernarusPlusData extends WorldData
 					phmnLength = 0;
 
 					m_Weather.GetRain().Set( phmnValue, phmnTime, phmnLength );
-					Print( "Chernarus::Weather::Rain::ForceStorm:: " + "( " + g_Game.GetDayTime() + " ) " + actual + " -> " + phmnValue);
+					Debug.Log(string.Format("Chernarus::Weather::Rain::ForceStorm:: (%1) %2 -> %3", g_Game.GetDayTime(), actual, phmnValue));
 					return true;
 				}
 			
@@ -244,7 +262,8 @@ class ChernarusPlusData extends WorldData
 		
 				m_Weather.GetRain().Set( phmnValue, phmnTime, phmnLength );
 
-				Print( "Chernarus::Weather::Rain:: " + "( " + g_Game.GetDayTime() + " ) " + actual );
+				Debug.Log(string.Format("Chernarus::Weather::Rain:: (%1) %2", g_Game.GetDayTime(), actual));
+
 				return true;
 
 			//-----------------------------------------------------------------------------------------------------------------------------
@@ -256,7 +275,7 @@ class ChernarusPlusData extends WorldData
 
 				float fogyMorning = Math.RandomFloatInclusive( 0.0, 1.0 );
 
-				if (  fogyMorning > 0.85 )
+				if ( fogyMorning > 0.85 )
 				{
 					if ( (g_Game.GetDayTime() > 4 && g_Game.GetDayTime() < 7 ) )
 					{
@@ -275,7 +294,8 @@ class ChernarusPlusData extends WorldData
 
 				m_Weather.GetFog().Set( Math.RandomFloatInclusive( fogMin, fogMax ), fogTime, 0);
 				
-				Print( "Chernarus::Weather::Fog:: " + "( " + g_Game.GetDayTime() + " ) " + actual );
+				Debug.Log(string.Format("Chernarus::Weather::Fog:: (%1) %2", g_Game.GetDayTime(), actual));
+
 				return true;
 		}
 

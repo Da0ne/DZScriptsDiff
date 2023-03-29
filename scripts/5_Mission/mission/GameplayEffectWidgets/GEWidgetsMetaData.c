@@ -8,12 +8,26 @@ class GameplayEffectsData extends Managed
 	protected ref array<ref Widget> 	m_WidgetArray;
 	int 								m_Type;
 	int 								m_WidgetSetIdentifier;
+	Widget 								m_LayoutRoot;
 	
 	void GameplayEffectsData(array<ref Widget> input, int type, int user_override = -1)
 	{
 		m_WidgetArray = input;
 		m_Type = type;
 		m_WidgetSetIdentifier = type;
+		
+		if (user_override != -1)
+		{
+			m_WidgetSetIdentifier = user_override;
+		}
+	}
+	
+	void Init(array<ref Widget> input, int type, Widget layout_root, int user_override = -1)
+	{
+		m_WidgetArray = input;
+		m_Type = type;
+		m_WidgetSetIdentifier = type;
+		m_LayoutRoot = layout_root;
 		
 		if (user_override != -1)
 		{
@@ -35,6 +49,22 @@ class GameplayEffectsData extends Managed
 	{
 		return m_WidgetSetIdentifier;
 	}
+	
+	//! Returns 'true' if this class contains update info
+	bool HasDefinedHandle()
+	{
+		return false;
+	}
+	
+	bool DataInitialized()
+	{
+		return true;
+	}
+	
+	void UpdateVisibility(bool state){}
+	void RegisterData(Param p){}
+	void Update(float timeSlice = 0, Param p = null, int handle = -1){}
+	void ForceStop();
 }
 
 class GameplayEffectsDataImage extends GameplayEffectsData
@@ -71,6 +101,5 @@ class GameplayEffectsDataImage extends GameplayEffectsData
 		return m_SaturationMultiplier;
 	}
 }
-
 
 typedef map<int,ref GameplayEffectsData> GameplayEffectDataMap;

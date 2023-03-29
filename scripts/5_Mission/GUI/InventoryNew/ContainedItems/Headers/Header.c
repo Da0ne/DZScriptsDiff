@@ -6,11 +6,15 @@ class Header: LayoutHolder
 	protected EntityAI		m_Entity;
 	
 	protected Widget		m_CollapseButton;
+	protected Widget		m_UpArrowButton;
+	protected Widget		m_DownArrowButton;
 	protected TextWidget	m_HeaderText;
 	
 	void Header( LayoutHolder parent, string function_name )
 	{
 		m_CollapseButton	= GetMainWidget().FindAnyWidget( "collapse_button" );
+		m_UpArrowButton		= GetMainWidget().FindAnyWidget( "opened" );
+		m_DownArrowButton	= GetMainWidget().FindAnyWidget( "closed" );
 		
 		#ifdef PLATFORM_CONSOLE
 			m_CollapseButton.Show( false );
@@ -65,5 +69,10 @@ class Header: LayoutHolder
 			GetMainWidget().SetColor( ARGBF( 1, 1, 0, 0 ) );
 		else
 			GetMainWidget().SetColor( m_DefaultColor );
+	}
+	
+	void ShowCollapseButton(bool state)
+	{
+		m_CollapseButton.Show(state);
 	}
 }

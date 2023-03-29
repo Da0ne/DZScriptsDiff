@@ -14,7 +14,7 @@ class VicinityContainer: CollapsibleContainer
 	{
 		m_VicinityIconsContainer = new VicinitySlotsContainer( this );
 		m_Body.Insert( m_VicinityIconsContainer );
-		
+		m_VicinityIconsContainer.GetRootWidget().SetColor(166 << 24 | 120 << 16 | 120 << 8 | 120);
 		m_MainWidget = m_RootWidget.FindAnyWidget( "body" );
 		WidgetEventHandler.GetInstance().RegisterOnChildAdd( m_MainWidget, this, "OnChildAdd" );
 		WidgetEventHandler.GetInstance().RegisterOnChildRemove( m_MainWidget, this, "OnChildRemove" );
@@ -47,39 +47,6 @@ class VicinityContainer: CollapsibleContainer
 	bool IsItemWithCategoriesActive()
 	{
 		return ( AttachmentCategoriesContainer.Cast( GetFocusedContainer() ) != null );
-	}
-
-	override void MoveGridCursor( int direction )
-	{
-		if ( !GetFocusedContainer() || !GetFocusedContainer().IsActive() )
-		{
-			return;
-		}
-		
-		ContainerWithCargo iwc = ContainerWithCargo.Cast( GetFocusedContainer() );
-		ContainerWithCargoAndAttachments iwca = ContainerWithCargoAndAttachments.Cast( GetFocusedContainer() );
-		ZombieContainer zmbc = ZombieContainer.Cast( GetFocusedContainer() );
-		PlayerContainer plc = PlayerContainer.Cast( GetFocusedContainer() );
-		if ( iwc )
-		{
-			iwc.MoveGridCursor(direction);
-		}
-		else if ( iwca )
-		{
-			iwca.MoveGridCursor( direction );
-		}
-		else if ( iwca )
-		{
-			zmbc.MoveGridCursor( direction );
-		}
-		else if ( iwca )
-		{
-			plc.MoveGridCursor( direction );
-		}
-		else if( GetFocusedContainer() == m_VicinityIconsContainer )
-		{
-			m_VicinityIconsContainer.MoveGridCursor( direction );
-		}
 	}
 
 	void TraverseShowedItems()
@@ -250,7 +217,7 @@ class VicinityContainer: CollapsibleContainer
 		{
 			( ItemBase.Cast( receiver_item ) ).CombineItemsClient( ItemBase.Cast( item ) );
 		}
-		/*else if( GameInventory.CanSwapEntitiesEx( receiver_item, item ) )
+		else if( GameInventory.CanSwapEntitiesEx( receiver_item, item ) )
 		{
 			InventoryLocation il1 = new InventoryLocation;
 			InventoryLocation il2 = new InventoryLocation;
@@ -260,7 +227,7 @@ class VicinityContainer: CollapsibleContainer
 			if( !receiver_item.GetInventory().CanRemoveEntity() || ( il1.GetType() == InventoryLocationType.GROUND && il2.GetType() == InventoryLocationType.GROUND ) )
 				return;
 			player.PredictiveSwapEntities( item, receiver_item );
-		}*/
+		}
 		/*else if( player.CanDropEntity( item ) )
 		{
 			player.PredictiveDropEntity( item );
@@ -268,31 +235,13 @@ class VicinityContainer: CollapsibleContainer
 		
 		ItemManager.GetInstance().HideDropzones();
 		ItemManager.GetInstance().SetIsDragging( false );
-		ItemManager.GetInstance().PrepareTooltip( item );
+		PrepareOwnedTooltip(item);
 
 		InventoryMenu menu = InventoryMenu.Cast( GetGame().GetUIManager().FindMenu( MENU_INVENTORY ) );
 		if ( menu )
 		{
 			menu.RefreshQuickbar();
 		}
-	}
-	
-	override void SetNextActive()
-	{
-		super.SetNextActive();
-		if ( m_IsActive && m_ActiveIndex == 1 )
-			m_CollapsibleHeader.SetActive( true );
-		else
-			m_CollapsibleHeader.SetActive( false );
-	}
-	
-	override void SetPreviousActive( bool force = false )
-	{
-		super.SetPreviousActive( force );
-		if ( m_ActiveIndex == 1 )
-			m_CollapsibleHeader.SetActive( true );
-		else
-			m_CollapsibleHeader.SetActive( false );
 	}
 	
 	void OnLeftPanelDropReceived( Widget w, int x, int y, Widget receiver )
@@ -366,6 +315,8 @@ class VicinityContainer: CollapsibleContainer
 		if (!player)
 			return;
 		
+		super.UpdateInterval();
+		
 		EntityAI eai;
 		vector pos = player.GetPosition();
 		ref array<EntityAI> objects;
@@ -399,8 +350,42 @@ class VicinityContainer: CollapsibleContainer
 				}
 			}
 		}
-
+		
+		
+		//MW HOTFIX - old containers must be removed before new one are added (part of initialize are refreshed whole structure - need proper fix to avoid it)
 		ref map<EntityAI, ref Container> new_showed_items = new ref map<EntityAI, ref Container>;
+		Container con;
+		
+		for ( i = 0; i < showable_items.Count(); i++ )
+		{
+			new_showed_items.Insert(showable_items[i],null);
+		}
+		
+		
+		bool need_update_focus = false;
+		for ( i = 0; i < m_ShowedItems.Count(); i++ )
+		{
+			EntityAI ent = m_ShowedItems.GetKey( i );
+			m_ShowedItems.GetElement( i ).UpdateInterval();
+			con = m_ShowedItems.GetElement( i );
+			if ( !new_showed_items.Contains( ent ) )
+			{
+				GetMainWidget().Update();
+				if ( con.IsActive() )
+					need_update_focus = true;
+				Container.Cast( GetParent() ).Remove( con );
+				Remove( con );
+			}
+			else
+			{
+				UpdateHeader(ent,con,player); //squeezed here, the map is iterated over enough already..
+			}
+		}
+		//////////
+
+
+		//ref map<EntityAI, ref Container> new_showed_items = new ref map<EntityAI, ref Container>;
+		new_showed_items.Clear();
 		ref map<int, ref Container> showed_items_IDs = new ref map<int, ref Container>;
 		for ( i = 0; i < showable_items.Count(); i++ )
 		{
@@ -479,18 +464,26 @@ class VicinityContainer: CollapsibleContainer
 								iwcas.SetEntity( entity, false );
 								new_showed_items.Insert( entity, iwcas );
 								showed_items_IDs.Insert( entity.GetID(), iwcas );
+								iwcas.UpdateInterval();
 							}
 						}
 					}
 				}
 				else
 				{
-					if ( m_ShowedItems.Get( entity ) )
+					//TODO MW: remove old containers on one spot (hotfix)
+					con = m_ShowedItems.Get( entity );
+					if ( con )
 					{
 						if ( entity.IsInherited( PlayerBase ) )
 						{
 							if ( !PlayerBase.DEBUG_INVENTORY_ACCESS && entity.IsAlive() && ( !PlayerBase.Cast( entity ).IsUnconscious() && !PlayerBase.Cast( entity ).IsRestrained() ) )
 							{
+								GetMainWidget().Update();
+								if ( con.IsActive() )
+									need_update_focus = true;
+								Container.Cast( GetParent() ).Remove( con );
+								Remove( con );
 								continue;
 							}
 						}
@@ -498,8 +491,14 @@ class VicinityContainer: CollapsibleContainer
 						if ( entity.IsInherited( BaseBuildingBase ) )
 						{	
 							if ( !BaseBuildingBase.Cast(entity).IsPlayerInside(player,""))
+							{
+								GetMainWidget().Update();
+								if ( con.IsActive() )
+									need_update_focus = true;
+								Container.Cast( GetParent() ).Remove( con );
+								Remove( con );
 								continue;
-						
+							}
 						}
 						
 						new_showed_items.Insert( entity, m_ShowedItems.Get( entity ) );
@@ -535,19 +534,25 @@ class VicinityContainer: CollapsibleContainer
 
 
 //			Print(m_ShowedItems.Count());
-		
+/*		bool need_update_focus = false;
 		for ( i = 0; i < m_ShowedItems.Count(); i++ )
 		{
 			EntityAI ent = m_ShowedItems.GetKey( i );
 			m_ShowedItems.GetElement( i ).UpdateInterval();
+			Container con = m_ShowedItems.GetElement( i );
 			if ( !new_showed_items.Contains( ent ) )
 			{
-				Container con = m_ShowedItems.GetElement( i );
 				GetMainWidget().Update();
+				if ( con.IsActive() )
+					need_update_focus = true;
 				Container.Cast( GetParent() ).Remove( con );
 				Remove( con );
 			}
-		}
+			else
+			{
+				UpdateHeader(ent,con,player); //squeezed here, the map is iterated over enough already..
+			}
+		}*/
 		
 		for ( int ic = 0; ic < m_ShowedCargos.Count(); ic++ )
 		{
@@ -556,6 +561,8 @@ class VicinityContainer: CollapsibleContainer
 			if ( !new_showed_cargos.Contains( cgo2 ) )
 			{
 				Container con2 = m_ShowedCargos.GetElement( ic );
+				if( con2.IsActive() )
+					need_update_focus = true;
 				GetMainWidget().Update();
 				Container.Cast( GetParent() ).Remove( con2 );
 				Remove( con2 );
@@ -565,67 +572,55 @@ class VicinityContainer: CollapsibleContainer
 		m_ShowedItems = new_showed_items;
 		m_ShowedItemsIDs = showed_items_IDs;
 		m_ShowedCargos = new_showed_cargos;
-		RecomputeOpenedContainers();
+		//Because WTF (zombie container)
+		Container.Cast( GetParent() ).RecomputeOpenedContainers();
+		if (need_update_focus)
+			SetFirstActive();
+		//RecomputeOpenedContainers();
 		UpdateCollapseButtons();
 		m_VicinityIconsContainer.ShowItemsInContainers( m_ShowedItemIcons );
 		
-		if ( m_ShowedItemIcons.Count() < m_OldShowedItemIconsCount )
+		if ( m_ShowedItemIcons.Count() != m_OldShowedItemIconsCount )
 		{
 			Inventory in = Inventory.Cast( GetRoot() );
 			if ( in )
 				in.UpdateConsoleToolbar();	
 		}
 	}
-
-	void ToggleContainer( Container conta )
+	
+	void ToggleContainer( Widget w, EntityAI item )
 	{
-		Container cont = conta;
-		ClosableContainer c;
-		if ( cont )
+		SlotsIcon slots_icon;
+		Container c;
+		w.GetUserData(slots_icon);
+				
+		if ( item )
 		{
-			if ( cont.IsInherited( ClosableContainer ) )
-			{
-				c = ClosableContainer.Cast( cont );
-				if ( c.IsOpened() )
-				{
-					c.Close();
-				}
-				else
-				{
-					c.Open();
-				}
-			}
-			else if ( cont.IsInherited( VicinitySlotsContainer ) )
-			{
-				VicinitySlotsContainer c2 = VicinitySlotsContainer.Cast( cont );
-				if ( m_VicinityIconsContainer == c2 )
-				{
-					EntityAI e = c2.GetFocusedItem();
-					c = ClosableContainer.Cast( m_ShowedItems.Get( e ) );
-					if ( c )
-					{
-						if ( c.IsOpened() )
-						{
-							c.Close();
-						}
-						else
-						{
-							c.Open();
-						}
-					}
-				}
-			}
-			else if ( cont.IsInherited( CollapsibleContainer ) )
-			{
-				CollapsibleContainer c3 = CollapsibleContainer.Cast( cont );
-				c3.CollapseButtonOnMouseButtonDown( null );
-			}
+			c = Container.Cast( m_ShowedItems.Get( item ) );
+		}
+		
+		if (c)
+		{
+			ToggleContainer(c);
 		}
 	}
-	
-	void ExpandCollapseContainer()
+
+	//Call from ExpandCollapseContainer - not call
+	void ToggleContainer( Container conta )
 	{
-		ToggleContainer( GetFocusedContainer() );
+		conta.Toggle();
+	}
+	
+	override void ExpandCollapseContainer()
+	{
+		EntityAI item = GetFocusedItem();
+		Container conta;
+			
+		if( m_ShowedItems && item )
+		{
+			conta = m_ShowedItems.Get( item );
+			ToggleContainer( conta );
+		}
 	}
 	
 	override bool OnChildRemove( Widget w, Widget child )
@@ -655,5 +650,20 @@ class VicinityContainer: CollapsibleContainer
 	{
 		super.CollapseButtonOnMouseButtonDown(w);
 		ItemManager.GetInstance().SetDefaultHeaderOpenState( "VICINITY", !m_Hidden );
+	}
+	
+	//! Updates header dragability to be consistent with current 'icon' behaviour
+	void UpdateHeader(EntityAI entity, Container cont, PlayerBase player)
+	{
+		bool draggable = ItemManager.GetInstance().EvaluateContainerDragabilityDefault(entity);
+		
+		if (cont.GetHeader())
+		{
+			if (GetDragWidget() == cont.GetHeader())
+			{
+				CancelWidgetDragging();
+			}
+			ItemManager.GetInstance().SetWidgetDraggable(cont.GetHeader().GetMainWidget(),draggable);
+		}
 	}
 }

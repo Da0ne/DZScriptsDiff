@@ -1,17 +1,76 @@
 class CivilianSedan extends CarScript
 {
+	protected ref UniversalTemperatureSource m_UTSource;
+	protected ref UniversalTemperatureSourceSettings m_UTSSettings;
+	protected ref UniversalTemperatureSourceLambdaEngine m_UTSLEngine;
+
 	void CivilianSedan()
 	{
-		m_dmgContactCoef = 0.065;
+		//m_dmgContactCoef		= 0.065;
 		
-		m_EngineStartOK = "CivilianSedan_engine_start_SoundSet";
-		m_EngineStartBattery = "CivilianSedan_engine_failed_start_battery_SoundSet";
-		m_EngineStartPlug = "CivilianSedan_engine_failed_start_sparkplugs_SoundSet";
-		m_EngineStartFuel = "CivilianSedan_engine_failed_start_fuel_SoundSet";
-		m_EngineStopFuel = "offroad_engine_stop_fuel_SoundSet";
+		m_EngineStartOK 		= "CivilianSedan_engine_start_SoundSet";
+		m_EngineStartBattery	= "CivilianSedan_engine_failed_start_battery_SoundSet";
+		m_EngineStartPlug		= "CivilianSedan_engine_failed_start_sparkplugs_SoundSet";
+		m_EngineStartFuel		= "CivilianSedan_engine_failed_start_fuel_SoundSet";
+		m_EngineStopFuel		= "offroad_engine_stop_fuel_SoundSet";
 
-		m_CarDoorOpenSound = "offroad_door_open_SoundSet";
-		m_CarDoorCloseSound = "offroad_door_close_SoundSet";
+		m_CarDoorOpenSound		= "offroad_door_open_SoundSet";
+		m_CarDoorCloseSound		= "offroad_door_close_SoundSet";
+		
+		m_CarHornShortSoundName = "CivilianSedan_Horn_Short_SoundSet";
+		m_CarHornLongSoundName	= "CivilianSedan_Horn_SoundSet";
+		
+		SetEnginePos("0 0.7 1.6");
+	}
+	
+	override void EEInit()
+	{		
+		super.EEInit();
+		
+		if (GetGame().IsServer() || !GetGame().IsMultiplayer())
+		{
+ 			m_UTSSettings 					= new UniversalTemperatureSourceSettings();
+			m_UTSSettings.m_ManualUpdate 	= true;
+			m_UTSSettings.m_TemperatureMin	= 0;
+			m_UTSSettings.m_TemperatureMax	= 30;
+			m_UTSSettings.m_RangeFull		= 0.5;
+			m_UTSSettings.m_RangeMax		= 2;
+			m_UTSSettings.m_TemperatureCap	= 25;
+			
+			m_UTSLEngine					= new UniversalTemperatureSourceLambdaEngine();
+			m_UTSource						= new UniversalTemperatureSource(this, m_UTSSettings, m_UTSLEngine);
+		}		
+	}
+	
+	override void OnEngineStart()
+	{
+		super.OnEngineStart();
+
+		if (GetGame().IsServer() || !GetGame().IsMultiplayer())
+		{
+			m_UTSource.SetDefferedActive(true, 20.0);
+		}
+	}
+	
+	override void OnEngineStop()
+	{
+		super.OnEngineStop();
+
+		if (GetGame().IsServer() || !GetGame().IsMultiplayer())
+		{
+			m_UTSource.SetDefferedActive(false, 10.0);
+		}
+	}
+	
+	override void EOnPostSimulate(IEntity other, float timeSlice)
+	{
+		if (GetGame().IsServer() || !GetGame().IsMultiplayer())
+		{
+			if (m_UTSource.IsActive())
+			{
+				m_UTSource.Update(m_UTSSettings, m_UTSLEngine);
+			}
+		}
 	}
 	
 	override int GetAnimInstance()
@@ -24,9 +83,9 @@ class CivilianSedan extends CarScript
 		return 4.5;
 	}
 
-	override int GetSeatAnimationType( int posIdx )
+	override int GetSeatAnimationType(int posIdx)
 	{
-		switch( posIdx )
+		switch (posIdx)
 		{
 		case 0:
 			return DayZPlayerConstants.VEHICLESEAT_DRIVER;
@@ -62,26 +121,29 @@ class CivilianSedan extends CarScript
 		
 		if ( EngineIsOn() || GetCarDoorsState("CivSedanHood") == CarDoorState.DOORS_CLOSED )
 		{
-			if ( attType == "CarRadiator" || attType == "CarBattery" || attType == "SparkPlug" )
+			if ( attType == "CarRadiator" || attType == "CarBattery" || attType == "SparkPlug")
 				return false;
 		}
 
 		return true;
 	}
+
+	override protected bool CanManipulateSpareWheel(string slotSelectionName)
+	{
+		return GetCarDoorsState("CivSedanTrunk") != CarDoorState.DOORS_CLOSED;
+	}
 	
-	override bool CanDisplayAttachmentCategory( string category_name )
+	override bool CanDisplayAttachmentCategory(string category_name)
 	{
 		//super
-		if ( !super.CanDisplayAttachmentCategory( category_name ) )
-		return false;
+		if (!super.CanDisplayAttachmentCategory(category_name))
+			return false;
 		//
 	
-		category_name.ToLower();
-		PlayerBase player = PlayerBase.Cast( GetGame().GetPlayer() );
-		
-		if ( category_name.Contains( "engine" ) )
+		category_name.ToLower();		
+		if (category_name.Contains("engine"))
 		{
-			if ( GetCarDoorsState("CivSedanHood") == CarDoorState.DOORS_CLOSED )
+			if (GetCarDoorsState("CivSedanHood") == CarDoorState.DOORS_CLOSED)
 				return false;
 		}
 				
@@ -104,56 +166,35 @@ class CivilianSedan extends CarScript
 		CarDoor carDoor;
 
 		Class.CastTo( carDoor, FindAttachmentBySlotName( slotType ) );
-		if ( !carDoor )
-			return CarDoorState.DOORS_MISSING;
-	
-		switch( slotType )
+		if (!carDoor)
 		{
-			case "CivSedanDriverDoors":
-				if ( GetAnimationPhase("DoorsDriver") > 0.5 )
-					return CarDoorState.DOORS_OPEN;
-				else
-					return CarDoorState.DOORS_CLOSED;
-
+			return CarDoorState.DOORS_MISSING;
+		}
+	
+		switch (slotType)
+		{
+		case "CivSedanDriverDoors":
+			return TranslateAnimationPhaseToCarDoorState("DoorsDriver");
 			break;
-			
-			case "CivSedanCoDriverDoors":
-				if ( GetAnimationPhase("DoorsCoDriver") > 0.5 )
-					return CarDoorState.DOORS_OPEN;
-				else
-					return CarDoorState.DOORS_CLOSED;
-
+		
+		case "CivSedanCoDriverDoors":
+			return TranslateAnimationPhaseToCarDoorState("DoorsCoDriver");
 			break;
-			
-			case "CivSedanCargo1Doors":
-				if ( GetAnimationPhase("DoorsCargo1") > 0.5 )
-					return CarDoorState.DOORS_OPEN;
-				else
-					return CarDoorState.DOORS_CLOSED;
 
+		case "CivSedanCargo1Doors":
+			return TranslateAnimationPhaseToCarDoorState("DoorsCargo1");
 			break;
-			
-			case "CivSedanCargo2Doors":
-				if ( GetAnimationPhase("DoorsCargo2") > 0.5 )
-					return CarDoorState.DOORS_OPEN;
-				else
-					return CarDoorState.DOORS_CLOSED;
-			break;
-			
-			case "CivSedanTrunk":
-				if ( GetAnimationPhase("DoorsTrunk") > 0.5 )
-					return CarDoorState.DOORS_OPEN;
-				else
-					return CarDoorState.DOORS_CLOSED;
 
+		case "CivSedanCargo2Doors":
+			return TranslateAnimationPhaseToCarDoorState("DoorsCargo2");
 			break;
-			
-			case "CivSedanHood":
-				if ( GetAnimationPhase("DoorsHood") > 0.5 )
-					return CarDoorState.DOORS_OPEN;
-				else
-					return CarDoorState.DOORS_CLOSED;
-
+		
+		case "CivSedanTrunk":
+			return TranslateAnimationPhaseToCarDoorState("DoorsTrunk");
+			break;
+		
+		case "CivSedanHood":
+			return TranslateAnimationPhaseToCarDoorState("DoorsHood");
 			break;
 		}
 
@@ -166,28 +207,28 @@ class CivilianSedan extends CarScript
 		switch( posIdx )
 		{
 			case 0:
-				if ( GetCarDoorsState( "CivSedanDriverDoors" ) == CarDoorState.DOORS_CLOSED )
+				if ( GetCarDoorsState("CivSedanDriverDoors") == CarDoorState.DOORS_CLOSED )
 					return false;
 
 				return true;
 			break;
 			
 			case 1:
-				if ( GetCarDoorsState( "CivSedanCoDriverDoors" ) == CarDoorState.DOORS_CLOSED )
+				if ( GetCarDoorsState("CivSedanCoDriverDoors") == CarDoorState.DOORS_CLOSED )
 					return false;
 
 				return true;
 			break;
 
 			case 2:
-				if ( GetCarDoorsState( "CivSedanCargo1Doors" ) == CarDoorState.DOORS_CLOSED )
+				if ( GetCarDoorsState("CivSedanCargo1Doors") == CarDoorState.DOORS_CLOSED )
 					return false;
 
 				return true;
 			break;
 
 			case 3:
-				if ( GetCarDoorsState( "CivSedanCargo2Doors" ) == CarDoorState.DOORS_CLOSED )
+				if ( GetCarDoorsState("CivSedanCargo2Doors") == CarDoorState.DOORS_CLOSED )
 					return false;
 
 				return true;
@@ -241,66 +282,65 @@ class CivilianSedan extends CarScript
 
 	// 0 full ambient and engine sound
 	// 1 zero ambient and engine sound
-	override float OnSound( CarSoundCtrl ctrl, float oldValue )
+	override float OnSound(CarSoundCtrl ctrl, float oldValue)
 	{
-		switch ( ctrl )
+		switch (ctrl)
 		{
-			case CarSoundCtrl.DOORS:
-				float newValue = 0;
-				
-				//-----
-				if ( GetCarDoorsState( "CivSedanDriverDoors" ) == CarDoorState.DOORS_CLOSED )
-					newValue += 0.25;
+		case CarSoundCtrl.DOORS:
+			float newValue = 0;
+			if (GetCarDoorsState("CivSedanDriverDoors") == CarDoorState.DOORS_CLOSED)
+			{
+				newValue += 0.25;
+			}
 
-				//-----
-				if ( GetCarDoorsState( "CivSedanCoDriverDoors" ) == CarDoorState.DOORS_CLOSED )
-					newValue += 0.25;
-			
-				//-----
-				if ( GetCarDoorsState( "CivSedanCargo1Doors" ) == CarDoorState.DOORS_CLOSED )
-					newValue += 0.25;
+			if (GetCarDoorsState("CivSedanCoDriverDoors") == CarDoorState.DOORS_CLOSED)
+			{
+				newValue += 0.25;
+			}
+		
+			if (GetCarDoorsState("CivSedanCargo1Doors") == CarDoorState.DOORS_CLOSED)
+			{
+				newValue += 0.25;
+			}
 
-				//-----
-				if ( GetCarDoorsState( "CivSedanCargo2Doors" ) == CarDoorState.DOORS_CLOSED )
-					newValue += 0.25;
-			
-				//-----
-				if ( GetHealthLevel( "WindowFront") == GameConstants.STATE_RUINED )
-					newValue -= 0.6;
+			if (GetCarDoorsState("CivSedanCargo2Doors") == CarDoorState.DOORS_CLOSED)
+			{
+				newValue += 0.25;
+			}
+		
+			if (GetHealthLevel("WindowFront") == GameConstants.STATE_RUINED)
+			{
+				newValue -= 0.6;
+			}
 
-				//-----
-				if ( GetHealthLevel( "WindowBack") == GameConstants.STATE_RUINED )
-					newValue -= 0.6;
-			
-				if ( newValue > 1 )
-					newValue = 1;
-			
-				if ( newValue < 0 )
-					newValue = 0;
-			
-				return newValue;
-			break;
+			if (GetHealthLevel("WindowBack") == GameConstants.STATE_RUINED)
+			{
+				newValue -= 0.6;
+			}
+		
+			return Math.Clamp(newValue, 0, 1);
+		break;
 		}
 
-		return oldValue;
+		return super.OnSound(ctrl, oldValue);
 	}
 
-	override string GetAnimSourceFromSelection( string selection )
+	override string GetAnimSourceFromSelection(string selection)
 	{
-		switch( selection )
+		switch (selection)
 		{
-		case "doors_driver":
-			return "DoorsDriver";
-		case "doors_codriver":
-			return "DoorsCoDriver";
-		case "doors_cargo1":
-			return "DoorsCargo1";
-		case "doors_cargo2":
-			return "DoorsCargo2";
-		case "doors_hood":
-			return "DoorsHood";
-		case "doors_trunk":
-			return "DoorsTrunk";
+			case "doors_driver":
+				return "DoorsDriver";
+			case "doors_codriver":
+				return "DoorsCoDriver";
+			case "doors_cargo1":
+				return "DoorsCargo1";
+			case "doors_cargo2":
+				return "DoorsCargo2";
+			case "doors_hood":
+				return "DoorsHood";
+			case "doors_trunk":
+				return "DoorsTrunk";
 		}
 
 		return "";
@@ -316,26 +356,21 @@ class CivilianSedan extends CarScript
 		return false;
 	}
 	
-	override bool CanReachSeatFromSeat( int currentSeat, int nextSeat )
+	override bool CanReachSeatFromSeat(int currentSeat, int nextSeat)
 	{
-		switch( currentSeat )
+		switch (currentSeat)
 		{
-		case 0:
-			if ( nextSeat == 1 )
-				return true;
-			break;
-		case 1:
-			if ( nextSeat == 0 )
-				return true;
-			break;
-		case 2:
-			if ( nextSeat == 3 )
-				return true;
-			break;
-		case 3:
-			if ( nextSeat == 2 )
-				return true;
-			break;
+			case 0:
+				return nextSeat == 1;
+	
+			case 1:
+				return nextSeat == 0;
+	
+			case 2:
+				return nextSeat == 3;
+	
+			case 3:
+				return nextSeat == 2;
 		}
 		
 		return false;
@@ -343,32 +378,19 @@ class CivilianSedan extends CarScript
 
 	override bool CanReachDoorsFromSeat( string pDoorsSelection, int pCurrentSeat )
 	{
-		switch( pCurrentSeat )
+		switch (pCurrentSeat)
 		{
-		case 0:
-			if (pDoorsSelection == "DoorsDriver")
-			{
-				return true;
-			}
-		break;
-		case 1:
-			if (pDoorsSelection == "DoorsCoDriver")
-			{
-				return true;
-			}
-		break;
-		case 2:
-			if (pDoorsSelection == "DoorsCargo1")
-			{
-				return true;
-			}
-		break;
-		case 3:
-			if (pDoorsSelection == "DoorsCargo2")
-			{
-				return true;
-			}
-		break;
+			case 0:
+				return pDoorsSelection == "DoorsDriver";
+	
+			case 1:
+	 			return pDoorsSelection == "DoorsCoDriver";
+	
+			case 2:
+				return pDoorsSelection == "DoorsCargo1";
+	
+			case 3:
+				return pDoorsSelection == "DoorsCargo2";
 		}
 		
 		return false;		
@@ -376,100 +398,76 @@ class CivilianSedan extends CarScript
 
 	override void OnDebugSpawn()
 	{
-		EntityAI entity;
-		
-		if ( Class.CastTo(entity, this) )
-		{
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
+		SpawnUniversalParts();
+		SpawnAdditionalItems();
+		FillUpCarFluids();
 
-			entity.GetInventory().CreateInInventory( "CarBattery" );
-			entity.GetInventory().CreateInInventory( "SparkPlug" );
-			entity.GetInventory().CreateInInventory( "CarRadiator" );
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
 
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_Driver" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_CoDriver" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_BackLeft" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_BackRight" );
-			entity.GetInventory().CreateInInventory( "CivSedanHood" );
-			entity.GetInventory().CreateInInventory( "CivSedanTrunk" );
+		GetInventory().CreateInInventory("CivSedanDoors_Driver");
+		GetInventory().CreateInInventory("CivSedanDoors_CoDriver");
+		GetInventory().CreateInInventory("CivSedanDoors_BackLeft");
+		GetInventory().CreateInInventory("CivSedanDoors_BackRight");
+		GetInventory().CreateInInventory("CivSedanHood");
+		GetInventory().CreateInInventory("CivSedanTrunk");
 
-			entity.GetInventory().CreateInInventory( "HeadlightH7" );
-			entity.GetInventory().CreateInInventory( "HeadlightH7" );
-		}
-
-		Fill( CarFluid.FUEL, 50 );
-		Fill( CarFluid.COOLANT, 6.0 );
-		Fill( CarFluid.OIL, 4.0 );
+		//-----IN CAR CARGO
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
 	}
-};
+}
 
 class CivilianSedan_Wine extends CivilianSedan
 {
 	override void OnDebugSpawn()
 	{
-		EntityAI entity;
-		
-		if ( Class.CastTo(entity, this) )
-		{
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
+		SpawnUniversalParts();
+		SpawnAdditionalItems();
+		FillUpCarFluids();
 
-			entity.GetInventory().CreateInInventory( "CarBattery" );
-			entity.GetInventory().CreateInInventory( "SparkPlug" );
-			entity.GetInventory().CreateInInventory( "CarRadiator" );
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
 
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_Driver_Wine" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_CoDriver_Wine" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_BackLeft_Wine" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_BackRight_Wine" );
-			entity.GetInventory().CreateInInventory( "CivSedanHood_Wine" );
-			entity.GetInventory().CreateInInventory( "CivSedanTrunk_Wine" );
+		GetInventory().CreateInInventory("CivSedanDoors_Driver_Wine");
+		GetInventory().CreateInInventory("CivSedanDoors_CoDriver_Wine");
+		GetInventory().CreateInInventory("CivSedanDoors_BackLeft_Wine");
+		GetInventory().CreateInInventory("CivSedanDoors_BackRight_Wine");
+		GetInventory().CreateInInventory("CivSedanHood_Wine");
+		GetInventory().CreateInInventory("CivSedanTrunk_Wine");
 
-			entity.GetInventory().CreateInInventory( "HeadlightH7" );
-			entity.GetInventory().CreateInInventory( "HeadlightH7" );
-		}
-
-		Fill( CarFluid.FUEL, 50 );
-		Fill( CarFluid.COOLANT, 6.0 );
-		Fill( CarFluid.OIL, 4.0 );
+		//-----IN CAR CARGO
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
 	}
-};
+}
 
 class CivilianSedan_Black extends CivilianSedan
 {
 	override void OnDebugSpawn()
 	{
-		EntityAI entity;
-		
-		if ( Class.CastTo(entity, this) )
-		{
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
-			entity.GetInventory().CreateInInventory( "CivSedanWheel" );
+		SpawnUniversalParts();
+		SpawnAdditionalItems();
+		FillUpCarFluids();
 
-			entity.GetInventory().CreateInInventory( "CarBattery" );
-			entity.GetInventory().CreateInInventory( "SparkPlug" );
-			entity.GetInventory().CreateInInventory( "CarRadiator" );
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
 
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_Driver_Black" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_CoDriver_Black" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_BackLeft_Black" );
-			entity.GetInventory().CreateInInventory( "CivSedanDoors_BackRight_Black" );
-			entity.GetInventory().CreateInInventory( "CivSedanHood_Black" );
-			entity.GetInventory().CreateInInventory( "CivSedanTrunk_Black" );
+		GetInventory().CreateInInventory("CivSedanDoors_Driver_Black");
+		GetInventory().CreateInInventory("CivSedanDoors_CoDriver_Black");
+		GetInventory().CreateInInventory("CivSedanDoors_BackLeft_Black");
+		GetInventory().CreateInInventory("CivSedanDoors_BackRight_Black");
+		GetInventory().CreateInInventory("CivSedanHood_Black");
+		GetInventory().CreateInInventory("CivSedanTrunk_Black");
 
-			entity.GetInventory().CreateInInventory( "HeadlightH7" );
-			entity.GetInventory().CreateInInventory( "HeadlightH7" );
-		}
-
-		Fill( CarFluid.FUEL, 50 );
-		Fill( CarFluid.COOLANT, 6.0 );
-		Fill( CarFluid.OIL, 4.0 );
+		//-----IN CAR CARGO
+		GetInventory().CreateInInventory("CivSedanWheel");
+		GetInventory().CreateInInventory("CivSedanWheel");
 	}
-};
+}

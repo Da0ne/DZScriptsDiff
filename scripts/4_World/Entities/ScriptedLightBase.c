@@ -24,8 +24,12 @@ class ScriptedLightBase extends EntityLightSource
 	float 		m_BrightnessSpeedOfChange = 1;
 	float 		m_RadiusSpeedOfChange = 1;
 	float 		m_OptimizeShadowsRadius = 0; // Within this range between the light source and camera the shadows will be automatically disabled to save on performance
+	
 	float 		m_DancingShadowsAmplitude;
 	float 		m_DancingShadowsSpeed;
+	
+	float		m_BlinkingSpeed;
+	
 	bool 		m_IsDebugEnabled = false;
 	
 	Object 		m_Parent; // Attachment parent
@@ -35,12 +39,38 @@ class ScriptedLightBase extends EntityLightSource
 	
 	ref Timer 	m_DeleteTimer;
 	
+	static ref set<ScriptedLightBase> m_NightTimeOnlyLights = new set<ScriptedLightBase>();
+	
 	//! Constructor. Everything here is executed before the constructor of all children.
 	void ScriptedLightBase()
 	{
 		m_LifetimeStart = GetGame().GetTime();
 		SetEnabled(true);
 		SetEventMask(EntityEvent.FRAME);
+		SetEventMask(EntityEvent.INIT);
+	}
+	
+	void ~ScriptedLightBase()
+	{
+		if (m_NightTimeOnlyLights)
+		{
+			int index = m_NightTimeOnlyLights.Find(this);
+			if (index != -1)
+			{
+				m_NightTimeOnlyLights.Remove(index);
+			}
+		}
+	}
+	
+	override void EOnInit(IEntity other, int extra)
+	{
+		if (!IsVisibleDuringDaylight())
+		{
+			PlayerBase player = PlayerBase.Cast(GetGame().GetPlayer());
+			if (player && player.m_UndergroundPresence)
+				SetVisibleDuringDaylight(true);
+			m_NightTimeOnlyLights.Insert(this);
+		}
 	}
 	
 	override bool IsScriptedLight()
@@ -48,15 +78,41 @@ class ScriptedLightBase extends EntityLightSource
 		return true;
 	}
 	
+	void UpdateMode()
+	{
+		ItemBase item = ItemBase.Cast(m_Parent);
+		if (item)
+		{
+			InventoryLocation il = new InventoryLocation;
+			item.GetInventory().GetCurrentInventoryLocation( il );
+			string slotName;
+			if (il.GetType() == InventoryLocationType.GROUND)
+			{
+				slotName = "Ground";
+			}
+			else if (il.GetSlot() != -1)
+			{
+				slotName = InventorySlots.GetSlotName(il.GetSlot());
+			}
+			UpdateLightMode(slotName);			
+		}
+	}
+	
+	private void UpdateLightMode(string slotName);
+	
 	//! Correct way of deleting light from memory. It is necesarry to have this delay due to hierarchy.
 	private void DeleteLightWithDelay()
 	{
 		DetachFromParent(); // This is the reason for the delay
 		
-		if (!m_DeleteTimer)
-			m_DeleteTimer = new Timer( CALL_CATEGORY_SYSTEM );
-			
-		m_DeleteTimer.Run( 0.03 , this, "DeleteLightNow", NULL, true);
+		if (GetGame())
+		{
+			if (!m_DeleteTimer)
+				m_DeleteTimer = new Timer( CALL_CATEGORY_SYSTEM );
+	
+			m_DeleteTimer.Run( 0.03 , this, "DeleteLightNow", NULL, true);
+		}
+		
 	}
 	
 	// Deletes light now. Do not call this directly. Call Destroy() instead. Otherwise you might get errors related to hierarchy.
@@ -103,16 +159,31 @@ class ScriptedLightBase extends EntityLightSource
 	//! Attaches this light on the parent entity's memory point, with optional direction target memory point.
 	void AttachOnMemoryPoint(Object parent, string memory_point_start, string memory_point_target = "")
 	{
-		m_LocalPos = parent.GetMemoryPointPos(memory_point_start);
-		vector local_ori;
-		if (memory_point_target != "")
+		if (parent.MemoryPointExists(memory_point_start))
 		{
-			vector target_pos = parent.GetSelectionPositionLS(memory_point_target);
-			target_pos = vector.Direction(m_LocalPos, target_pos);
-			local_ori = target_pos.VectorToAngles();
+			m_LocalPos = parent.GetMemoryPointPos(memory_point_start);
+			vector local_ori;
+			
+			if (memory_point_target != "" )
+			{
+				if (parent.MemoryPointExists(memory_point_target))
+				{
+					vector target_pos = parent.GetSelectionPositionLS(memory_point_target);
+					target_pos = vector.Direction(m_LocalPos, target_pos);
+					local_ori = target_pos.VectorToAngles();
+				}
+				else
+				{
+					ErrorEx("memory point 'memory_point_target' not found when attaching light");
+				}
+			}
+			AttachOnObject(parent, m_LocalPos, local_ori);	
+			UpdateMode();
 		}
-		
-		AttachOnObject(parent, m_LocalPos, local_ori);
+		else
+		{
+			ErrorEx("memory point 'memory_point_start' not found when attaching light");
+		}
 	}
 	
 	//! Detaches this light from its parent entity.
@@ -134,6 +205,17 @@ class ScriptedLightBase extends EntityLightSource
 		m_Parent = null;
 		m_LocalPos = Vector(0,0,0);
 		m_LocalOri = Vector(0,0,0);
+	}
+	
+	static ScriptedLightBase CreateLightAtObjMemoryPoint(typename name, notnull Object target, string memory_point_start, string memory_point_target = "", vector global_pos = "0 0 0", float fade_in_time_in_s = 0)
+	{
+		ScriptedLightBase light;
+		if (target.MemoryPointExists(memory_point_start))
+		{
+			light = CreateLight(name, global_pos, fade_in_time_in_s);
+			light.AttachOnMemoryPoint(target, memory_point_start, memory_point_target);
+		}
+		return light;
 	}
 	
 	//! Creates an instance of light on the given position. Optionally, use fade_in_time_in_s parameter to make the light fade into existence.
@@ -240,7 +322,10 @@ class ScriptedLightBase extends EntityLightSource
 	{
 		ClearEventMask(EntityEvent.FRAME);
 		SetEnabled(false);
-		DeleteLightWithDelay();
+		if (m_Parent)
+			DeleteLightWithDelay();
+		else
+			DeleteLightNow();
 	}
 	
 	//! Makes the light destroy itself after the given time in seconds. The light will fade out if it's set to do so with SetFadeOutTime(...)
@@ -321,6 +406,8 @@ class ScriptedLightBase extends EntityLightSource
 		CheckIfParentIsInCargo();
 		TryShadowOptimization();
 		OnFrameLightSource(other, timeSlice);
+		
+		HandleBlinking(current_time);
 	}
 	
 	//! Sets the maximum range of the point light within the dancing shadows effect
@@ -383,7 +470,7 @@ class ScriptedLightBase extends EntityLightSource
 			
 			if (m_IsDebugEnabled)
 			{
-				Particle p = Particle.PlayInWorld( ParticleList.DEBUG_DOT, GetPosition() );
+				Particle p = ParticleManager.GetInstance().PlayInWorld( ParticleList.DEBUG_DOT, GetPosition() );
 				p.SetParticleParam( EmitorParam.SIZE, 0.01);
 			}
 		}
@@ -611,5 +698,32 @@ class ScriptedLightBase extends EntityLightSource
 		{
 			SetRadius(m_Radius);
 		}
+	}
+	
+	//! Sets blinking speed (no blinking if speed <= 0)
+	void SetBlinkingSpeed(float _speed)
+	{
+		m_BlinkingSpeed = _speed;
+	}
+	
+	//! Returns the speed of blinks
+	float GetBlinkingSpeed()
+	{
+		return m_BlinkingSpeed;
+	}
+	
+	// handles blinking. Turns light  on and off on regular intervals
+	private void HandleBlinking(float time)
+	{
+		if ( m_BlinkingSpeed <= 0 )
+			return;
+		
+		float multiplier;
+
+		multiplier = Math.Sin(time * 0.001 * m_BlinkingSpeed);		// Oscillate the multiplier overtime (time normalized to sec)
+		multiplier = (multiplier + 1)/2;							// Normalized the value to 0-1 
+		
+		multiplier = Math.Round(multiplier);						// Rounding to 0 or 1 to make it blink instantly	
+		SetBrightness(m_Brightness * multiplier);
 	}
 };

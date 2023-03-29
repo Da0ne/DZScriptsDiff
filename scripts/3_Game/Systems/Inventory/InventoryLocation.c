@@ -174,6 +174,11 @@ class InventoryLocation
 	 * brief	sets current inventory location's GetParent
 	 **/
 	proto native void SetParent (notnull EntityAI parent);
+	/**
+	 * @fn		SetItem
+	 * brief	sets current inventory location's item
+	 **/
+	proto native void SetItem (notnull EntityAI item);
 
 	// direct set methods
 	proto native void SetSlot (int slotId);

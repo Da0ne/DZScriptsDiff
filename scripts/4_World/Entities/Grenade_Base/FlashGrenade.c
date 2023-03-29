@@ -8,36 +8,30 @@ class FlashGrenade extends Grenade_Base
 
 		PlayerBase player = PlayerBase.Cast(GetGame().GetPlayer());
 
-		if ( player )
+		if (player)
 		{
-			bool visual = false;
-			vector headPos = player.GetDamageZonePos("Head"); // animated position in the middle of the zone
+			vector headPos 			= player.GetDamageZonePos("Head"); // animated position in the middle of the zone
+			float ammoRangeKill	 	= GetGame().ConfigGetFloat(string.Format("CfgAmmo %1 indirectHitRange", ammoType));
+			float ammoRangeMaxMult 	= 4.0;
 			
-			// get grenade range
-			string grenade_path = "cfgAmmo " + ammoType + " indirectHitRange";
-			float ammo_kill_range = GetGame().ConfigGetFloat(grenade_path);
-			float ammo_max_range_mult = 4.0;
-			
-			grenade_path = "cfgAmmo " + ammoType + " indirectHitRangeMultiplier";
-			if (GetGame().ConfigIsExisting(grenade_path))
+			string indirectHitRangeMultiplier = string.Format("CfgAmmo %1 indirectHitRangeMultiplier", ammoType);
+			if (GetGame().ConfigIsExisting(indirectHitRangeMultiplier))
 			{
-				ammo_max_range_mult = GetGame().ConfigGetFloat(grenade_path);
-				if (ammo_max_range_mult < 1.0) //values less than 1.0 make no sense
-				{
-					ammo_max_range_mult = 1.0;
-				}
+				//! values less than 1.0 make no sense
+				ammoRangeMaxMult = Math.Clamp(GetGame().ConfigGetFloat(indirectHitRangeMultiplier), 1.0, float.MAX);
 			}
-			float ammo_max_range = ammo_kill_range * ammo_max_range_mult;
-			ammo_max_range = Math.Clamp( ammo_max_range * FX_RANGE_MAX_MULT,ammo_kill_range,ammo_max_range );
+
+			float ammoRangeMax = ammoRangeKill * ammoRangeMaxMult;
+			ammoRangeMax = Math.Clamp(ammoRangeMax * FX_RANGE_MAX_MULT, ammoRangeKill, ammoRangeMax);
 			
-			float dist = vector.Distance(headPos, pos);
-			float dist_sq = vector.DistanceSq(headPos, pos);
-			float radius_sq_max = Math.SqrFloat(ammo_max_range);
+			float dist			= vector.Distance(headPos, pos);
+			float distSq 		= vector.DistanceSq(headPos, pos);
+			float radiusMaxSq = Math.SqrFloat(ammoRangeMax);
 			
-			if ( dist_sq <= radius_sq_max )
+			if (distSq <= radiusMaxSq)
 			{
 				// ignore collisions with parent if fireplace
-				InventoryItem invItem = InventoryItem.Cast( source );
+				InventoryItem invItem = InventoryItem.Cast(source);
 				EntityAI parent = invItem.GetHierarchyParent();
 				array<Object> excluded = new array<Object>;
 				
@@ -50,29 +44,33 @@ class FlashGrenade extends Grenade_Base
 				excluded.Insert(this); //Ignore self for visibility check
 				
 				//There shouldn't be cases justifying we go further than first entry (if in fireplace, self does not impact)
-				RaycastRVParams rayParams = new RaycastRVParams(pos, headPos, excluded[0]);
+				RaycastRVParams rayParams	= new RaycastRVParams(pos, headPos, excluded[0]);
+				rayParams.flags				= CollisionFlags.ALLOBJECTS;
 				DayZPhysics.RaycastRVProxy(rayParams, results, excluded);
-				
-				//If player is not first index, object is between player and grenade
-				if (PlayerBase.Cast(results[0].obj))
+
+				//! removes possible obstacles made by items around the grenade(or on the same position)
+				array<Object> hitObjects = new array<Object>;
+				for (int i = 0; i < results.Count(); i++)
 				{
-					if ( MiscGameplayFunctions.IsPlayerOrientedTowardPos(player, pos, 60) )
+					if (results[i].obj && !results[i].obj.IsInherited(ItemBase))
 					{
-						visual = true;
+						hitObjects.Insert(results[i].obj);
 					}
-					
-					float duration_coef;
-					if (ammo_max_range == ammo_kill_range)
+				}
+
+				//If player is not first index, object is between player and grenade
+				if (hitObjects.Count() && PlayerBase.Cast(hitObjects[0]))
+				{
+					float effectCoef;
+					if (ammoRangeMax == ammoRangeKill)
 					{
-						duration_coef = 1.0; //edge case, landed right on the edge
+						effectCoef = 1.0; //edge case, landed right on the edge
 					}
-					duration_coef = 1 - ((dist - ammo_kill_range) / (ammo_max_range - ammo_kill_range));
-					duration_coef = Math.Clamp(duration_coef,0.1,100.0);
-					
-					float effect_coef = duration_coef;
-					
-					player.OnPlayerReceiveFlashbangHitStart(visual);
-					player.GetFlashbangEffect().SetupFlashbangValues(duration_coef,effect_coef,effect_coef);
+					effectCoef = 1 - ((dist - ammoRangeKill) / (ammoRangeMax - ammoRangeKill));
+					effectCoef = Math.Clamp(effectCoef, 0.1, 100.0);
+
+					player.OnPlayerReceiveFlashbangHitStart(MiscGameplayFunctions.IsPlayerOrientedTowardPos(player, pos, 60));
+					player.GetFlashbangEffect().SetupFlashbangValues(effectCoef, effectCoef, effectCoef);
 				}
 			}
 		}
@@ -88,7 +86,7 @@ class FlashGrenade extends Grenade_Base
 	
 	protected override void CreateLight()
 	{
-		m_Light = GrenadeLight.Cast( ScriptedLightBase.CreateLight( FlashGrenadeLight, GetPosition()) );
+		m_Light = ExplosiveLight.Cast(ScriptedLightBase.CreateLight(FlashGrenadeLight, GetPosition()));
 	}
 
 	void ~FlashGrenade() {}

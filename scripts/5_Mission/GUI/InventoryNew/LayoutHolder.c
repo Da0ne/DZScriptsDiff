@@ -8,6 +8,7 @@ class LayoutHolder extends ScriptedWidgetEventHandler
 	
 	protected bool					m_IsActive;
 	protected bool					m_ImmedUpdate;
+	protected bool					m_TooltipOwner;
 	
 	protected EntityAI				m_am_entity1, m_am_entity2;
 
@@ -30,7 +31,7 @@ class LayoutHolder extends ScriptedWidgetEventHandler
 	void ShowActionMenu(InventoryItem item)
 	{
 		PlayerBase m_player = PlayerBase.Cast( GetGame().GetPlayer() );
-		ItemManager.GetInstance().HideTooltip();
+		HideOwnedTooltip();
 		m_am_entity1 = item;
 		m_am_entity2 = null;
 		ContextMenu cmenu = GetGame().GetUIManager().GetMenu().GetContextMenu();
@@ -38,41 +39,40 @@ class LayoutHolder extends ScriptedWidgetEventHandler
 		cmenu.Hide();
 		cmenu.Clear();
 
-		if(m_am_entity1 == null)
+		if (m_am_entity1 == null)
 			return;
 
-		ref TSelectableActionInfoArray customActions = new TSelectableActionInfoArray;
-		ItemBase itemBase = ItemBase.Cast( item );
-		
-		///itemBase.GetRecipesActions(m_player, customActions);
+		TSelectableActionInfoArrayEx customActions = new TSelectableActionInfoArrayEx();
+		ItemBase itemBase = ItemBase.Cast(item);
+		itemBase.GetDebugActions(customActions);
 
-		if( ItemBase.GetDebugActionsMask() & DebugActionType.GENERIC_ACTIONS )
-		{
-			itemBase.GetDebugActions(customActions);
-		}
-		if( ItemBase.GetDebugActionsMask() & DebugActionType.PLAYER_AGENTS )
+		if (ItemBase.GetDebugActionsMask() & DebugActionType.PLAYER_AGENTS)
 		{
 			m_player.GetDebugActions(customActions);
 		}
 
 		int actionsCount = customActions.Count();
-		for ( int i = 0; i < customActions.Count(); i++ )
+		for (int i = 0; i < customActions.Count(); i++)
 		{
-			TSelectableActionInfo actionInfo = customActions.Get(i);
-			if( actionInfo )
+			TSelectableActionInfoWithColor actionInfo = TSelectableActionInfoWithColor.Cast(customActions.Get(i));
+			if (actionInfo)
 			{
-				int actionId = actionInfo.param2;
-				string actionText = actionInfo.param3;
+				int actionId 		= actionInfo.param2;
+				int textColor		= actionInfo.param4;
+				string actionText 	= actionInfo.param3;
 
-				cmenu.Add(actionText, this, "OnSelectAction", new Param2<ItemBase, int>(itemBase, actionId));
+				if (actionId == EActions.SEPARATOR)
+					cmenu.AddEx(actionText, textColor, this, "", null);
+				else
+					cmenu.AddEx(actionText, textColor, this, "OnSelectAction", new Param3<ItemBase, int, int>(itemBase, actionId, textColor));
 			}
 		}
 
-		int m_am_Pos_x,  m_am_Pos_y;
-		GetMousePos( m_am_Pos_x, m_am_Pos_y );
-				m_am_Pos_x -= 5;
-		m_am_Pos_y -= 5;
-		cmenu.Show(m_am_Pos_x, m_am_Pos_y);
+		int actionMenuPosX, actionMenuPosY;
+		GetMousePos(actionMenuPosX, actionMenuPosY);
+		actionMenuPosX -= 5;
+		actionMenuPosY -= 5;
+		cmenu.Show(actionMenuPosX, actionMenuPosY);
 	}
 	
 	
@@ -83,6 +83,8 @@ class LayoutHolder extends ScriptedWidgetEventHandler
 		SetLayoutName();
 		SetParentWidget();
 		SetImmedUpdate();
+		
+		m_TooltipOwner = false;
 		
 		if ( m_LayoutName != "" )
 		{
@@ -110,6 +112,7 @@ class LayoutHolder extends ScriptedWidgetEventHandler
 	
 	void ~LayoutHolder()
 	{
+		HideOwnedTooltip();
 		delete m_RootWidget;
 	}	
 		
@@ -136,11 +139,14 @@ class LayoutHolder extends ScriptedWidgetEventHandler
 	{
 		return m_Parent;
 	}
-
-	void SetActive( bool active )
+	
+	void SetActive(bool active)
 	{
 		m_IsActive = active;
 	}
+	
+	void SetLastActive();
+	void SetFirstActive();
 
 	bool IsActive()
 	{
@@ -155,6 +161,20 @@ class LayoutHolder extends ScriptedWidgetEventHandler
 	Widget GetRootWidget()
 	{
 		return m_RootWidget;
+	}
+	
+	bool IsDisplayable()
+	{
+		return true;
+	}
+	
+	bool IsVisible()
+	{
+		if (m_RootWidget)
+		{
+			return m_RootWidget.IsVisible();
+		}
+		return false;
 	}
 
 	void OnShow()
@@ -183,6 +203,40 @@ class LayoutHolder extends ScriptedWidgetEventHandler
 			GetGame().GetMission().GetHud().ShowHudUI( false );
 			GetGame().GetMission().GetHud().ShowQuickbarUI( false );
 			inspect_menu.SetItem( item );
+		}
+	}
+	
+	void UpdateSelectionIcons()
+	{}
+	
+	void PrepareOwnedTooltip(EntityAI item/*, Widget w*/, int x = 0, int y = 0)
+	{
+		ItemManager.GetInstance().PrepareTooltip(item,x,y);
+		m_TooltipOwner = true;
+	}
+	
+	void PrepareOwnedSlotsTooltip(Widget w, string name, string desc, int x = 0, int y = 0)
+	{
+		ItemManager.GetInstance().SetTooltipWidget(w);
+		ItemManager.GetInstance().PrepareSlotsTooltip(name,desc,x,y);
+		m_TooltipOwner = true;
+	}
+	
+	void HideOwnedTooltip()
+	{
+		if (m_TooltipOwner)
+		{
+			ItemManager.GetInstance().HideTooltip();
+			m_TooltipOwner = false;
+		}
+	}
+	
+	void HideOwnedSlotsTooltip()
+	{
+		if (m_TooltipOwner)
+		{
+			ItemManager.GetInstance().HideTooltipSlot();
+			m_TooltipOwner = false;
 		}
 	}
 }

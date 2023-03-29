@@ -115,15 +115,15 @@ class AreaExposureMdfr: ModifierBase
 	void BleedingSourceCreateCheck(PlayerBase player)
 	{
 		int free_bs_locations = 0;//bitmask where each bit set to 1 represents available bleeding source location
-		set<int> list = m_Player.GetBleedingManagerServer().GetBleedingSourcesLocations();
+		set<int> list = player.GetBleedingManagerServer().GetBleedingSourcesLocations();
 		
 		foreach(int location: list)
 		{
-			float prot_level = PluginTransmissionAgents.GetProtectionLevelEx(DEF_CHEMICAL, location, m_Player, true);
+			float prot_level = PluginTransmissionAgents.GetProtectionLevelEx(DEF_CHEMICAL, location, player, true);
 			float dice_throw = Math.RandomFloat01();
 			if(dice_throw > prot_level)
 			{
-				free_bs_locations = m_Player.GetBleedingManagerServer().GetFreeBleedingSourceBitsByInvLocation(location) | free_bs_locations;
+				free_bs_locations = player.GetBleedingManagerServer().GetFreeBleedingSourceBitsByInvLocation(location) | free_bs_locations;
 			}
 		}
 		
@@ -133,9 +133,8 @@ class AreaExposureMdfr: ModifierBase
 		{
 			int random_bs_index = Math.RandomIntInclusive(0, num_of_free_bs - 1 );// - 1 on the max to convert count to index
 			int random_bs_bit = Math.Pow(2, Math.GetNthBitSet(free_bs_locations,random_bs_index));
-			m_Player.GetBleedingManagerServer().AttemptAddBleedingSourceDirectly(random_bs_bit, eBleedingSourceType.CONTAMINATED);
+			player.GetBleedingManagerServer().AttemptAddBleedingSourceDirectly(random_bs_bit, eBleedingSourceType.CONTAMINATED);
 		}
-
 	}
 
 	float TransmitAgents(PlayerBase player, float count)

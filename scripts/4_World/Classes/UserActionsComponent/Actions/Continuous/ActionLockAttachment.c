@@ -32,10 +32,16 @@ class ActionLockAttachment: ActionContinuousBase
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT;
 		m_FullBody = true;
 	}
-
-	override string GetText()
+	
+	override void OnActionInfoUpdate( PlayerBase player, ActionTarget target, ItemBase item )
 	{
-		return m_Name;
+		ItemBase target_IB = ItemBase.Cast(target.GetObject());
+		if ( target_IB.IsLockedInSlot() )
+			m_Text = UNLOCK_VERSION;
+		else if ( target_IB.IsAlive() )
+			m_Text = LOCK_VERSION;
+		else
+			m_Text = "";
 	}
 	
 	override void CreateConditionComponents()  

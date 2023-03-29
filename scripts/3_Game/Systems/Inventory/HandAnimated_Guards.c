@@ -1,4 +1,4 @@
-int SlotToAnimType (notnull Man player, notnull InventoryLocation src, InventoryLocation dst = null)
+int SlotToAnimType(notnull Man player, notnull InventoryLocation src, InventoryLocation dst = null)
 {
 	//Print("src.GetType() " + src.GetType());
 	InventoryLocation invloc1 = new InventoryLocation;
@@ -114,7 +114,7 @@ int SlotToAnimType (notnull Man player, notnull InventoryLocation src, Inventory
 	return -1;
 }
 
-bool SelectAnimationOfTakeToHands (notnull Man player, notnull InventoryLocation src, notnull InventoryLocation dst, out int animType)
+bool SelectAnimationOfTakeToHands(notnull Man player, notnull InventoryLocation src, notnull InventoryLocation dst, out int animType)
 {
 	if (player.IsInTransport())
 		return false;
@@ -134,7 +134,7 @@ bool SelectAnimationOfTakeToHands (notnull Man player, notnull InventoryLocation
 	return false;
 }
 
-bool SelectAnimationOfMoveFromHands (notnull Man player, notnull InventoryLocation src, notnull InventoryLocation dst, out int animType)
+bool SelectAnimationOfMoveFromHands(notnull Man player, notnull InventoryLocation src, notnull InventoryLocation dst, out int animType)
 {
 	if (player.IsInTransport())
 		return false;
@@ -152,7 +152,7 @@ bool SelectAnimationOfMoveFromHands (notnull Man player, notnull InventoryLocati
 	return false;
 }
 
-bool SelectAnimationOfForceSwapInHands (notnull Man player, notnull InventoryLocation old_src, notnull InventoryLocation new_src, notnull InventoryLocation old_dst, notnull InventoryLocation new_dst, out int animType1, out int animType2)
+bool SelectAnimationOfForceSwapInHands(notnull Man player, notnull InventoryLocation old_src, notnull InventoryLocation new_src, notnull InventoryLocation old_dst, notnull InventoryLocation new_dst, out int animType1, out int animType2)
 {
 	if (player.IsInTransport())
 		return false;
@@ -161,8 +161,8 @@ bool SelectAnimationOfForceSwapInHands (notnull Man player, notnull InventoryLoc
 
 	if (old_src.GetItem().GetHierarchyRootPlayer() == player || new_src.GetItem().GetHierarchyRootPlayer() == player)
 	{
-		animType1 = SlotToAnimType(player, new_dst, new_src);
-		animType2 = SlotToAnimType(player, old_src, old_dst);
+		animType1 = SlotToAnimType(player, old_src, old_dst);
+		animType2 = SlotToAnimType(player, new_src, new_dst);
 		//Print("animType1 = " + animType1);
 		//Print("animType2 = " + animType2);
 		if (animType1 != -1 && animType2 != -1)
@@ -170,12 +170,12 @@ bool SelectAnimationOfForceSwapInHands (notnull Man player, notnull InventoryLoc
 			hndDebugPrint("[hndfsm] SelectAnimationOfForceSwapInHands guard - selected animType1=" + animType1 + " animType2=" + animType2 + " for old_item=" + old_src.GetItem() + " for new_item=" + new_src.GetItem());
 			return true;
 		}
-		else if (animType1 != -1 || animType2 != -1) //HACK
+		/*else if (animType1 != -1 || animType2 != -1) //HACK
 		{
 			animType1 = -1;
 			animType2 = -1;
-			return true;
-		}
+			return false;
+		}*/
 	}
 	hndDebugPrint("[hndfsm] SelectAnimationOfForceSwapInHands - no animation");
 	return false;
@@ -184,9 +184,9 @@ bool SelectAnimationOfForceSwapInHands (notnull Man player, notnull InventoryLoc
 
 class HandSelectAnimationOfTakeToHandsEvent extends HandGuardBase
 {
-	void HandSelectAnimationOfTakeToHandsEvent (Man p = NULL) { }
+	void HandSelectAnimationOfTakeToHandsEvent(Man p = null) { }
 
-	override bool GuardCondition (HandEventBase e)
+	override bool GuardCondition(HandEventBase e)
 	{
 		int animType = -1;
 		if (SelectAnimationOfTakeToHands(e.m_Player, e.GetSrc(), e.GetDst(), animType))
@@ -201,31 +201,33 @@ class HandSelectAnimationOfTakeToHandsEvent extends HandGuardBase
 class HandSelectAnimationOfMoveFromHandsEvent extends HandGuardBase
 {
 	protected Man m_Player;
-	ref HandGuardHasRoomForItem m_HasRoomGuard;
 
-	void HandSelectAnimationOfMoveFromHandsEvent (Man p = NULL) {
-		 m_Player = p; 
-		m_HasRoomGuard = new HandGuardHasRoomForItem(p);
+	void HandSelectAnimationOfMoveFromHandsEvent(Man p = null)
+	{
+		m_Player = p; 
 	}
 
-	override bool GuardCondition (HandEventBase e)
+	override bool GuardCondition(HandEventBase e)
 	{
-		if (m_HasRoomGuard.GuardCondition(e))
+		EntityAI eai = m_Player.GetHumanInventory().GetEntityInHands();
+		if (eai)
 		{
-			EntityAI eai = m_Player.GetHumanInventory().GetEntityInHands();
-			if (eai)
+			InventoryLocation src = new InventoryLocation;
+			if (eai.GetInventory().GetCurrentInventoryLocation(src))
 			{
-				InventoryLocation src = new InventoryLocation;
-				if (eai.GetInventory().GetCurrentInventoryLocation(src))
+				if ( !GameInventory.LocationCanMoveEntity(src, e.GetDst()) )
 				{
-					int animType = -1;
-					if (SelectAnimationOfMoveFromHands(e.m_Player, src, e.GetDst(), animType))
-					{
-						e.m_AnimationID = animType;
-						return true;
-					}
+					hndDebugPrint("[hndfsm] HandSelectAnimationOfMoveFromHandsEvent - rejected");
 					return false;
 				}
+				
+				int animType = -1;
+				if (SelectAnimationOfMoveFromHands(e.m_Player, src, e.GetDst(), animType))
+				{
+					e.m_AnimationID = animType;
+					return true;
+				}
+				return false;
 			}
 		}
 		return false;
@@ -236,9 +238,9 @@ class HandSelectAnimationOfForceSwapInHandsEvent extends HandGuardBase
 {
 	protected Man m_Player;
 
-	void HandSelectAnimationOfForceSwapInHandsEvent (Man p = NULL) { m_Player = p; }
+	void HandSelectAnimationOfForceSwapInHandsEvent(Man p = NULL) { m_Player = p; }
 
-	bool ProcessSwapEvent (notnull HandEventBase e, out int animType1, out int animType2)
+	bool ProcessSwapEvent(notnull HandEventBase e, out int animType1, out int animType2)
 	{
 		HandEventSwap es = HandEventSwap.Cast(e);
 		if (es)
@@ -247,14 +249,14 @@ class HandSelectAnimationOfForceSwapInHandsEvent extends HandGuardBase
 		return false;
 	}
 
-	override bool GuardCondition (HandEventBase e)
+	override bool GuardCondition(HandEventBase e)
 	{
 		HandEventForceSwap es = HandEventForceSwap.Cast(e);
 		if (es)
 		{
 			hndDebugPrint("[hndfsm] HandSelectAnimationOfForceSwapInHandsEvent FSwap e=" + e.DumpToString());
 			
-			if( !es.m_Src2.IsValid() || !es.m_Src.IsValid() )
+			if ( !es.m_Src2.IsValid() || !es.m_Src.IsValid() )
 			{
 				Error("[hndfsm] HandSelectAnimationOfForceSwapInHandsEvent - invalid item source");
 				return false;
@@ -265,7 +267,7 @@ class HandSelectAnimationOfForceSwapInHandsEvent extends HandGuardBase
 				allow = true; // allow if ordinary swap
 			else if (es.m_Dst2)
 			{
-				if (!GameInventory.CanForceSwapEntitiesEx(es.GetSrc().GetItem(), null, es.m_Src2.GetItem(), es.m_Dst2))
+				if (!GameInventory.CanForceSwapEntitiesEx(es.GetSrc().GetItem(), es.m_Dst, es.m_Src2.GetItem(), es.m_Dst2))
 				{
 					Error("[hndfsm] HandSelectAnimationOfForceSwapInHandsEvent - no room at dst=" + InventoryLocation.DumpToStringNullSafe(es.m_Dst2));
 				}
@@ -297,7 +299,7 @@ class HandSelectAnimationOfForceSwapInHandsEvent extends HandGuardBase
 
 class HandSelectAnimationOfSwapInHandsEvent extends HandSelectAnimationOfForceSwapInHandsEvent
 {
-	override bool GuardCondition (HandEventBase e)
+	override bool GuardCondition(HandEventBase e)
 	{
 		HandEventSwap es = HandEventSwap.Cast(e);
 		if (es)

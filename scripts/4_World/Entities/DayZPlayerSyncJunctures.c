@@ -28,6 +28,32 @@ class DayZPlayerSyncJunctures
 	static const int SJ_SHOCK							= 22;
 	static const int SJ_STAMINA							= 23;
 	static const int SJ_STAMINA_MISC					= 24;
+	static const int SJ_ADS_RESET						= 25;
+	#ifdef DEVELOPER
+	static const int SJ_DEBUG_GET_IN_CAR				= 200;
+	#endif
+	
+	
+	#ifdef DEVELOPER
+	//-------------------------------------------------------------
+	//!
+	//!Get in Car
+	//! 
+
+	static void SendGetInCar(DayZPlayer pPlayer, EntityAI car)
+	{
+		ScriptJunctureData ctx = new ScriptJunctureData;
+		ctx.Write(car);
+		pPlayer.SendSyncJuncture(SJ_DEBUG_GET_IN_CAR, ctx);
+	}
+	
+	static bool ReadGetInCarParams(ParamsReadContext pCtx, out EntityAI car)
+	{
+		if (!pCtx.Read(car))
+			return false;
+		return true;
+	}
+	#endif
 	
 	//-------------------------------------------------------------
 	//!
@@ -68,6 +94,28 @@ class DayZPlayerSyncJunctures
 		pPlayer.SendSyncJuncture(SJ_DAMAGE_HIT, ctx);
 	}
 	
+	static void SendDamageHitEx(DayZPlayer pPlayer, int pType, float pHitDir, bool pFullbody, TotalDamageResult pDamageResult, int pDamageType, EntityAI pSource, string pComponent, string pAmmoType, vector pModelPos)
+	{
+		ScriptJunctureData ctx = new ScriptJunctureData;
+		SyncHitInfo data = new SyncHitInfo;
+		
+		data.m_AnimType = pType;
+		data.m_HitDir = pHitDir;
+		data.m_Fullbody = pFullbody;
+		data.m_HasSource = pSource != null;
+		if ( !pDamageResult )
+		{
+			data.m_HealthDamage = -1.0;
+		}
+		else
+		{
+			data.m_HealthDamage = pDamageResult.GetHighestDamage("Health");
+		}
+		
+		ctx.Write(data);
+		pPlayer.SendSyncJuncture(SJ_DAMAGE_HIT, ctx);
+	}
+	
 	static bool ReadDamageHitParams(ParamsReadContext pCtx, out int pType, out float pHitDir, out bool pFullbody)
 	{
 		if (!pCtx.Read(pType))
@@ -76,6 +124,13 @@ class DayZPlayerSyncJunctures
 			return false;
 		if (!pCtx.Read(pFullbody))
 			return false;	
+		return true;
+	}
+	
+	static bool ReadDamageHitParamsEx(ParamsReadContext pCtx, out SyncHitInfo pData)
+	{
+		if (!pCtx.Read(pData))
+			return false;
 		return true;
 	}
 
@@ -327,6 +382,22 @@ class DayZPlayerSyncJunctures
 		if ( !pCtx.Read(currentState) )
 			return false; // error
 		if ( !pCtx.Read(localState) )
+			return false;
+		
+		return true;
+	}
+	
+	static void SendBrokenLegsEx(DayZPlayer pPlayer, int currentState)
+	{
+		ScriptJunctureData ctx = new ScriptJunctureData;
+		ctx.Write(currentState);
+
+		pPlayer.SendSyncJuncture(SJ_BROKEN_LEGS, ctx);
+	}
+	
+	static bool ReadBrokenLegsParamsEx(ParamsReadContext pCtx, out int currentState)
+	{
+		if ( !pCtx.Read(currentState) )
 			return false;
 		
 		return true;

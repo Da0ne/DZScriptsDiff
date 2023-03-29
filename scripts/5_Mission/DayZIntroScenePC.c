@@ -16,7 +16,7 @@ class DayZIntroScenePC : DayZIntroScene
 	protected float 	m_NewZ = 0;
 	protected float 	m_BlurValue;
 
-	protected ref OptionsMenu m_optmenu = new OptionsMenu;
+	protected ref OptionsMenu m_optmenu;
 
 	// ------------------------------------------------------------
 	void DayZIntroScenePC()

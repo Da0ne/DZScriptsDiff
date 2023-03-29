@@ -44,7 +44,7 @@ class DayZIntroSceneXbox: Managed
 		m_CharacterDir = "0 0 0";
 		
 		//g_Game.m_PlayerName = "Survivor"; //default
-		if( m_MenuData.GetCharactersCount() == 0 )
+		if ( m_MenuData.GetCharactersCount() == 0 )
 		{
 			m_LastPlayedCharacterID = -1;
 		}
@@ -128,6 +128,10 @@ class DayZIntroSceneXbox: Managed
 		{
 			m_MenuData.ClearCharacters();
 		}
+		
+		SEffectManager.DestroyEffect(m_FXParticleCarSmoke);
+		SEffectManager.DestroyEffect(m_FXParticleStreamLeft);
+		SEffectManager.DestroyEffect(m_FXParticleStreamRight);
 		
 		PPEManagerStatic.GetPPEManager().StopAllEffects(PPERequesterCategory.ALL);
 	}

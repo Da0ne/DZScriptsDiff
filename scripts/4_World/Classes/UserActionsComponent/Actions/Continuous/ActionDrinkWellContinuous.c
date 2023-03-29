@@ -14,11 +14,7 @@ class ActionDrinkWellContinuous: ActionContinuousBase
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONFB_DRINKWELL;
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_CROUCH;
-	}
-
-	override string GetText()
-	{
-		return "#drink";
+		m_Text = "#drink";
 	}
 	
 	override bool IsDrink()
@@ -34,7 +30,7 @@ class ActionDrinkWellContinuous: ActionContinuousBase
 	override void CreateConditionComponents()  
 	{
 		m_ConditionItem = new CCINone;
-		m_ConditionTarget = new CCTObject(UAMaxDistances.DEFAULT);
+		m_ConditionTarget = new CCTCursor(UAMaxDistances.DEFAULT);
 	}
 	
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )

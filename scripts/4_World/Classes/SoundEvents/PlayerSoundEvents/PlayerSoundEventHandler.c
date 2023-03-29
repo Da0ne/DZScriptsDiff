@@ -26,6 +26,9 @@ enum EPlayerSoundEventID
 	STAMINA_LOW_FILTER_UPPER,
 	STAMINA_LOW_FILTER_MID,
 	STAMINA_LOW_FILTER_LOWER,
+	DROWNING_BREATH,
+	DROWNING_PAIN,
+	PICKUP_HEAVY,
 	//--------------
 	// Count bellow, put enums above
 	//--------------
@@ -39,11 +42,18 @@ class PlayerSoundEventHandler extends SoundEventHandler
 	static ref PlayerSoundEventBase m_AvailableStates[SOUND_EVENTS_MAX];
 	static ref map<int,int> m_ConfigIDToScriptIDmapping = new ref map<int,int> ;
 	ref PlayerSoundEventBase m_CurrentState;
+	ref Timer m_UpdateTimer;
 	
 	
 	void PlayerSoundEventHandler(PlayerBase player)
 	{
 		m_Player = player;
+		
+		if(!m_UpdateTimer && !m_Player.IsControlledPlayer())
+		{
+			m_UpdateTimer = new Timer();
+			m_UpdateTimer.Run(1, this, "OnTick", null, true);//ticking for remotes, the controlled player is ticking on command handler at higher intervals
+		}
 		
 		RegisterState(new HoldBreathSoundEvent());
 		RegisterState(new ExhaustedBreathSoundEvent());
@@ -71,6 +81,10 @@ class PlayerSoundEventHandler extends SoundEventHandler
 		RegisterState(new StaminaLowFilterUpper());
 		RegisterState(new StaminaLowFilterMid());
 		RegisterState(new StaminaLowFilterLower());
+		RegisterState(new DrowningEvent1());
+		RegisterState(new DrowningEvent2());
+		RegisterState(new PickupHeavySoundEvent());
+
 
 	}
 	
@@ -127,6 +141,7 @@ class PlayerSoundEventHandler extends SoundEventHandler
 		{
 			Error("EPlayerSoundEventID out of bounds");
 		}
+
 		PlayerSoundEventBase requested_state = m_AvailableStates[id];
 		if ( sent_from_server && (param & EPlayerSoundEventParam.SKIP_CONTROLLED_PLAYER) && m_Player.GetInstanceType() == DayZPlayerInstanceType.INSTANCETYPE_CLIENT )
 		{

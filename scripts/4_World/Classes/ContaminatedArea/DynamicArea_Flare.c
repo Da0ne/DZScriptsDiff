@@ -10,7 +10,7 @@ class DynamicArea_Flare : ScriptedEntity
 		SetFlags( EntityFlags.ACTIVE, false );
 		
 		// We create the particle effect
-		m_Particle = Particle.PlayOnObject( ParticleList.FLAREPROJ_ACTIVATE_RED, this );
+		m_Particle = ParticleManager.GetInstance().PlayOnObject( ParticleList.FLAREPROJ_ACTIVATE_RED, this );
 		
 		// We specify we will delete this object after set time
 		GetGame().GetCallQueue(CALL_CATEGORY_SYSTEM).CallLater( GetGame().ObjectDeleteOnClient, LIFETIME, false, this );

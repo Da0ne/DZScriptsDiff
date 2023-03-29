@@ -19,6 +19,11 @@ class DeadChicken_ColorBase extends Edible_Base
 	{
 		return true;
 	}
+	
+	override bool CanBeSkinned()
+	{
+		return true;
+	}
 }
 
 class DeadRooster extends DeadChicken_ColorBase {}

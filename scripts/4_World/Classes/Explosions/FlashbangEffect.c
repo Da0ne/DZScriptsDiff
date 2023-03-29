@@ -45,7 +45,7 @@ class FlashbangEffect
 			m_Requester.Start();
 		}
 		
-		m_DeferAttenuation = new Timer;
+		m_DeferAttenuation = new ref Timer();
 		m_DeferAttenuation.Run(SOUND_DEFER_TIME, this, "PlaySound", null, false);
 		
 		//! naive time of the day selector
@@ -67,13 +67,14 @@ class FlashbangEffect
 		{
 			m_Player.OnPlayerReceiveFlashbangHitEnd();
 		}
-		
+
 		if ( m_DeferAttenuation.IsRunning() )
 		{
 			m_DeferAttenuation.Stop();
 		}
 		
-		StopSound();
+		m_DeferAttenuation = null;
+		SEffectManager.DestroyEffect(m_FlashbangEffectSound);
 	}
 	
 	void SetupFlashbangValues(float progress_mult = 1.0, float visual_value_max = 1.0, float sound_value_max = 1.0)
@@ -99,21 +100,27 @@ class FlashbangEffect
 		}
 		
 		vector pos;
-
 		MiscGameplayFunctions.GetHeadBonePos(m_Player, pos);
-
-		m_FlashbangEffectSound = SEffectManager.CreateSound("Tinnitus_SoundSet", pos);
-		m_FlashbangEffectSound.SetParent(m_Player);
-		m_FlashbangEffectSound.SetAttachedLocalPos(m_Player.WorldToModel(pos));
-		m_FlashbangEffectSound.SetSoundWaveKind(WaveKind.WAVEEFFECTEX);
-		m_FlashbangEffectSound.SetSoundFadeIn(4 * Math.Clamp(m_ProgressMultiplier,0.5,1.0)); //TODO
-		m_SoundStopTime = 2 * Math.Clamp(m_ProgressMultiplier,0.5,1.0);
-		m_FlashbangEffectSound.SetSoundFadeOut(m_SoundStopTime); //TODO
-		m_FlashbangEffectSound.SetSoundMaxVolume(Math.Clamp(m_SoundMaxActual,0.1,1.0)); //TODO
-		m_FlashbangEffectSound.SetSoundLoop(true);
-		m_FlashbangEffectSound.SoundPlay();
 		
-		SetAttenuationFilter();
+		if (!m_FlashbangEffectSound)
+		{
+			m_FlashbangEffectSound = SEffectManager.CreateSound("Tinnitus_SoundSet", pos);
+		}
+		
+		if (!m_FlashbangEffectSound.IsPlaying())
+		{
+			m_FlashbangEffectSound.SetParent(m_Player);
+			m_FlashbangEffectSound.SetAttachedLocalPos(m_Player.WorldToModel(pos));
+			m_FlashbangEffectSound.SetSoundWaveKind(WaveKind.WAVEEFFECTEX);
+			m_FlashbangEffectSound.SetSoundFadeIn(4 * Math.Clamp(m_ProgressMultiplier,0.5,1.0)); //TODO
+			m_SoundStopTime = 2 * Math.Clamp(m_ProgressMultiplier,0.5,1.0);
+			m_FlashbangEffectSound.SetSoundFadeOut(m_SoundStopTime); //TODO
+			m_FlashbangEffectSound.SetSoundMaxVolume(Math.Clamp(m_SoundMaxActual,0.1,1.0)); //TODO
+			m_FlashbangEffectSound.SetSoundLoop(true);
+			m_FlashbangEffectSound.SoundPlay();
+			
+			SetAttenuationFilter();
+		}
 	}
 
 	protected void SetAttenuationFilter()
@@ -139,7 +146,10 @@ class FlashbangEffect
 	
 	protected void ClearVisual()
 	{
-		m_Requester.Stop();
+		if (m_Requester)
+		{
+			m_Requester.Stop();
+		}
 	}
 	
 	protected void SetVisual(float val)
@@ -148,6 +158,11 @@ class FlashbangEffect
 		{
 			m_Requester.SetFlashbangIntensity(val, m_DayTimeToggle);
 		}
+	}
+	
+	void Stop()
+	{
+		StopSound();
 	}
 	
 	void Update(float deltatime)

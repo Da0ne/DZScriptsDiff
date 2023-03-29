@@ -1,25 +1,17 @@
-/*
-DISCLAIMER: may undergo some changes in the course of 1.14 experimental stage.
-*/
-
-//!data for one material parameter, requester side
+//! Data for one material parameter, requester side
 class PPERequestParamDataBase
 {
-	ref PPERequesterBase m_Requester;
+	PPERequesterBase m_Requester;
 	protected bool m_UpdatingDataValues; //new values are being sent periodically
 	protected bool m_IsActive; //hasn't been stopped yet (does not have to update values)
-	protected bool m_SettingDefaultValues; //NOTE - used
+	protected bool m_SettingDefaultValues;
 	
 	protected int m_MaterialID;
 	protected int m_ParameterID;
 	protected int m_VariableType; //PPEConstants.VAR_TYPE_INT etc.
 	protected int m_RequesterIDX;
 	protected int m_InteractionMask;
-	protected int m_Priority; //de-facto layer
-	
-	//TODO
-	//MAT_DECLARE_TEXTURE - string?
-	//DECLARE_RESOURCE_NAME - string + data?
+	protected int m_Priority; //de-facto blending layer
 	
 	void PPERequestParamDataBase(int requester_idx, int mat_id, int param_id, int data_type = 0, int priority = 0, int mask = PPOperators.SET)
 	{
@@ -143,9 +135,9 @@ class PPERequestParamDataFloat extends PPERequestParamDataBase
 	float m_FloatTarget;
 	float m_FloatCurrent;
 	float m_FloatLast;
-	//?
-	float m_FloatFormerTarget;//former target
-	float m_FloatStart;//actual start value
+	
+	float m_FloatFormerTarget;//former target; remnants of a fading mechanic...revise and re-connect?
+	float m_FloatStart;//actual start value; remnants of a fading mechanic...revise and re-connect?
 	
 	void PPERequestParamDataFloat(int requester_idx, int mat_id, int param_id, int data_type = 0, int priority = 0, int mask = PPOperators.SET, bool relative = false )
 	{
@@ -154,13 +146,11 @@ class PPERequestParamDataFloat extends PPERequestParamDataBase
 	
 	override void InitValues()
 	{
-		m_FloatCurrent = -1;
-		m_FloatLast = -1;
-		m_FloatTarget = 0.0;
-		m_FloatCurrent = 0.0;
-		m_FloatLast = 0.0;
-		m_FloatFormerTarget = 0.0;
-		m_FloatStart = 0.0;
+		m_FloatTarget = float.LOWEST;
+		m_FloatCurrent = float.LOWEST;
+		m_FloatLast = float.LOWEST;
+		m_FloatFormerTarget = float.LOWEST;
+		m_FloatStart = float.LOWEST;
 	}
 }
 
@@ -170,8 +160,8 @@ class PPERequestParamDataColor extends PPERequestParamDataBase
 	ref array<float>  m_ColorCurrent;
 	ref array<float>  m_ColorLast;
 	
-	ref array<float>  m_ColorFormerTarget;//former target
-	ref array<float>  m_ColorStart;//actual start values
+	ref array<float>  m_ColorFormerTarget;//former target; remnants of a fading mechanic...revise and re-connect?
+	ref array<float>  m_ColorStart;//actual start values; remnants of a fading mechanic...revise and re-connect?
 	
 	void PPERequestParamDataColor(int requester_idx, int mat_id, int param_id, int data_type = 0, int priority = 0, int mask = PPOperators.SET, bool relative = false )
 	{

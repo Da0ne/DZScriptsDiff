@@ -39,31 +39,56 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 			m_AttachmentCargos.Clear();
 	}
 	
+	void RecomputeContainers()
+	{
+		m_Body.Clear();
+
+		if(m_Atts)
+		{
+			m_Body.Insert(m_Atts.GetWrapper());
+		}
+
+		if(m_CargoGrid)
+		{
+			m_Body.Insert(m_CargoGrid);
+		}
+		
+		GameInventory inv = m_Entity.GetInventory();
+		for (int i = 0; i < inv.AttachmentCount(); i++)
+		{
+			EntityAI ent = inv.GetAttachmentFromIndex(i);
+			if(ent)
+			{
+				AttachmentsWrapper att = m_AttachmentAttachmentsContainers.Get(ent);
+				if(att)
+				{
+					m_Body.Insert(att);
+				}
+				
+				CargoContainer cargo = m_AttachmentCargos.Get(ent);
+				if(cargo)
+				{
+					m_Body.Insert(cargo);
+				}
+			}
+		}
+	}
+	
 	void AttachmentAddedEx(EntityAI item, string slot, EntityAI parent, bool immedUpdate = true)
 	{
 		int slot_id = InventorySlots.GetSlotIdFromString( slot );
-		int att_mod = 1;
+		int sort = -1;
 		bool updateNeeded = false;
+		ref Attachments att_cont = null;
+		ref CargoContainer cont = null;
 		
-		if ( item.GetInventory().GetCargo() )
+		if ( item.GetInventory().GetAttachmentSlotsCount() > 0 && item.CanDisplayAnyAttachmentSlot() )
 		{
 			updateNeeded = true;
 			
-			ref CargoContainer cont = new CargoContainer( this, true );
-			cont.GetRootWidget().SetSort( m_AttachmentSlotsSorted.Find( slot_id ) + m_AttachmentCargos.Count() + 1 );
-			cont.SetEntity( item, false );
-			Insert( cont, m_Atts.GetAttachmentHeight() + m_AttachmentCargos.Count() + 1 );
-			
-			m_AttachmentCargos.Insert( item, cont );
-			att_mod += m_AttachmentSlotsSorted.Find( slot_id ) + m_AttachmentCargos.Count() + 1;
-		}
-		
-		if ( item.GetInventory().GetAttachmentSlotsCount() > 0  )
-		{
-			updateNeeded = true;
-			
-			ref Attachments att_cont = new Attachments( this, item );
-			att_cont.InitAttachmentGrid( m_AttachmentSlotsSorted.Find( slot_id ) + m_Atts.GetAttachmentHeight() + att_mod );
+			att_cont = new Attachments( this, item );
+			sort = (m_AttachmentSlotsSorted.Find( slot_id ) * 2) + SORT_ATTACHMENTS_NEXT_OFFSET;
+			att_cont.InitAttachmentGrid( sort );
 			
 			m_AttachmentAttachments.Insert( item, att_cont );
 			m_AttachmentAttachmentsContainers.Insert( item, att_cont.GetWrapper() );
@@ -71,8 +96,37 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 			att_cont.UpdateInterval();
 		}
 		
+		if ( item.GetInventory().GetCargo() )
+		{
+			updateNeeded = true;
+			
+			cont = new CargoContainer( this, true );
+			sort = (m_AttachmentSlotsSorted.Find( slot_id ) * 2) + SORT_CARGO_NEXT_OFFSET;
+			cont.GetRootWidget().SetSort( sort );
+			cont.SetEntity( item, false );
+			Insert( cont, m_Atts.GetAttachmentHeight() + m_AttachmentCargos.Count() + 1 );
+			
+			m_AttachmentCargos.Insert( item, cont );
+		}
+		
 		if (updateNeeded)
 		{
+			if (att_cont)
+			{
+				att_cont.ShowFalseAttachmentsHeader(true);
+				if (cont)
+				{
+					cont.ShowFalseCargoHeader(false);
+					cont.UpdateSize();
+					cont.SetAlternateFalseTextHeaderWidget(att_cont.GetFalseHeaderTextWidget());
+				}
+			}
+			else if (cont)
+			{
+				cont.SetAlternateFalseTextHeaderWidget(null); //just to be safe..
+			}
+			
+			RecomputeContainers();
 			RecomputeOpenedContainers();
 			
 			Inventory.GetInstance().UpdateConsoleToolbar();
@@ -94,9 +148,9 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		CargoContainer old_cont = m_AttachmentCargos.Get( item );
 		if( old_cont )
 		{
-			m_Body.RemoveItem( old_cont );
 			m_AttachmentCargos.Remove( item );
-			RecomputeOpenedContainers();
+			delete old_cont;
+			
 			if( m_Parent )
 				m_Parent.Refresh();
 			Inventory.GetInstance().UpdateConsoleToolbar();
@@ -106,45 +160,50 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		AttachmentsWrapper old_att_cont = m_AttachmentAttachmentsContainers.Get( item );
 		if( old_att_cont )
 		{
-			m_Body.RemoveItem( old_att_cont );
 			m_AttachmentAttachmentsContainers.Remove( item );
 			m_AttachmentAttachments.Remove( item );
 			delete old_att_cont;
-			RecomputeOpenedContainers();
+			
 			if( m_Parent )
 				m_Parent.Refresh();
 			Inventory.GetInstance().UpdateConsoleToolbar();
 		}
+		
+		RecomputeContainers();
+		RecomputeOpenedContainers();
 	}
 	
 	override void UpdateInterval()
 	{
-		int i;
 		if ( m_Entity )
 		{
-			for ( i = 0; i < m_AttachmentCargos.Count(); i++ )
+			if (m_CargoGrid)
 			{
-				m_AttachmentCargos.GetElement( i ).UpdateInterval();
-			}
-			
-			if ( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
-			{
-				HideContent();
-			}
-			else
-			{
-				ShowContent();
-			}
-			
-			if ( m_Atts )
-			{
-				m_Atts.UpdateInterval();
-			}
-			
-			if ( m_CargoGrid )
-			{
+				bool hideCargo = m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || !m_Entity.CanDisplayCargo() || m_ForcedHide;
+				if (m_CargoGrid.IsVisible() && hideCargo)
+				{
+					HideCargo();
+				}
+				else if (!m_CargoGrid.IsVisible() && !hideCargo)
+				{
+					ShowCargo();
+				}
+				
 				m_CargoGrid.UpdateInterval();
 			}
+			
+			if ( m_SlotIcon )
+			{
+				bool hide = m_LockCargo || ItemManager.GetInstance().GetDraggedItem() == m_Entity;
+				if (!hide)
+				{
+					SetOpenForSlotIcon(IsOpened());
+				}
+				m_SlotIcon.GetRadialIconPanel().Show( !hide );
+				
+			}
+			
+			super.UpdateInterval();
 		}
 	}
 	
@@ -153,137 +212,6 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		return m_Entity;
 	}
 	
-	override Container GetFocusedContainer()
-	{
-		int index = m_ActiveIndex - 1;
-		int attachment_start_index = -1;
-		int cargo_start_index = -1;
-		int attachment_end_index = -1;
-		int cargo_end_index = -1;
-		
-		if( m_Atts || m_AttachmentAttachments.Count() > 0 )
-		{
-			attachment_start_index = 0;
-			if( m_Atts )
-				attachment_end_index++;
-			attachment_end_index += m_AttachmentAttachments.Count();
-		}
-		
-		if( m_CargoGrid || m_AttachmentCargos.Count() > 0 )
-		{
-			cargo_start_index = attachment_end_index + 1;
-			if( m_CargoGrid )
-				cargo_end_index++;
-			cargo_end_index += cargo_start_index + m_AttachmentCargos.Count();
-		}
-		
-		if( index.InRange( 0, attachment_end_index ) )
-		{
-			if( m_Atts )
-			{
-				if( index == 0 )
-				{
-					return m_Atts.GetWrapper();
-				}
-				else
-				{
-					return m_AttachmentAttachments.GetElement( index - 1 ).GetWrapper();
-				}
-			}
-			else
-			{
-				return m_AttachmentAttachments.GetElement( index ).GetWrapper();
-			}
-		}
-		else if( index.InRange( cargo_start_index, cargo_end_index ) )
-		{
-			if( m_CargoGrid )
-			{
-				if( index == cargo_start_index )
-				{
-					return m_CargoGrid;
-				}
-				else
-				{
-					return m_AttachmentCargos.GetElement( index - 1 - cargo_start_index );
-				}
-			}
-			else
-			{
-				return m_AttachmentCargos.GetElement( index - cargo_start_index );
-			}
-		}
-		
-		return null;
-	}
-	
-	override void SetActive( bool active )
-	{
-		super.SetActive( active );
-		UnfocusAll();
-		
-		if( GetFocusedContainer() )
-			GetFocusedContainer().SetActive( active );
-		if( active )
-			SetFocusToIndex( true );
-		Inventory.GetInstance().UpdateConsoleToolbar();
-	}
-	
-	override void SetLastActive()
-	{
-		if( GetFocusedContainer() )
-		{
-			GetFocusedContainer().UnfocusAll();
-		}
-		
-		Container old = GetFocusedContainer();
-		m_ActiveIndex = m_Body.Count() - 1;
-		if( old != GetFocusedContainer() )
-			old.SetActive( false );
-		
-		SetFocusToIndex( true, true );
-		Inventory.GetInstance().UpdateConsoleToolbar();
-	}
-	
-	void EquipmentMoveUp()
-	{
-		PlayerContainer pc = PlayerContainer.Cast( m_Parent );
-		if( pc )
-		{
-			pc.MoveContainerUp( this );
-		}
-	}
-	
-	void EquipmentMoveDown()
-	{
-		PlayerContainer pc = PlayerContainer.Cast( m_Parent );
-		if( pc )
-		{
-			pc.MoveContainerDown( this );
-		}
-	}
-
-	void SetDefaultFocus()
-	{
-		UnfocusAll();
-		if( m_Atts )
-		{
-			m_Atts.SetDefaultFocus();
-		}
-		else if( m_CargoGrid )
-		{
-			m_CargoGrid.SetDefaultFocus();
-		}
-		else if( m_AttachmentAttachments.Count() > 0 )
-		{
-			m_AttachmentAttachments.GetElement( 0 ).SetDefaultFocus();
-		}
-		else if( m_AttachmentCargos.Count() > 0 )
-		{
-			m_AttachmentCargos.GetElement( 0 ).SetDefaultFocus();
-		}
-	}
-
 	override void UnfocusAll()
 	{
 		if( m_Atts )
@@ -310,7 +238,7 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 	
 	override bool IsLastIndex()
 	{
-		return m_ActiveIndex == ( m_Body.Count() - 1 );
+		return m_ActiveIndex == ( m_OpenedContainers.Count() - 1 );
 	}
 	
 	override bool IsFirstContainerFocused()
@@ -325,263 +253,33 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 
 	override void MoveGridCursor( int direction )
 	{
-		int index = m_ActiveIndex - 1;
-		int attachment_start_index = -1;
-		int cargo_start_index = -1;
-		int attachment_end_index = -1;
-		int cargo_end_index = -1;
-		
-		if( m_Atts || m_AttachmentAttachments.Count() > 0 )
+		Container c = GetFocusedContainer();
+		if ( c )
 		{
-			attachment_start_index = 0;
-			if( m_Atts )
-				attachment_end_index++;
-			attachment_end_index += m_AttachmentAttachments.Count();
+			c.MoveGridCursor( direction );
+			Inventory.GetInstance().UpdateConsoleToolbar();
 		}
-		
-		if( m_CargoGrid || m_AttachmentCargos.Count() > 0 )
-		{
-			cargo_start_index = attachment_end_index + 1;
-			if( m_CargoGrid )
-				cargo_end_index++;
-			cargo_end_index += cargo_start_index + m_AttachmentCargos.Count();
-		}
-		
-		if( index.InRange( 0, attachment_end_index ) )
-		{
-			if( m_Atts )
-			{
-				if( index == 0 )
-				{
-					m_Atts.MoveGridCursor( direction );
-				}
-				else
-				{
-					m_AttachmentAttachments.GetElement( index - 1 ).MoveGridCursor( direction );
-				}
-			}
-			else
-			{
-				m_AttachmentAttachments.GetElement( index ).MoveGridCursor( direction );
-			}
-		}
-		else if( index.InRange( cargo_start_index, cargo_end_index ) )
-		{
-			if( m_CargoGrid )
-			{
-				if( index == cargo_start_index )
-				{
-					m_CargoGrid.MoveGridCursor( direction );
-				}
-				else
-				{
-					m_AttachmentCargos.GetElement( index - 1 - cargo_start_index ).MoveGridCursor( direction );
-				}
-			}
-			else
-			{
-				m_AttachmentCargos.GetElement( index - cargo_start_index ).MoveGridCursor( direction );
-			}
-		}
-		Inventory.GetInstance().UpdateConsoleToolbar();
-	}
-	
-	override void SetNextActive()
-	{
-		ItemManager.GetInstance().HideTooltip( );
-		
-		if( IsLastIndex() )
-		{
-			Container.Cast( GetParent() ).SetNextActive();
-			m_ActiveIndex = 1;
-			UnfocusAll();
-		}
-		else
-		{
-			if( GetFocusedContainer() )
-				GetFocusedContainer().SetActive( false );
-			SetFocusToIndex( false );
-			m_ActiveIndex++;
-			if( GetFocusedContainer() )
-				GetFocusedContainer().SetActive( true );
-			SetFocusToIndex( true );
-		}
-	}
-
-	override void SetPreviousActive( bool force = false )
-	{
-		if( IsFirstIndex() || force )
-		{
-			Container.Cast( GetParent() ).SetPreviousActive();
-			m_ActiveIndex = 1;
-			UnfocusAll();
-		}
-		else
-		{
-			if( GetFocusedContainer() )
-				GetFocusedContainer().SetActive( false );
-			SetFocusToIndex( false );
-			m_ActiveIndex--;
-			if( GetFocusedContainer() )
-				GetFocusedContainer().SetActive( true );
-			SetFocusToIndex( true );
-		}
-	}
-	
-	void SetFocusToIndex( bool focus, bool last = false )
-	{
-		int index = m_ActiveIndex - 1;
-		int attachment_start_index = -1;
-		int cargo_start_index = -1;
-		int attachment_end_index = -1;
-		int cargo_end_index = -1;
-		
-		if( m_Atts || m_AttachmentAttachments.Count() > 0 )
-		{
-			attachment_start_index = 0;
-			if( m_Atts )
-				attachment_end_index++;
-			attachment_end_index += m_AttachmentAttachments.Count();
-		}
-		
-		if( m_CargoGrid || m_AttachmentCargos.Count() > 0 )
-		{
-			cargo_start_index = attachment_end_index + 1;
-			if( m_CargoGrid )
-				cargo_end_index++;
-			cargo_end_index += cargo_start_index + m_AttachmentCargos.Count();
-		}
-		
-		if( index.InRange( 0, attachment_end_index ) )
-		{
-			if( m_Atts )
-			{
-				if( index == 0 )
-				{
-					if( focus )
-					{
-						m_Atts.SetActive(true);
-						if( last )
-							m_Atts.SetLastActive();
-						else
-							m_Atts.SetDefaultFocus();
-					}
-					else
-					{
-						m_Atts.UnfocusAll();
-						m_Atts.SetActive(false);
-					}
-				}
-				else
-				{
-					if( focus )
-					{
-						m_AttachmentAttachments.GetElement( index - 1 ).SetActive(true);
-						if( last )
-							m_AttachmentAttachments.GetElement( index - 1 ).SetLastActive();
-						else
-							m_AttachmentAttachments.GetElement( index - 1 ).SetDefaultFocus();
-					}
-					else
-					{
-						m_AttachmentAttachments.GetElement( index - 1 ).UnfocusAll();
-						m_AttachmentAttachments.GetElement( index - 1 ).SetActive(false);
-					}
-					
-				}
-			}
-			else
-			{
-				if( focus )
-				{
-					m_AttachmentAttachments.GetElement( index ).SetActive(true);
-					if( last )
-						m_AttachmentAttachments.GetElement( index ).SetLastActive();
-					else
-						m_AttachmentAttachments.GetElement( index ).SetDefaultFocus();
-				}
-				else
-				{
-					m_AttachmentAttachments.GetElement( index ).UnfocusAll();
-					m_AttachmentAttachments.GetElement( index ).SetActive(false);
-				}
-			}
-		}
-		else if( index.InRange( cargo_start_index, cargo_end_index ) )
-		{
-			if( m_CargoGrid )
-			{
-				if( index == cargo_start_index )
-				{
-					if( focus )
-					{
-						m_CargoGrid.SetActive(true);
-						if( last )
-							m_CargoGrid.SetLastActive();
-						else
-							m_CargoGrid.SetDefaultFocus();
-					}
-					else
-					{
-						m_CargoGrid.UnfocusAll();
-						m_CargoGrid.SetActive(false);
-					}	
-				}
-				else
-				{
-					if( focus )
-					{
-						m_AttachmentCargos.GetElement( index - 1 - cargo_start_index ).SetActive(true);
-						if( last )
-							m_AttachmentCargos.GetElement( index - 1 - cargo_start_index ).SetLastActive();
-						else
-							m_AttachmentCargos.GetElement( index - 1 - cargo_start_index ).SetDefaultFocus();
-					}
-					else
-					{
-						m_AttachmentCargos.GetElement( index - 1 - cargo_start_index ).UnfocusAll();
-						m_AttachmentCargos.GetElement( index - 1 - cargo_start_index ).SetActive(false);
-					}
-				}
-			}
-			else
-			{
-				if( focus )
-				{
-					m_AttachmentCargos.GetElement( index - cargo_start_index ).SetActive(true);
-					if( last )
-						m_AttachmentCargos.GetElement( index - cargo_start_index ).SetLastActive();
-					else
-						m_AttachmentCargos.GetElement( index - cargo_start_index ).SetDefaultFocus();
-				}
-				else
-				{
-					m_AttachmentCargos.GetElement( index - cargo_start_index ).UnfocusAll();
-					m_AttachmentCargos.GetElement( index - cargo_start_index ).SetActive(false);
-				}
-			}
-		}
-		Inventory.GetInstance().UpdateConsoleToolbar();
 	}
 	
 	void SetEntity( EntityAI entity, bool immedUpdate = true )
 	{
 		m_Entity = entity;
 		
-		m_Atts = new Attachments( this, entity );
-		m_Atts.InitAttachmentGrid( 1 );
+		m_Atts = new Attachments( this, m_Entity );
+		m_Atts.InitAttachmentGrid( SORT_ATTACHMENTS_OWN );
 		m_AttachmentSlotsSorted = m_Atts.GetSlotsSorted();
 		
 		m_Entity.GetOnItemAttached().Insert( AttachmentAdded );
 		m_Entity.GetOnItemDetached().Insert( AttachmentRemoved );
 		
-		m_ClosableHeader.SetItemPreview( entity );
+		m_ClosableHeader.SetItemPreview( m_Entity );
+		CheckHeaderDragability();
 		
-		if ( entity.GetInventory().GetCargo() )
+		if ( m_Entity.GetInventory().GetCargo() )
 		{
 			m_CargoGrid = new CargoContainer( this, false );
-			m_CargoGrid.GetRootWidget().SetSort( 2 );
-			m_CargoGrid.SetEntity( entity, 0, immedUpdate );
+			m_CargoGrid.GetRootWidget().SetSort( SORT_CARGO_OWN );
+			m_CargoGrid.SetEntity( m_Entity, 0, immedUpdate );
 			m_CargoGrid.UpdateHeaderText(); // TODO: refresh?
 			Insert( m_CargoGrid );
 		}
@@ -605,17 +303,54 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 				AttachmentAddedEx( item, InventorySlots.GetSlotName( slot_id ), m_Entity, false );
 		}
 		
-		if ( m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || m_Closed )
-			HideContent();
-		else
-			ShowContent();
+		RecomputeContainers();
 		
-		SetOpenState( ItemManager.GetInstance().GetDefaultOpenState( m_Entity.GetType() ) );
+		if (m_CargoGrid)
+		{
+			bool hideCargo = m_Entity.GetInventory().IsInventoryLockedForLockType( HIDE_INV_FROM_SCRIPT ) || !m_Entity.CanDisplayCargo() || m_ForcedHide;
+			if (m_CargoGrid.IsVisible() && hideCargo)
+			{
+				HideCargo();
+			}
+			else if (!m_CargoGrid.IsVisible() && !hideCargo)
+			{
+				ShowCargo();
+			}
+		}
+		
+		if( IsDisplayable() )
+			SetOpenState( true );
+		else
+			SetOpenState( false );
 		
 		if (immedUpdate)
 			m_Parent.m_Parent.Refresh();
 		
 		RecomputeOpenedContainers();
+	}
+	
+	void HideCargo()
+	{
+		if( m_CargoGrid )
+		{
+			if(m_CargoGrid.IsVisible())
+			{
+				m_CargoGrid.OnHide();
+				RecomputeOpenedContainers();
+			}
+		}
+	}
+	
+	void ShowCargo()
+	{
+		if( m_CargoGrid )
+		{
+			if(!m_CargoGrid.IsVisible())
+			{
+				m_CargoGrid.OnShow();
+				RecomputeOpenedContainers();
+			}
+		}
 	}
 
 	EntityAI GetEntity()
@@ -672,12 +407,12 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		w.GetUserData(slots_icon);
 		
 		EntityAI item = null;
-		if(slots_icon)
+		if (slots_icon)
 			item = slots_icon.GetEntity();
 		
 		ItemBase itemAtPos = ItemBase.Cast( item );
 		
-		if( item )
+		if ( item )
 		{
 			bool reserved = false;
 		
@@ -685,32 +420,35 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 		
 			if ( button == MouseState.RIGHT )
 			{
-				if( GetDayZGame().IsLeftCtrlDown() )
+				#ifdef DIAG_DEVELOPER
+				if ( GetDayZGame().IsLeftCtrlDown() )
 					ShowActionMenu( InventoryItem.Cast(item) );
-				if( reserved )
+				#endif
+				
+				if ( reserved )
 				{
 					EntityAI att_parent = slots_icon.GetSlotParent();
-					GetGame().GetPlayer().GetHumanInventory().ClearUserReservedLocation( item );
+					GetGame().GetPlayer().GetHumanInventory().ClearUserReservedLocationSynced( item );
 					att_parent.GetOnAttachmentReleaseLock().Invoke(item, slots_icon.GetSlotID());
 				}
 			}
 			else if ( button == MouseState.MIDDLE )
 			{
-				if( !reserved )
+				if ( !reserved )
 				{
 					InspectItem( itemAtPos );
 				}
 			} 
 			else if ( button == MouseState.LEFT )
 			{
-				if( !reserved )
+				if ( !reserved )
 				{
 					PlayerBase player = PlayerBase.Cast( GetGame().GetPlayer() );
 					if ( g_Game.IsLeftCtrlDown() )
 					{
-						if( itemAtPos && itemAtPos.GetInventory().CanRemoveEntity() )
+						if ( itemAtPos && itemAtPos.GetInventory().CanRemoveEntity() )
 						{
-							if( itemAtPos.GetTargetQuantityMax() < itemAtPos.GetQuantity() )
+							if ( itemAtPos.GetTargetQuantityMax() < itemAtPos.GetQuantity() )
 								itemAtPos.SplitIntoStackMaxClient( player, -1 );
 							else
 								player.PredictiveTakeEntityToInventory( FindInventoryLocationType.ANY, itemAtPos );
@@ -734,7 +472,7 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 	void DropReceived( Widget w, int x, int y, CargoContainer cargo )
 	{
 		EntityAI item = GetItemPreviewItem( w );
-		if( !item )
+		if ( !item )
 		{
 			return;
 		}
@@ -920,7 +658,7 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 				item_base.SplitIntoStackMaxClient( m_Entity, il.GetSlot() );
 			}
 		}
-		else if( ( m_Entity.GetInventory().CanAddEntityInCargo( item, item.GetInventory().GetFlipCargo() ) && ( !player.GetInventory().HasEntityInInventory( item ) || !m_Entity.GetInventory().HasEntityInCargo( item )) ) || player.GetHumanInventory().HasEntityInHands( item ) )
+		else if( m_Entity.GetInventory().CanAddEntityInCargo( item, item.GetInventory().GetFlipCargo() ) && !m_Entity.GetInventory().HasEntityInCargo( item ) )
 		{
 			SplitItemUtils.TakeOrSplitToInventory( PlayerBase.Cast( GetGame().GetPlayer() ), m_Entity, item );
 		}
@@ -999,7 +737,7 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 				}
 			}
 	
-			ItemManager.GetInstance().HideTooltip();
+			HideOwnedTooltip();
 	
 			name = w.GetName();
 			name.Replace( "PanelWidget", "Temperature" );
@@ -1211,7 +949,7 @@ class ContainerWithCargoAndAttachments extends ClosableContainer
 				}
 				ColorManager.GetInstance().SetColor( w, ColorManager.GREEN_COLOR );
 			}
-			else if( ( m_Entity.GetInventory().CanAddEntityInCargo( item, item.GetInventory().GetFlipCargo() ) && (!player.GetInventory().HasEntityInInventory( item ) || !m_Entity.GetInventory().HasEntityInCargo( item )) ) /*|| player.GetHumanInventory().HasEntityInHands( item )*/ )
+			else if( ( m_Entity.GetInventory().CanAddEntityInCargo( item, item.GetInventory().GetFlipCargo() ) && !m_Entity.GetInventory().HasEntityInCargo( item ) ) /*|| player.GetHumanInventory().HasEntityInHands( item )*/ )
 			{
 				ItemManager.GetInstance().HideDropzones();
 				if( m_Entity.GetHierarchyRootPlayer() == GetGame().GetPlayer() )

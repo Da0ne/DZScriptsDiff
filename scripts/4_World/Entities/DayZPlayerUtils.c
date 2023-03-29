@@ -66,8 +66,13 @@ class DayZPlayerUtils
 	//--------------------------------------------------
 	// Custom player functions
 
-	//! returns entities in 2d cone specified by 
-	//! angle in degrees 
+	/**@fn		GetEntitiesInCone
+	 * @brief	returns entities in height-extended 2D cone
+	 * @param[in]	angle 	\p 	angle in degrees
+	 * @param[in]	minHeigh	\p cone 3D-extension Y min
+	 * @param[in]	maxHeight	\p cone 3D-extension Y max
+	 * @note		the detection hits points/faces from ANY non-edit model geometry, including resolution LODs, regardless of animation hiding (scaling). That is why certain animated objects, like flags in folded state, get detected from significant distance away!
+	 **/
 	static proto native void 		GetEntitiesInCone(vector pos, vector dir, float angle, float dist, float minHeigh, float maxHeight, out array<Object> entList);
 
 
@@ -405,8 +410,35 @@ class DayZPlayerUtils
 		
 		return -1;
 	}
-
-
+	
+	static EWaterLevels CheckWaterLevel(DayZPlayer pPlayer, out vector waterLevel)
+	{
+		SHumanCommandSwimSettings swimData = pPlayer.GetDayZPlayerType().CommandSwimSettingsW();
+		vector 	pp = pPlayer.GetPosition();
+		waterLevel = HumanCommandSwim.WaterLevelCheck(pPlayer, pp);
+		
+		if (waterLevel[1] < swimData.m_fToCrouchLevel)
+		{
+			return EWaterLevels.LEVEL_LOW;
+		}
+		else if (waterLevel[1] >= swimData.m_fToCrouchLevel && waterLevel[1] < swimData.m_fToErectLevel)
+		{
+			return EWaterLevels.LEVEL_CROUCH;
+		}
+		else// if (waterLevel[1] >= swimData.m_fToErectLevel)
+		{
+			//! if total water depth >= 1.5m && character is 1.5m in water 
+			if (waterLevel[0] >= swimData.m_fWaterLevelIn && waterLevel[1] >= swimData.m_fWaterLevelIn)
+			{
+				return EWaterLevels.LEVEL_SWIM_START;
+			}
+			else
+			{
+				return EWaterLevels.LEVEL_ERECT;
+			}
+		}
+	}
+	
 	//------------------------------------------------	
 	// private data	
 

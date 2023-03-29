@@ -171,7 +171,7 @@ class PluginRecipesManager extends PluginRecipesManagerBase
 		m_CachedItems.Clear();
 		PluginRecipesManager.m_RecipeCache.Clear();
 		
-		ref TStringArray all_config_paths = new TStringArray;
+		TStringArray all_config_paths = new TStringArray;
 		
 		all_config_paths.Insert(CFG_VEHICLESPATH);
 		all_config_paths.Insert(CFG_WEAPONSPATH);
@@ -180,7 +180,7 @@ class PluginRecipesManager extends PluginRecipesManagerBase
 		string config_path;
 		string child_name;
 		int scope;
-		ref TStringArray full_path = new TStringArray;
+		TStringArray full_path = new TStringArray;
 		WalkRecipes();
 		for (int i = 0; i < all_config_paths.Count(); i++)
 		{

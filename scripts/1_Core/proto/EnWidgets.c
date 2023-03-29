@@ -94,6 +94,15 @@ enum WidgetAlignment
 }
 
 //------------------------------------------
+//! Defined in code
+/*enum LinebreakOverrideMode
+{
+	LINEBREAK_DEFAULT,
+	LINEBREAK_WESTERN,
+	LINEBREAK_ASIAN
+};*/
+
+//------------------------------------------
 class Widget: Managed
 {
 	proto void ~Widget();
@@ -119,10 +128,14 @@ class Widget: Managed
 	proto native bool IsVisible();
 	proto native bool IsVisibleHierarchy();
 	proto native void SetPos(float x, float y, bool immedUpdate = true);
-	proto native void SetSize(float x, float y, bool immedUpdate = true);
+	proto native void SetSize(float w, float h, bool immedUpdate = true);
+	proto native void SetScreenPos(float x, float y, bool immedUpdate = true);
+	proto native void SetScreenSize(float w, float h, bool immedUpdate = true);
 	proto native void SetColor(int color);
 	proto native int GetColor();
 	proto native void SetRotation(float roll, float pitch, float yaw, bool immedUpdate = true);
+	//! returns rotation of widget in order roll, pitch, yaw
+	proto native vector GetRotation();
 	proto native void SetAlpha(float alpha);
 	proto native float GetAlpha();
 	proto void GetPos(out float x, out float y);
@@ -195,6 +208,7 @@ class TextWidget extends Widget
 
 class MultilineTextWidget extends TextWidget
 {
+	proto native float SetLineBreakingOverride(int mode);
 };
 
 class RichTextWidget extends TextWidget
@@ -206,6 +220,7 @@ class RichTextWidget extends TextWidget
 	proto native int   GetNumLines();
 	proto native void  SetLinesVisibility(int lineFrom, int lineTo, bool visible);
 	proto native float GetLineWidth(int line);
+	proto native float SetLineBreakingOverride(int mode);
 };
 
 class RenderTargetWidget extends Widget
@@ -327,10 +342,13 @@ class EditBoxWidget extends UIWidget
 
 class SliderWidget extends UIWidget
 {
+	proto native void SetMinMax(float minimum, float maximum);
 	proto native float GetMin();
 	proto native float GetMax();
 	proto native float GetCurrent();
 	proto native void SetCurrent(float curr);
+	proto native float GetStep();
+	proto native void SetStep(float step);
 };
 
 class SimpleProgressBarWidget extends UIWidget
@@ -446,6 +464,7 @@ class WrapSpacerWidget extends SpacerWidget
 class ScrollWidget extends SpacerBaseWidget
 {
 	proto native float GetScrollbarWidth();
+	proto native bool IsScrollbarVisible(); //reflects native C++ side scrollbar state
 
 	proto native float GetContentWidth();
 	proto native float GetContentHeight();

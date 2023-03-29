@@ -411,7 +411,7 @@ class DayZPlayerCameraOptics : DayZPlayerCameraIronsights
 		ItemOptics optics = ItemOptics.Cast( GetCurrentSightEntity() );
 		if (optics)
 		{
-			if (optics.GetCurrentStepFOV() >= GameConstants.DZPLAYER_CAMERA_FOV_EYEZOOM && (m_pPlayer.IsHoldingBreath() || m_pPlayer.IsEyeZoom()))
+			if (optics.GetCurrentStepFOV() >= GameConstants.DZPLAYER_CAMERA_FOV_EYEZOOM && (m_pPlayer.IsHoldingBreath() || m_pPlayer.GetEyeZoomLevel()))
 			{
 				m_fFovAbsolute = Math.SmoothCD(m_fFovAbsolute, GameConstants.DZPLAYER_CAMERA_FOV_EYEZOOM, m_fFovAbsVel, 0.1, 1000, pDt);
 			}
@@ -491,16 +491,8 @@ class DayZPlayerCameraOptics : DayZPlayerCameraIronsights
 				// optics NV mode
 				if (m_opticsUsed.IsNVOptic())
 				{
-					if (m_opticsUsed.IsWorking())
-					{
-						SetCameraNV(true);
-						SetNVPostprocess(NVTypes.NV_OPTICS_ON);
-					}
-					else
-					{
-						SetCameraNV(false);
-						SetNVPostprocess(NVTypes.NV_OPTICS_OFF);
-					}
+					SetCameraNV(true);
+					SetNVPostprocess(m_opticsUsed.GetCurrentNVType());
 				}
 				else
 				{
@@ -539,27 +531,12 @@ class DayZPlayerCameraOptics : DayZPlayerCameraIronsights
 				// optics NV mode
 				if (m_opticsUsed.IsNVOptic())
 				{
-					if (m_opticsUsed.IsWorking())
-					{
-						SetCameraNV(true);
-						if ( m_opticsUsed.IsNVG() ) //hotfix for the handheld NVGoggles not using the occluder
-						{
-							SetNVPostprocess(NVTypes.NV_GOGGLES);
-						}
-						else
-						{
-							SetNVPostprocess(NVTypes.NV_OPTICS_ON);
-						}
-					}
-					else
-					{
-						SetCameraNV(false);
-						SetNVPostprocess(NVTypes.NV_OPTICS_OFF);
-					}
+					SetCameraNV(true);
+					SetNVPostprocess(m_opticsUsed.GetCurrentNVType());
 				}
 				else
 				{
-					SetNVPostprocess(NVTypes.NONE);
+					SetNVPostprocess(NVTypes.NONE); //magnifying optics do not combine with other NV sources (would render NV optics obsolete)
 				}
 			}
 			
@@ -592,23 +569,6 @@ class DayZPlayerCameraOptics : DayZPlayerCameraIronsights
 		else
 		{
 			m_CameraPPDelay = DayZPlayerCameras.TIME_CAMERACHANGE_02 - 0.05;
-		}
-	}
-	
-	//different handling in optics; no NV outside designated NV scopes
-	override void UpdateCameraNV(PlayerBase player)
-	{
-		if ( !m_opticsUsed || (m_opticsUsed && !m_opticsUsed.IsNVOptic()) )
-		{
-			if (m_opticsUsed && m_opticsUsed.AllowsDOF()) //1x scopes
-			{
-				super.UpdateCameraNV(player);
-			}
-			else if ( IsCameraNV() )
-			{
-				//super.UpdateCameraNV(player);
-				SetCameraNV(false);
-			}
 		}
 	}
 	

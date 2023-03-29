@@ -4,11 +4,11 @@ class OnlineServices
 	static ref ScriptInvoker												m_PermissionsAsyncInvoker	= new ScriptInvoker();
 	static ref ScriptInvoker												m_ServersAsyncInvoker		= new ScriptInvoker();
 	static ref ScriptInvoker												m_ServerAsyncInvoker		= new ScriptInvoker();
-	static ref ScriptInvoker												m_MuteUpdateAsyncInvoker	= new ScriptInvoker();
+	static ref ScriptInvoker												m_MuteUpdateAsyncInvoker	= new ScriptInvoker(); // DEPRECATED
 	static ref ScriptInvoker												m_ServerModLoadAsyncInvoker	= new ScriptInvoker();
 	
 	static ref BiosClientServices											m_ClientServices;
-	static ref TrialService													m_TrialService				= new TrialService;
+	static ref TrialService													m_TrialService;
 	
 	protected static string													m_InviteServerIP;
 	protected static int													m_InviteServerPort;
@@ -31,11 +31,13 @@ class OnlineServices
 	{
 		#ifdef PLATFORM_CONSOLE
 			#ifndef PLATFORM_WINDOWS // if app is not on Windows with -XBOX parameter
-			if( !m_FriendsList )
+			if ( !m_TrialService )
+				m_TrialService = new TrialService;
+			if ( !m_FriendsList )
 				m_FriendsList = new map<string, ref BiosFriendInfo>;
-			if( !m_MuteList )
+			if ( !m_MuteList )
 				m_MuteList = new map<string, bool>;
-			if( !m_PermissionsList )
+			if ( !m_PermissionsList )
 				m_PermissionsList = new map<string, ref BiosPrivacyPermissionResultArray>;
 			
 			m_FriendsList.Clear();
@@ -55,17 +57,17 @@ class OnlineServices
 	static void GetClientServices()
 	{
 		BiosUserManager user_manager = GetGame().GetUserManager();
-		if( user_manager )
+		if ( user_manager )
 		{
 			BiosUser selected_user = user_manager.GetSelectedUser();
-			if( selected_user )
+			if ( selected_user )
 			{
 				m_ClientServices = selected_user.GetClientServices();
 			}
 			#ifdef PLATFORM_WINDOWS
 				array<ref BiosUser> user_list = new array<ref BiosUser>;
 				user_manager.GetUserList( user_list );
-				if( user_list.Count() > 0 )
+				if ( user_list.Count() > 0 )
 				{
 					m_ClientServices = user_list.Get( 0 ).GetClientServices();
 				}
@@ -79,76 +81,22 @@ class OnlineServices
 	
 	static bool ErrorCaught( EBiosError error )
 	{
-		switch( error )
+		switch ( error )
 		{
 			case EBiosError.OK:
 			{
 				return false;
 			}
-			case EBiosError.CANCEL:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Operation canceled." );
-				return true;
-			}
-			case EBiosError.BAD_PARAMETER:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Bad parameter." );
-				return true;
-			}
-			case EBiosError.NOT_FOUND:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: User not found." );
-				return true;
-			}
-			case EBiosError.NOT_IMPLEMENTED:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Function not implemented on this platform." );
-				return true;
-			}
-			case EBiosError.PURCHASE_REQUIRED:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Purchase required." );
-				return true;
-			}
-			case EBiosError.NOT_ALLOWED:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Not allowed." );
-				return true;
-			}
-			case EBiosError.BANNED:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Not allowed." );
-				return true;
-			}
-			case EBiosError.LOGICAL:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Logical error." );
-				return true;
-			}
-			case EBiosError.BAD_SCRIPT:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Bad script linking." );
-				return true;
-			}
-			case EBiosError.UPDATE_REQUIRED:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Update required." );
-				return true;
-			}
-			case EBiosError.UPDATE_REQUIRED_AND_DOWNLOADED:
-			{
-				DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Mandatory update is ready for install." );
-				return true;
-			}
 		}
-		DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Unknown error." );
+
+		DebugPrint.LogErrorAndTrace( string.Format("BiosClientServices Error: %1", ErrorModuleHandler.GetClientMessage(ErrorCategory.BIOSError, error)) );
 		return true;
 	}
 	
 	static void LoadServers( notnull GetServersInput inputValues )
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			m_ClientServices.GetLobbyService().GetServers( inputValues );
 		}
@@ -157,11 +105,21 @@ class OnlineServices
 			DebugPrint.LogErrorAndTrace( "BiosClientServices Error: Service reference does not exist." );
 		}
 	}
+
+	static void GetFavoriteServers(TStringArray favServers)
+	{
+		m_ClientServices.GetLobbyService().GetFavoriteServers(favServers);
+	}
+	
+	static void GetCachedFavServerInfo(array<ref CachedServerInfo> favServersInfoCache)
+	{
+		m_ClientServices.GetLobbyService().GetCachedFavoriteServerInfo(favServersInfoCache);
+	}
 	
 	static void SetServerFavorited(string ipAddress, int port, int steamQueryPort, bool is_favorited )
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			if ( is_favorited )
 			{
@@ -200,10 +158,18 @@ class OnlineServices
 			inputValues.m_Platform = 3;
 		#endif
 		
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			m_ClientServices.GetLobbyService().GetServers( inputValues );
 		}
+	}
+	
+	static GetServersResultRow GetCurrentServerInfo()
+	{
+		if (m_CurrentServerInfo)
+			return m_CurrentServerInfo;
+		else
+			return g_Game.GetHostData();
 	}
 	
 	static void ClearCurrentServerInfo()
@@ -227,13 +193,13 @@ class OnlineServices
 	
 	static void OnLoadServersAsync( GetServersResult result_list, EBiosError error, string response )
 	{
-		if( !ErrorCaught( error ) )
+		if ( !ErrorCaught( error ) )
 		{
-			if( m_CurrentServerIP != "" && m_CurrentServerPort > 0 )
+			if ( m_CurrentServerIP != "" && m_CurrentServerPort > 0 )
 			{
-				foreach( GetServersResultRow result : result_list.m_Results )
+				foreach ( GetServersResultRow result : result_list.m_Results )
 				{
-					if( result.m_HostIp == m_CurrentServerIP && result.m_HostPort == m_CurrentServerPort )
+					if ( result.m_HostIp == m_CurrentServerIP && result.m_HostPort == m_CurrentServerPort )
 					{
 						m_CurrentServerInfo	= result;
 						m_CurrentServerIP	= "";
@@ -263,16 +229,12 @@ class OnlineServices
 			m_ServersAsyncInvoker.Invoke( null, error, "" );
 		}
 	}
-	
-	static GetServersResultRow GetCurrentServerInfo()
-	{
-		return m_CurrentServerInfo;
-	}
+
 	
 	static void LoadFriends()
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			m_ClientServices.GetSocialService().GetFriendsAsync();
 		}
@@ -285,7 +247,7 @@ class OnlineServices
 	static void ShowUserProfile( string uid )
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			m_ClientServices.GetSocialService().ShowUserProfileAsync( uid );
 		}
@@ -349,7 +311,7 @@ class OnlineServices
 	static void LoadPermissions( array<string> player_list )
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			array<EBiosPrivacyPermission> perms = new array<EBiosPrivacyPermission>;
 			perms.Insert( EBiosPrivacyPermission.COMMUNICATE_VOICE );
@@ -367,7 +329,6 @@ class OnlineServices
 		if ( !ErrorCaught( error ) )
 		{
 			BiosPrivacyUidResultArray new_list = new BiosPrivacyUidResultArray;
-			map<string, bool> mute_list = new map<string, bool>;
 			
 			for ( int i = 0; i < result_list.Count(); i++ )
 			{
@@ -381,54 +342,30 @@ class OnlineServices
 					{
 						new_list.Insert( result );
 						m_PermissionsList.Set( uid, result_array2 );
-						mute_list.Insert( uid, IsPlayerMuted( uid ) );
 					}
 				}
 				else
 				{
 					m_PermissionsList.Insert( uid, result_array2 );
 					new_list.Insert( result );
-					mute_list.Insert( uid, IsPlayerMuted( uid ) );
-				}
-				
-				if ( !m_MuteList.Contains( uid ) )
-				{
-					m_MuteList.Insert( uid, !result_array2.Get( 0 ).m_IsAllowed );
 				}
 			}
 			m_PermissionsAsyncInvoker.Invoke( new_list );
-			m_MuteUpdateAsyncInvoker.Invoke( mute_list );
 		}
 	}
 	
 	static bool IsPlayerMuted( string id )
 	{
-		if( m_MuteList.Contains( id ) )
+		if ( m_MuteList.Contains( id ) )
 		{
 			return m_MuteList.Get( id );
-		}
-		else
-		{
-			BiosPrivacyPermissionResultArray perms = m_PermissionsList.Get( id );
-			if( perms )
-			{
-				for( int i = 0; i < perms.Count(); i++ )
-				{
-					BiosPrivacyPermissionResult result = perms.Get( i );
-					if( result.m_Permission == EBiosPrivacyPermission.COMMUNICATE_VOICE )
-					{
-						m_MuteList.Insert( id, !result.m_IsAllowed );
-						return !result.m_IsAllowed;
-					}
-				}
-			}
 		}
 		return false;
 	}
 	
 	static bool MutePlayer( string id, bool mute )
 	{
-		if( m_MuteList.Contains( id ) )
+		if ( m_MuteList.Contains( id ) )
 		{
 			m_MuteList.Set( id, mute );
 		}
@@ -436,6 +373,13 @@ class OnlineServices
 		{
 			m_MuteList.Insert( id, mute );
 		}
+		
+		// notify server
+		ScriptInputUserData ctx = new ScriptInputUserData();
+		ctx.Write( INPUT_UDT_USER_MUTE_XBOX );
+		ctx.Write( id );
+		ctx.Write( mute );
+		ctx.Send();
 		
 		return true;
 	}
@@ -449,11 +393,11 @@ class OnlineServices
 	{
 		#ifdef PLATFORM_CONSOLE
 			GetClientServices();
-			if( m_ClientServices )
+			if ( m_ClientServices )
 			{
 				string addr;
 				int port;
-				if( GetGame().GetHostAddress( addr, port ) )
+				if ( GetGame().GetHostAddress( addr, port ) )
 				{
 					ErrorCaught( m_ClientServices.GetSessionService().ShowInviteToGameplaySessionAsync( addr, port ) );
 				}
@@ -469,7 +413,7 @@ class OnlineServices
 	{
 		#ifdef PLATFORM_CONSOLE
 			GetClientServices();
-			if( m_ClientServices )
+			if ( m_ClientServices )
 			{
 				ErrorCaught( m_ClientServices.GetPrivacyService().GetPrivilegeAsync( EBiosPrivacyPrivilege.MULTIPLAYER_GAMEPLAY, true ) );
 			}
@@ -485,7 +429,7 @@ class OnlineServices
 	static void LoadVoicePrivilege()
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			ErrorCaught( m_ClientServices.GetPrivacyService().GetPrivilegeAsync( EBiosPrivacyPrivilege.COMMUNICATE_VOICE, true ) );
 		}
@@ -497,13 +441,13 @@ class OnlineServices
 	
 	static void OnLoadMPPrivilege( EBiosError err )
 	{
-		if( !ErrorCaught( err ) )
+		if ( !ErrorCaught( err ) )
 		{
 			g_Game.TryConnect();
 		}
 		else
 		{
-			if( g_Game.GetGameState() != DayZGameState.MAIN_MENU )
+			if ( g_Game.GetGameState() != DayZGameState.MAIN_MENU )
 			{
 				g_Game.MainMenuLaunch();
 			}
@@ -517,7 +461,7 @@ class OnlineServices
 	
 	static void OnLoadVoicePrivilege( EBiosError err )
 	{
-		if( g_Game.GetGameState() == DayZGameState.IN_GAME )
+		if ( g_Game.GetGameState() == DayZGameState.IN_GAME )
 		{
 			#ifdef PLATFORM_PS4
 			GetGame().GetWorld().DisableReceiveVoN( ErrorCaught( err ) );
@@ -529,7 +473,7 @@ class OnlineServices
 	static void SetSessionHandle( string handle )
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			m_ClientServices.GetSessionService().m_CurrentHandle = handle;
 		}
@@ -538,7 +482,7 @@ class OnlineServices
 	static string GetSessionHandle()
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			return m_ClientServices.GetSessionService().m_CurrentHandle;
 		}
@@ -548,7 +492,7 @@ class OnlineServices
 	static void GetSession()
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
 			m_ClientServices.GetSessionService().TryGetSession( GetSessionHandle() );
 		}
@@ -574,10 +518,10 @@ class OnlineServices
 	{
 		m_MultiplayState = state;
 		bool is_multiplay;
-		if( ClientData.GetSimplePlayerList() )
+		if ( ClientData.GetSimplePlayerList() )
 			is_multiplay = state && ( ClientData.GetSimplePlayerList().Count() > 1 );
 
-		if( m_ClientServices )
+		if ( m_ClientServices )
 			m_ClientServices.GetSessionService().SetMultiplayState(is_multiplay);
 	}
 	
@@ -585,10 +529,10 @@ class OnlineServices
 	{
 		string addr;
 		int port;
-		if( GetGame().GetHostAddress( addr, port ) )
+		if ( GetGame().GetHostAddress( addr, port ) )
 		{
 			GetClientServices();
-			if( m_ClientServices )
+			if ( m_ClientServices )
 			{
 				m_ClientServices.GetSessionService().EnterGameplaySessionAsync( addr, port );
 				SetMultiplayState(true);
@@ -599,17 +543,17 @@ class OnlineServices
 	static void LeaveGameplaySession()
 	{
 		GetClientServices();
-		if( m_ClientServices )
+		if ( m_ClientServices )
 		{
-			if( m_CurrentServerInfo )
+			if ( m_CurrentServerInfo )
 				m_ClientServices.GetSessionService().LeaveGameplaySessionAsync(m_CurrentServerInfo.m_HostIp, m_CurrentServerInfo.m_HostPort);
-			else if( m_CurrentServerIP != "" )
+			else if ( m_CurrentServerIP != "" )
 				m_ClientServices.GetSessionService().LeaveGameplaySessionAsync(m_CurrentServerIP, m_CurrentServerPort);
 				
 			SetMultiplayState(false);
 			m_FirstFriendsLoad = true;
 			
-			if( m_FriendsList )
+			if ( m_FriendsList )
 				m_FriendsList.Clear();
 		}
 	}
@@ -618,10 +562,10 @@ class OnlineServices
 	{
 		string addr;
 		int port;
-		if( GetGame().GetHostAddress( addr, port ) )
+		if ( GetGame().GetHostAddress( addr, port ) )
 		{
 			GetClientServices();
-			if( m_ClientServices )
+			if ( m_ClientServices )
 			{
 				m_ClientServices.GetSessionService().SetGameplayActivityAsync( addr, port );
 			}
@@ -632,10 +576,10 @@ class OnlineServices
 	{
 		string addr;
 		int port;
-		if( GetGame().GetHostAddress( addr, port ) )
+		if ( GetGame().GetHostAddress( addr, port ) )
 		{
 			GetClientServices();
-			if( m_ClientServices )
+			if ( m_ClientServices )
 			{
 				m_PendingInvites = invitees;
 				m_ClientServices.GetSessionService().InviteToGameplaySessionAsync( addr, port, GetPendingInviteList() );
@@ -650,12 +594,12 @@ class OnlineServices
 	static array<string> GetPendingInviteList()
 	{
 		array<string> already_on_server = ClientData.GetSimplePlayerList();
-		if( already_on_server && m_PendingInvites )
+		if ( already_on_server && m_PendingInvites )
 		{
 			array<string> new_to_server = new array<string>;
-			foreach( string invitee : m_PendingInvites )
+			foreach ( string invitee : m_PendingInvites )
 			{
-				if( already_on_server.Find( invitee ) == -1 )
+				if ( already_on_server.Find( invitee ) == -1 )
 				{
 					new_to_server.Insert( invitee );
 				}
@@ -677,7 +621,7 @@ class OnlineServices
 	static void AutoConnectToEmptyServer()
 	{
 		GetClientServices();
-		if( m_ClientServices && m_AutoConnectTries == 0 )
+		if ( m_ClientServices && m_AutoConnectTries == 0 )
 		{
 			m_AutoConnectTries = 1;
 			GetFirstServerWithEmptySlotInput input = new GetFirstServerWithEmptySlotInput;
@@ -691,11 +635,11 @@ class OnlineServices
 		GetServersResultRow result;
 		array<ref GetServersResultRow> results_free = new array<ref GetServersResultRow>;
 		
-		if( results && results.m_Result && results.m_Result.m_Results && results.m_Result.m_Results.Count() > 0 )
+		if ( results && results.m_Result && results.m_Result.m_Results && results.m_Result.m_Results.Count() > 0 )
 		{
-			foreach( GetServersResultRow result_temp : results.m_Result.m_Results )
+			foreach ( GetServersResultRow result_temp : results.m_Result.m_Results )
 			{
-				if( result_temp.m_FreeSlots > 0 )
+				if ( result_temp.m_FreeSlots > 0 )
 				{
 					results_free.Insert( result_temp );
 				}
@@ -756,7 +700,7 @@ class OnlineServices
 	{
 		#ifdef PLATFORM_XBOX
 		#ifndef PLATFORM_WINDOWS
-		if( m_TrialService )
+		if ( m_TrialService )
 			return m_TrialService.IsGameTrial( sim );
 		#endif
 		#endif
@@ -767,7 +711,7 @@ class OnlineServices
 	{
 		#ifdef PLATFORM_XBOX
 		#ifndef PLATFORM_WINDOWS
-		if( m_TrialService )
+		if ( m_TrialService )
 			return m_TrialService.IsGameActive( sim );
 		#endif
 		#endif

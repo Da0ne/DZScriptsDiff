@@ -244,15 +244,17 @@ class FoodStage
 		string food_stage_name = GetFoodStageName( stage_type );
 		int hashedStageName = GetFoodStageNameHash( stage_type );
 
-		array<float> nutrition_properties = new array<float>;
+		array<float> nutrition_properties;
 		
-		map<int, ref map<int, ref array<float>>>foodStagesMap = new map<int, ref map<int, ref array<float>>>;
-		map<int, ref array<float>> stagePropertiesMap = new map<int, ref array<float>>;
+		map<int, ref map<int, ref array<float>>>foodStagesMap;
+		map<int, ref array<float>> stagePropertiesMap;
 		
-		m_EdibleBasePropertiesMap.Find(classname.Hash(), foodStagesMap);
-		foodStagesMap.Find(hashedStageName, stagePropertiesMap);
-		
-		stagePropertiesMap.Find(NUTRITION_PROPERTIES_HASH, nutrition_properties);
+		if( !m_EdibleBasePropertiesMap.Find(classname.Hash(), foodStagesMap))
+			return 0;
+		if( !foodStagesMap.Find(hashedStageName, stagePropertiesMap))
+			return 0;
+		if( !stagePropertiesMap.Find(NUTRITION_PROPERTIES_HASH, nutrition_properties))
+			return 0;
 
 		if ( nutrition_properties.Count() > 0 )
 		{

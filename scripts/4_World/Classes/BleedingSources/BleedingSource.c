@@ -37,24 +37,22 @@ class BleedingSource
 		m_ParticleName = particle_name;
 		
 		//CreateBleedSymptom();
-		if(GetGame().IsClient() || !GetGame().IsMultiplayer())
+		if (!GetGame().IsDedicatedServer())
 		{	
 			CreateParticle();
+			StartSourceBleedingIndication();
+
 		}
 	}
 
 	void ~BleedingSource()
 	{
-		if(m_BloodParticle)	RemoveParticle();
-		if(m_DebugShape)
-		{
-			Debug.RemoveShape(m_DebugShape);
-		}		
+		if (m_BloodParticle)
+			RemoveParticle();
 		
-		if(m_DebugShape1)
-		{
-			Debug.RemoveShape(m_DebugShape1);
-		}
+		RemoveDebugShape();
+		
+		StopSourceBleedingIndication(!m_Player || !m_Player.IsAlive());
 	}
 	
 	void SetType(eBleedingSourceType type)
@@ -86,7 +84,7 @@ class BleedingSource
 	{
 		int boneIdx = m_Player.GetBoneIndexByName(m_Bone);
 		m_BleedingEffect = EffectParticle.Cast(m_ParticleName.ToType().Spawn());
-		if(m_BleedingEffect)
+		if (m_BleedingEffect)
 		{
 			SEffectManager.PlayInWorld( m_BleedingEffect, "0 0 0" );
 			m_BloodParticle = m_BleedingEffect.GetParticle();
@@ -110,25 +108,25 @@ class BleedingSource
 	
 	void RemoveParticle()
 	{
-		if(m_BleedingEffect) delete m_BleedingEffect;
+		SEffectManager.DestroyEffect(m_BleedingEffect);
 	}
 
 	void OnUpdateServer(float deltatime, float blood_scale, bool no_blood_loss )
 	{
 		m_ActiveTime += deltatime;
 		
-		if(m_ActiveTime >= m_MaxTime)
+		if (m_ActiveTime >= m_MaxTime)
 		{
-			if(m_Player.GetBleedingManagerServer() && !m_DeleteRequested)
+			if (m_Player.GetBleedingManagerServer() && !m_DeleteRequested)
 			{
 				m_Player.GetBleedingManagerServer().RequestDeletion(GetBit());//add yourself to a list of sources to be deleted
 				m_DeleteRequested = true;
 			}
 		}
-		if( !no_blood_loss )
+		if ( !no_blood_loss )
 		{
 			float flow = m_FlowModifier;
-			switch( m_Type )
+			switch ( m_Type )
 			{
 				case eBleedingSourceType.NORMAL:
 				{
@@ -144,18 +142,36 @@ class BleedingSource
 		}
 	}
 	
+	void StartSourceBleedingIndication()
+	{
+		if (m_Player.IsControlledPlayer())
+		{
+			#ifdef DIAG_DEVELOPER
+			if (DbgBleedingIndicationStaticInfo.m_DbgEnableBleedingIndication)
+			{
+			#endif
+				Param4<bool,int,vector,bool> par = new Param4<bool,int,vector,bool>(true,m_Bit,"0 0 0",false);
+				GetGame().GetMission().GetEffectWidgets().AddActiveEffects({EffectWidgetsTypes.BLEEDING_LAYER});
+				GetGame().GetMission().GetEffectWidgets().UpdateWidgets(EffectWidgetsTypes.BLEEDING_LAYER,0,par);
+			#ifdef DIAG_DEVELOPER
+			}
+			#endif
+		}
+	}
+	
+	void StopSourceBleedingIndication(bool instant = false)
+	{
+		if ( m_Player && m_Player.IsControlledPlayer() && GetGame() && (!GetGame().IsDedicatedServer()) )
+		{
+			Param4<bool,int,vector,bool> par = new Param4<bool,int,vector,bool>(false,m_Bit,"0 0 0",instant);
+			GetGame().GetMission().GetEffectWidgets().UpdateWidgets(EffectWidgetsTypes.BLEEDING_LAYER,0,par);
+		}
+	}
+	
 	void DrawDebugShape()
 	{
-		if(m_DebugShape)
-		{
-			Debug.RemoveShape(m_DebugShape);
-		}
+		RemoveDebugShape();
 		
-		if(m_DebugShape1) 
-		{
-			Debug.RemoveShape(m_DebugShape1);
-		}
-
 		Particle p = m_BleedingEffect.GetParticle();
 		vector pos = p.GetPosition();
 		m_DebugShape = Debug.DrawSphere(pos, 0.009, COLOR_BLUE, ShapeFlags.TRANSP|ShapeFlags.NOOUTLINE|ShapeFlags.NOZBUFFER);
@@ -165,5 +181,18 @@ class BleedingSource
 		arrow_to = pos + arrow_to;
 		
 		m_DebugShape1 = Debug.DrawArrow(pos, arrow_to, 0.1, COLOR_GREEN);
+	}
+	
+	void RemoveDebugShape()
+	{
+		if (m_DebugShape)
+		{
+			Debug.RemoveShape(m_DebugShape);
+		}
+		
+		if (m_DebugShape1) 
+		{
+			Debug.RemoveShape(m_DebugShape1);
+		}
 	}
 }

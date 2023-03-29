@@ -1,10 +1,7 @@
-/*
-DISCLAIMER: may undergo some changes in the course of 1.14 experimental stage.
-*/
 
 class PPERequesterBase
 {
-	protected bool m_IsRunning; //TODO - investigate the 'false' in Default setters
+	protected bool m_IsRunning; //helps determine if the requester has been stopped or not
 	protected bool m_ValuesSent;
 	protected int m_IDX;
 	
@@ -33,7 +30,7 @@ class PPERequesterBase
 		
 		PPEManagerStatic.GetPPEManager().SetRequestUpdating(this,state);
 		
-		//TODO - separate into its own function
+		//TODO - separate into its own function?
 		if (state)
 			PPEManagerStatic.GetPPEManager().SetRequestActive(this,true);
 	}
@@ -46,9 +43,6 @@ class PPERequesterBase
 	
 	void Stop(Param par = null)
 	{
-		if (!m_IsRunning)
-			return;
-		
 		if (!m_RequestDataStructure || m_RequestDataStructure.Count() <= 0)
 			return;
 		
@@ -92,10 +86,14 @@ class PPERequesterBase
 		
 		data.m_BoolTarget = val;
 		data.m_BoolLast = data.m_BoolCurrent;
-		data.SetSettingDefaultValues(false);
-		data.SetDataActive(true);
 		
-		QueueValuesSend();
+		if (data.m_BoolTarget != data.m_BoolCurrent || data.IsSettingDefaultValues())
+		{
+			data.SetSettingDefaultValues(false);
+			data.SetDataActive(true);
+			
+			QueueValuesSend();
+		}
 		//DbgPrnt("PPEDebug | PPERequesterBase - SetTargetValueBool | mat/par/req: " + mat_id + "/" + param_idx + "/" + m_IDX + " | data: " + data);
 	}
 	
@@ -107,9 +105,12 @@ class PPERequesterBase
 		
 		PPERequestParamDataBool data = PPERequestParamDataBool.Cast(GetRequestData(mat_id,param_idx,PPEConstants.VAR_TYPE_BOOL));
 		data.m_BoolLast = data.m_BoolCurrent;
-		data.SetSettingDefaultValues(true);
-		
-		QueueValuesSend();
+		if (!data.IsSettingDefaultValues())
+		{
+			data.SetSettingDefaultValues(true);
+			
+			QueueValuesSend();
+		}
 		//DbgPrnt("PPEDebug | PPERequesterBase - SetTargetValueBoolDefault | mat/par/req: " + mat_id + "/" + param_idx + "/" + m_IDX + " | data: " + data);
 	}
 	
@@ -124,10 +125,13 @@ class PPERequesterBase
 		
 		data.m_IntTarget = val;
 		data.m_IntLast = data.m_IntCurrent;
-		data.SetSettingDefaultValues(false);
-		data.SetDataActive(true);
-		
-		QueueValuesSend();
+		if (data.m_IntTarget != data.m_IntCurrent || data.IsSettingDefaultValues())
+		{
+			data.SetSettingDefaultValues(false);
+			data.SetDataActive(true);
+			
+			QueueValuesSend();
+		}
 		//DbgPrnt("PPEDebug | PPERequesterBase - SetTargetValueInt | mat/par/req: " + mat_id + "/" + param_idx + "/" + m_IDX + " | data: " + data);
 	}
 	
@@ -139,13 +143,15 @@ class PPERequesterBase
 		
 		PPERequestParamDataInt data = PPERequestParamDataInt.Cast(GetRequestData(mat_id,param_idx,PPEConstants.VAR_TYPE_INT));
 		data.m_IntLast = data.m_IntCurrent;
-		data.SetSettingDefaultValues(true);
-		
-		QueueValuesSend();
+		if (!data.IsSettingDefaultValues())
+		{
+			data.SetSettingDefaultValues(true);
+			
+			QueueValuesSend();
+		}
 		//DbgPrnt("PPEDebug | PPERequesterBase - SetTargetValueIntDefault | mat/par/req: " + mat_id + "/" + param_idx + "/" + m_IDX + " | data: " + data);
 	}
 	
-	//TODO - carve out redundant parameters
 	protected void SetTargetValueFloat(int mat_id, int param_idx, bool relative, float val, int priority_layer, int operator = PPOperators.ADD_RELATIVE)
 	{
 		if ( !m_RequestDataStructure )
@@ -159,10 +165,13 @@ class PPERequesterBase
 		data.m_FloatTarget = RelativizeValue(val,PPEConstants.VAR_TYPE_FLOAT,mat_id,param_idx,relative);
 		data.m_FloatLast = data.m_FloatCurrent;
 		data.m_FloatStart = data.m_FloatCurrent;
-		data.SetSettingDefaultValues(false);
-		data.SetDataActive(true);
-		
-		QueueValuesSend();
+		if (data.m_FloatTarget != data.m_FloatCurrent || data.IsSettingDefaultValues())
+		{
+			data.SetSettingDefaultValues(false);
+			data.SetDataActive(true);
+			
+			QueueValuesSend();
+		}
 		//DbgPrnt("PPEDebug | PPERequesterBase - SetTargetValueFloat | mat/par/req: " + mat_id + "/" + param_idx + "/" + m_IDX + " | data: " + data);
 	}
 	
@@ -176,9 +185,12 @@ class PPERequesterBase
 		data.m_FloatFormerTarget = data.m_FloatTarget;
 		data.m_FloatLast = data.m_FloatCurrent;
 		data.m_FloatStart = data.m_FloatCurrent;
-		data.SetSettingDefaultValues(true);
-		
-		QueueValuesSend();
+		if (!data.IsSettingDefaultValues())
+		{
+			data.SetSettingDefaultValues(true);
+			
+			QueueValuesSend();
+		}
 		//DbgPrnt("PPEDebug | PPERequesterBase - SetTargetValueFloatDefault | mat/par/req: " + mat_id + "/" + param_idx + "/" + m_IDX + " | data: " + data);
 	}
 	
@@ -196,10 +208,13 @@ class PPERequesterBase
 		
 		data.m_ColorLast = data.m_ColorCurrent;
 		data.m_ColorStart = data.m_ColorCurrent;
-		data.SetSettingDefaultValues(false);
-		data.SetDataActive(true);
-				
-		QueueValuesSend();
+		//if (data.m_ColorTarget != data.m_ColorCurrent)
+		{
+			data.SetSettingDefaultValues(false);
+			data.SetDataActive(true);
+					
+			QueueValuesSend();
+		}
 		//DbgPrnt("PPEDebug | PPERequesterBase - SetTargetValueColor | mat/par/req: " + mat_id + "/" + param_idx + "/" + m_IDX + " | data: " + data);
 	}
 	
@@ -213,9 +228,12 @@ class PPERequesterBase
 		data.m_ColorFormerTarget = data.m_ColorTarget;
 		data.m_ColorLast = data.m_ColorCurrent;
 		data.m_ColorStart = data.m_ColorCurrent;
-		data.SetSettingDefaultValues(true);
-		
-		QueueValuesSend();
+		if (!data.IsSettingDefaultValues())
+		{
+			data.SetSettingDefaultValues(true);
+			
+			QueueValuesSend();
+		}
 		//DbgPrnt("PPEDebug | PPERequesterBase - SetTargetValueColorDefault | mat/par/req: " + mat_id + "/" + param_idx + "/" + m_IDX + " | data: " + data);
 	}
 	
@@ -235,7 +253,7 @@ class PPERequesterBase
 	protected void QueueValuesSend()
 	{
 		m_ValuesSent = false;
-		m_IsRunning = true;
+		//m_IsRunning = true;
 		SetRequesterUpdating(true);
 	}
 	
@@ -308,7 +326,6 @@ class PPERequesterBase
 		m_RequestDataStructure.Clear();
 	}
 	
-	//TODO - rename
 	protected void SendCurrentValueData(PPERequestParamDataBase data)
 	{
 		PPEManagerStatic.GetPPEManager().SendMaterialValueData(data);
@@ -347,11 +364,11 @@ class PPERequesterBase
 		SetDefaultValuesAll();
 	}
 	
-	//! converts all values used to relative values (if not relative already) //TODO - remove relativization (WB min/max not actually min/max!!)
+	//! converts all values used to relative values (if not relative already)
 	protected float RelativizeValue(float value, int var_type, int mat_id, int param_id, bool relative)
 	{
 		float ret = value;
-		if (!relative)
+		if (!relative) //if not already relative...
 		{
 			switch (var_type)
 			{
@@ -368,7 +385,6 @@ class PPERequesterBase
 	}
 	
 	//! Sets all requested values to default, ignoring them in further calculations.
-	//TODO - don't just leave zero values in, cleanup across the entire system!
 	protected void SetDefaultValuesAll()
 	{
 		//<material<param_id,data>>

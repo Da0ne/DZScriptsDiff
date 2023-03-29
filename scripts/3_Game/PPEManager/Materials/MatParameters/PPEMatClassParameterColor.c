@@ -126,7 +126,7 @@ class PPEMatClassParameterColor extends PPEMatClassParameterCommandData
 			
 			if (!req_data.GetUpdatingDataValues() && req_data.IsDataActive()) //set to exact value, not updating anymore
 			{
-				color_values_temp.Copy(req_data.m_ColorCurrent); //already converted from before? //TODO - test this!
+				color_values_temp.Copy(req_data.m_ColorCurrent); //already converted from before?
 				PrepareLayerInfo(req_data.GetPriorityLayer(),{color_values_temp[0],color_values_temp[1],color_values_temp[2],color_values_temp[3]},req_data.GetInteractionMask());
 				//DbgPrnt("PPEDebug | PPEMatClassParameterColor - UpdateParameterValues | !req_data.m_UpdatingData | mat/par/req: " + m_MaterialIndex + "/" + m_ParameterIndex + "/" + req_data.GetRequesterIDX() + " | not updating, addaing current values into mix: " + req_data.m_ColorCurrent[0] + "," + req_data.m_ColorCurrent[1] + "," + req_data.m_ColorCurrent[2] + "," + req_data.m_ColorCurrent[3]);
 				continue;
@@ -187,6 +187,7 @@ class PPEMatClassParameterColor extends PPEMatClassParameterCommandData
 					color_values_total[VALUE_ALPHA] = Math.Max(color_values_total[VALUE_ALPHA], values[VALUE_ALPHA]);
 				break;
 				
+				case PPOperators.ADD_RELATIVE:
 				case PPOperators.ADD:
 					color_values_total[VALUE_RED] = color_values_total[VALUE_RED] + values[VALUE_RED];
 					color_values_total[VALUE_GREEN] = color_values_total[VALUE_GREEN] + values[VALUE_GREEN];
@@ -198,6 +199,7 @@ class PPEMatClassParameterColor extends PPEMatClassParameterCommandData
 					float_value_total = (1 - float_value_total) * value + float_value_total;
 				break;*/
 				
+				case PPOperators.SUBSTRACT_RELATIVE:
 				case PPOperators.SUBSTRACT:
 					color_values_total[VALUE_RED] = color_values_total[VALUE_RED] - values[VALUE_RED];
 					color_values_total[VALUE_GREEN] = color_values_total[VALUE_GREEN] - values[VALUE_GREEN];
@@ -209,6 +211,7 @@ class PPEMatClassParameterColor extends PPEMatClassParameterCommandData
 					float_value_total = float_value_total - value * float_value_total;
 				break;*/
 				
+				case PPOperators.SUBSTRACT_REVERSE_RELATIVE:
 				case PPOperators.SUBSTRACT_REVERSE:
 					color_values_total[VALUE_RED] = values[VALUE_RED] - color_values_total[VALUE_RED];
 					color_values_total[VALUE_GREEN] = values[VALUE_GREEN] - color_values_total[VALUE_GREEN];

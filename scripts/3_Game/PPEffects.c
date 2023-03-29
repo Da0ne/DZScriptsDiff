@@ -107,7 +107,7 @@ class PPEffects
 		m_ShockEffect 		= RegisterColorEffect();
 		
 		// ------------------------NV-related stuff below------------------------
-		ref array<float> colorizeDefault = {0.0, 0.0, 0.0};
+		array<float> colorizeDefault = {0.0, 0.0, 0.0};
 		m_ColorizeEffects = new map<int, ref array<float>>;
 		
 		// colorize: r, g, b
@@ -357,7 +357,7 @@ class PPEffects
 	{
 		if ( index < m_ColorEffect.Count() )
 		{
-			ref array<float> values = {r,g,b,a,overlay};
+			array<float> values = {r,g,b,a,overlay};
 			
 			m_ColorValues.Set(index, values);
 		}
@@ -388,7 +388,7 @@ class PPEffects
 		for ( int i = 0; i < m_ColorValues.Count(); ++i )
 		{
 			int key = m_ColorValues.GetKey(i);
-			ref array<float> value = m_ColorValues.Get(key);
+			array<float> value = m_ColorValues.Get(key);
 			
 			color_value_total[0] 	= color_value_total[0] + value[0];
 			color_value_total[1] 	= color_value_total[1] + value[1];
@@ -447,7 +447,7 @@ class PPEffects
 	{
 		if ( index < m_VignetteEffects.Count() )
 		{
-			ref array<float> values = {intensity,r,g,b,a};
+			array<float> values = {intensity,r,g,b,a};
 			
 			m_VignetteValues.Set(index, values);
 		}
@@ -492,7 +492,7 @@ class PPEffects
 		{
 			for ( int i = 0; i < m_VignetteValues.Count(); ++i )
 			{
-				ref array<float> values = {0,0,0,0,0};
+				array<float> values = {0,0,0,0,0};
 			
 				m_VignetteValues.Set(i, values);
 			}
@@ -658,7 +658,7 @@ class PPEffects
 	// appropriate parts of the code will call these functions
 	static void SetColorizationNV(float r, float g, float b)
 	{
-		ref array<float> colorizeArray = {r, g, b};
+		array<float> colorizeArray = {r, g, b};
 		m_ColorizeEffects.Set(PPEffects.COLORIZE_NV, colorizeArray);
 		UpdateColorize();
 	}
@@ -667,12 +667,12 @@ class PPEffects
 	{
 		bool foundActiveEffect = false;
 		int lowestKey = 1000000;
-		ref array<float> chosenArray;
+		array<float> chosenArray;
 		// search for active effect with highest priority (lower value of key better)
 		for (int i = 0; i < m_ColorizeEffects.Count(); i++)
 		{
 			int currentKey = m_ColorizeEffects.GetKey(i);
-			ref array<float> colorizeValues = m_ColorizeEffects.Get(currentKey);
+			array<float> colorizeValues = m_ColorizeEffects.Get(currentKey);
 			// check for non-zero active effect
 			for (int j = 0; j < colorizeValues.Count(); j++)
 			{

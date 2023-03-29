@@ -45,7 +45,7 @@ class CoughSymptom extends SymptomBase
 	//!gets called once on an Symptom which is being activated
 	override void OnGetActivatedServer(PlayerBase player)
 	{
-		if( m_Manager.GetCurrentCommandID() == DayZPlayerConstants.COMMANDID_MOVE && !m_Manager.m_Player.IsRaised() && m_Manager.m_Player.GetCommand_Move() && !m_Manager.m_Player.GetCommand_Move().IsOnBack())
+		if( m_Manager.GetCurrentCommandID() == DayZPlayerConstants.COMMANDID_MOVE && !player.IsRaised() && player.GetCommand_Move() && player.GetCommand_Move() && !player.GetCommand_Move().IsOnBack())
 		{
 			PlayAnimationADD(1);
 		}
@@ -56,7 +56,7 @@ class CoughSymptom extends SymptomBase
 		player.SpreadAgentsEx(3);
 		
 		if ( IsContaminationActive() )
-			m_Player.AddHealth("","Blood", -COUGH_BLOOD_LOSS);
+			player.AddHealth("","Blood", -COUGH_BLOOD_LOSS);
 	}
 
 	//!gets called once on a Symptom which is being activated

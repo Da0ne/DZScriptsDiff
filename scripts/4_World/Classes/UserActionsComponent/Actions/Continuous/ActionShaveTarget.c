@@ -15,6 +15,7 @@ class ActionShaveTarget: ActionContinuousBase
 		m_FullBody = true;
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ERECT | DayZPlayerConstants.STANCEMASK_CROUCH;
 		m_SpecialtyWeight = UASoftSkillsWeight.PRECISE_LOW;
+		m_Text = "#shave_target";
 	}
 	
 	override void CreateConditionComponents()  
@@ -35,19 +36,17 @@ class ActionShaveTarget: ActionContinuousBase
 
 		return false;
 	}
-		
-	override string GetText()
-	{
-		return "#shave_target";
-	}
 
 	override void OnFinishProgressServer( ActionData action_data )
 	{	
 		PlayerBase man;
 		if ( action_data.m_Target && Class.CastTo(man, action_data.m_Target.GetObject()) )
 		{
-			man.ShavePlayer();
-			action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+			if (CanReceiveAction(action_data.m_Target))
+			{
+				man.ShavePlayer();
+				action_data.m_Player.GetSoftSkillsManager().AddSpecialty( m_SpecialtyWeight );
+			}		
 		}
 	}
 };

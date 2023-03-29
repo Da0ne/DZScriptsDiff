@@ -7,6 +7,11 @@ class PPEEyeAccomodationNative: PPEClassBase
 	//g_Game.GetWorld().SetEyeAccom
 	static const int PARAM_INTENSITY = 0;
 	
+	static const int L_0_UNDERGROUND = 100;
+	static const int L_0_NVG_GENERIC = 300;
+	/*static const int L_0_NVG_OPTIC = 400;
+	static const int L_0_NVG_GOGGLES = 401;
+	static const int L_0_NVG_OFF = 402;*/
 	static const int L_0_BURLAP = 500;
 	
 	override int GetPostProcessEffectID()

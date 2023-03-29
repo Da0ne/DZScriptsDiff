@@ -4,19 +4,43 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 	int m_BleedingBits;
 	bool m_ShowDiag;
 	bool m_ShowingDiag;
+	bool m_ShowingDiagDraw;
 	Shape m_Point;
+	bool m_EnableHitIndication = false;
+	
+	override protected void Init()
+	{
+		super.Init();
+		
+		if (GetGame().GetMission().GetEffectWidgets()/* && m_Player.IsControlledPlayer()*/)
+		{
+			Param3<bool,int,float> par = new Param3<bool,int,float>(true,0,0);
+			GetGame().GetMission().GetEffectWidgets().RegisterGameplayEffectData(EffectWidgetsTypes.BLEEDING_LAYER,par);
+		}
+	}
+	
+	override protected void RegisterBleedingZoneEx(string name, int max_time, string bone = "", vector orientation = "0 0 0", vector offset = "0 0 0", float flow_modifier = 1, string particle_name = "BleedingSourceEffect", int inv_location = 0)
+	{
+		super.RegisterBleedingZoneEx(name,max_time,bone,orientation,offset,flow_modifier,particle_name,inv_location);
+		
+		if (GetGame().GetMission().GetEffectWidgets()/* && m_Player.IsControlledPlayer()*/)
+		{
+			Param3<bool,int,float> par = new Param3<bool,int,float>(false,m_Bit,flow_modifier);
+			GetGame().GetMission().GetEffectWidgets().RegisterGameplayEffectData(EffectWidgetsTypes.BLEEDING_LAYER,par);
+		}
+	}
 	
 	void OnVariablesSynchronized(int current_bits)
 	{
 		if (current_bits != m_BleedingBits)
 		{
-			if(m_BleedingBits == 0)
+			if (m_BleedingBits == 0)
 			{
 				m_Player.OnBleedingBegin();
 			}
 			OnBleedingBitsUpdate(m_BleedingBits, current_bits);
 			m_BleedingBits = current_bits;
-			if(m_BleedingBits == 0)
+			if (m_BleedingBits == 0)
 			{
 				m_Player.OnBleedingEnd();
 			}
@@ -30,11 +54,11 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 		Init();
 		int bit_offset = 0;
 		
-		for(int i = 0; i < BIT_INT_SIZE; i++)
+		for (int i = 0; i < BIT_INT_SIZE; i++)
 		{
 			int bit = 1 << bit_offset;
 			bit_offset++;
-			if( (bit & m_BleedingBits) != 0 )
+			if ( (bit & m_BleedingBits) != 0 )
 			{
 				RemoveBleedingSource(bit);
 				AddBleedingSource(bit);
@@ -44,15 +68,15 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 
 	void OnBleedingBitsUpdate(int old_mask, int new_mask)
 	{
-		for(int i = 0; i < 32; i++)
+		for (int i = 0; i < 32; i++)
 		{
 			int compare_bit = 1 << i;
 			int new_compare_result_bit = compare_bit & new_mask;
 			int old_compare_result_bit = compare_bit & old_mask;
 			
-			if( new_compare_result_bit )
+			if ( new_compare_result_bit )
 			{
-				if( !(new_compare_result_bit & old_mask))
+				if ( !(new_compare_result_bit & old_mask))
 				{
 					//a different active bit in the new mask
 					AddBleedingSource(new_compare_result_bit);
@@ -60,7 +84,7 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 			}
 			else
 			{
-				if( new_compare_result_bit != old_compare_result_bit )
+				if ( new_compare_result_bit != old_compare_result_bit )
 				{
 					RemoveBleedingSource(old_compare_result_bit);
 				}
@@ -73,11 +97,11 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 		int bleeding_source_count = 0;
 		int pow = 0;
 		
-		for(int i = 0; i < BIT_INT_SIZE ; i++)
+		for (int i = 0; i < BIT_INT_SIZE ; i++)
 		{
 			int bit = Math.Pow(2, pow);
 			pow++;
-			if( (m_BleedingBits & bit) != 0)
+			if ( (m_BleedingBits & bit) != 0)
 			{
 				bleeding_source_count++;
 			}
@@ -90,9 +114,10 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 	{
 		m_ShowDiag = value;
 		return;
+		
 		int boneIdx = m_Player.GetBoneIndexByName("RightArmExtra");
 
-		if( boneIdx != -1 )
+		if ( boneIdx != -1 )
 		{
 		  Object linkedObject = GetGame().CreateObject("Ammo_ArrowBolt", "0 0 0");
 		
@@ -105,12 +130,13 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 		  */
 			
 			BleedingSourceEffect eff = new BleedingSourceEffect();
+			eff.SetAutodestroy(true);
 			SEffectManager.PlayInWorld( eff, "0 0 0" );
 			Particle p = eff.GetParticle();
 			//p.SetOrientation("0 90 0");
 			m_Player.AddChild(p, boneIdx);
 		
-		  m_Player.AddChild(linkedObject, boneIdx);
+		 	 m_Player.AddChild(linkedObject, boneIdx);
 		}
 	
 	}
@@ -118,15 +144,17 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 	void OnUpdate()
 	{
 		#ifndef NO_GUI
-		if(m_ShowDiag)
+		if (m_ShowDiag)
 		{
 			DisplayDebug();
 			DisplayVisualDebug();
 		}
-		else if( m_ShowingDiag )
+		else if ( m_ShowingDiag || m_ShowingDiagDraw )
 		{
-			CleanDebug();
-			m_ShowingDiag = false;
+			if (m_ShowingDiag)
+				CleanDebug();
+			if (m_ShowingDiagDraw)
+				CleanVisualDebug();
 		}
 		#endif
 	}
@@ -140,22 +168,40 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 		
 		int pow = 0;
 		
-		for(int i = 0; i < BIT_INT_SIZE ; i++)
+		bool anyBleedingSourceActive = false;
+		
+		for (int i = 0; i < BIT_INT_SIZE ; i++)
 		{
 			int bit = Math.Pow(2, pow);
 			pow++;
-			if( (m_BleedingBits & bit) != 0)
+			if ( (m_BleedingBits & bit) != 0)
 			{
 				BleedingSourceZone bsz = GetBleedingSourceMeta(bit);
 				
 				string name = GetSelectionNameFromBit(bit);
 				string slot_name =  InventorySlots.GetSlotName(bsz.GetInvLocation());
 				DbgUI.Text(name + "| slot name: "+ slot_name);
+				anyBleedingSourceActive = true;
 			}
+		}
+		
+		if (!anyBleedingSourceActive)
+		{
+			DbgUI.Text("Currently no bleeding sources are active.");
 		}
 		
         DbgUI.End();
         DbgUI.EndCleanupScope();
+	}
+	
+	void CleanDebug()
+	{
+		m_ShowingDiag = false;
+		
+		DbgUI.BeginCleanupScope();
+		DbgUI.Begin("Bleeding Sources", 50, 50);
+		DbgUI.End();
+		DbgUI.EndCleanupScope();
 	}
 	
 	void DisplayVisualDebug()
@@ -179,22 +225,23 @@ class BleedingSourcesManagerRemote extends BleedingSourcesManagerBase
 		m_Point = Debug.DrawSphere(pos, 0.1, COLOR_RED);
 		*/
 		
+		m_ShowingDiagDraw = true;
 		
-		
-		
-		
-		
-		for(int i = 0; i < m_BleedingSources.Count(); i++)
+		int bsCount = m_BleedingSources.Count();
+		for (int i = 0; i < bsCount; ++i)
 		{
 			m_BleedingSources.GetElement(i).DrawDebugShape();
 		}
 	}
 	
-	void CleanDebug()
+	void CleanVisualDebug()
 	{
-		DbgUI.BeginCleanupScope();
-		DbgUI.Begin("Bleeding Sources", 50, 50);
-		DbgUI.End();
-		DbgUI.EndCleanupScope();
+		m_ShowingDiagDraw = false;
+		
+		int bsCount = m_BleedingSources.Count();
+		for (int i = 0; i < bsCount; ++i)
+		{
+			m_BleedingSources.GetElement(i).RemoveDebugShape();
+		}
 	}
 }

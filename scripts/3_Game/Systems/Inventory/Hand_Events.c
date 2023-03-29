@@ -173,6 +173,7 @@ class HandEventTake extends HandEventBase
 	{
 		if (false == GameInventory.CheckRequestSrc(m_Player, GetSrc(), GameInventory.c_MaxItemDistanceRadius))
 		{
+			Debug.InventoryHFSMLog("CANNOT perform", typename.EnumToString(HandEventID, GetEventID()) , "n/a", "CheckRequestSrc", m_Player.ToString() );
 			syncDebugPrint("[cheat] HandleInputData man=" + Object.GetDebugName(m_Player) + " failed src1 check with cmd=" + typename.EnumToString(HandEventID, GetEventID()) + " src1=" + InventoryLocation.DumpToStringNullSafe(GetSrc()));
 			return false; // stale packet
 		}
@@ -666,6 +667,7 @@ HandEventBase HandAnimEventFactory (WeaponEvents type, Man p = null, InventoryLo
 	switch (type)
 	{
 		case WeaponEvents.CHANGE_HIDE: return new HandAnimEventChanged(p, src);
+		case WeaponEvents.CHANGE_SHOW: return new HandAnimEventChanged(p, src);
 	}
 	return null;
 }

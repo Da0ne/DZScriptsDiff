@@ -12,7 +12,7 @@ class SyncEvents
 	{		
 		if ( rpc_type == ERPCs.RPC_SYNC_EVENT && GetGame() && GetGame().IsMultiplayer() && GetGame().IsClient() )
 		{			
-			Param2<ESyncEvent, ref SyncData> event_data = new ref Param2<ESyncEvent, ref SyncData>( -1, null );
+			Param2<ESyncEvent, ref SyncData> event_data = new Param2<ESyncEvent, ref SyncData>( -1, null );
 			
 			if ( ctx.Read( event_data ) )
 			{
@@ -64,17 +64,18 @@ class SyncEvents
 			data.m_EntityKill.m_EntitySource	= source;
 			data.m_EntityKill.m_IsHeadShot		= is_headshot;
 			
-			if ( victim && victim.IsPlayer() )
-			{
-				Man man_victim = Man.Cast(victim);
-				SendSyncEvent( ERPCs.RPC_SYNC_EVENT, ESyncEvent.EntityKill, data, true, man_victim.GetIdentity() );
-			}
+			Man recipient;
 			
 			if ( killer && killer.IsPlayer() && victim.GetID() != killer.GetID() )
 			{
-				Man man_killer = Man.Cast(killer);
-				SendSyncEvent( ERPCs.RPC_SYNC_EVENT, ESyncEvent.EntityKill, data, true, man_killer.GetIdentity() );
+				recipient = Man.Cast(killer);
 			}
+			else if ( victim && victim.IsPlayer() )
+			{
+				recipient = Man.Cast(victim);
+			}	
+			
+			SendSyncEventEx( ERPCs.RPC_SYNC_EVENT, ESyncEvent.EntityKill, data, true, recipient );
 		}
 	}
 	
@@ -97,5 +98,10 @@ class SyncEvents
 		{
 			GetGame().RPCSingleParam( null, rpc_event_id, event_data, guaranteed, player_target );
 		}
+	}
+	
+	private static void SendSyncEventEx( ERPCs rpc_event_id, ESyncEvent sync_event_type, SyncData data = null, bool guaranteed = true, Man recipient = null )
+	{
+		SendSyncEvent(rpc_event_id, sync_event_type, data, guaranteed, recipient.GetIdentity());
 	}
 }

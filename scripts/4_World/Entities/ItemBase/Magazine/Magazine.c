@@ -48,7 +48,7 @@ class Magazine : InventoryItemSuper
 		m_ManipulationDamage = ConfigGetFloat("manipulationDamage");
 		m_CompatiableAmmo = new array<string>;
 		ConfigGetTextArray("ammoItems", m_CompatiableAmmo);
-		if ( GetGame().IsClient() || !GetGame().IsMultiplayer() )
+		if ( !GetGame().IsDedicatedServer() )
 		{
 			if ( !m_AmmoData )
 				m_AmmoData = new map<string, ref AmmoData>;
@@ -294,26 +294,18 @@ class Magazine : InventoryItemSuper
 			return false;			
 		}
 	}
-
-	//TODO add functionality for multiple ammo types (does not exist yet)
-	override int GetWeight()
+	
+	override protected float GetWeightSpecialized(bool forceRecalc = false)
 	{
-		float item_wetness = GetWet();
-		int AmmoWeight = 0;
-		int AmmoTypeWeight = 0;
-		array<string> ammo_array = new array<string>;
-		
-		ConfigGetTextArray ("ammoItems", ammo_array);
-		if (ammo_array.Count() > 0)
+		#ifdef DEVELOPER
+		if (WeightDebug.m_VerbosityFlags & WeightDebugType.RECALC_FORCED)
 		{
-			string AmmoType = ammo_array.Get(0);
-			
-			AmmoTypeWeight = GetGame().ConfigGetInt("cfgMagazines " + AmmoType + " weight");
-			AmmoWeight = GetAmmoCount() * AmmoTypeWeight;
+			WeightDebugData data = WeightDebug.GetWeightDebug(this);
+			data.SetCalcDetails("TMAG: ("+GetAmmoCount()+"(Ammo count) * " + ConfigGetFloat("weightPerQuantityUnit")+"(weightPerQuantityUnit)) + " + GetConfigWeightModifiedDebugText());
 		}
-		return Math.Round((item_wetness + 1) * m_ConfigWeight + AmmoWeight);
+		#endif
+		return GetConfigWeightModified() + (GetAmmoCount() * ConfigGetFloat("weightPerQuantityUnit"));
 	}
-
 	/*
 	override void CombineItems( ItemBase other_item )
 	{
@@ -418,6 +410,8 @@ class Magazine : InventoryItemSuper
 	
 	override void OnWasAttached( EntityAI parent, int slot_id )
 	{
+		super.OnWasAttached(parent, slot_id);
+		
 		PlayerBase player = PlayerBase.Cast(GetHierarchyRootPlayer());
 		Weapon_Base wpn = Weapon_Base.Cast(parent);
 		if (wpn && player)
@@ -435,6 +429,8 @@ class Magazine : InventoryItemSuper
 	
 	override void OnWasDetached( EntityAI parent, int slot_id )
 	{
+		super.OnWasDetached(parent, slot_id);
+		
 		PlayerBase player = PlayerBase.Cast(GetHierarchyRootPlayer());
 		Weapon_Base wpn = Weapon_Base.Cast(parent);
 		
@@ -446,13 +442,43 @@ class Magazine : InventoryItemSuper
 	
 	override void EEHealthLevelChanged( int oldLevel, int newLevel, string zone )
 	{
+		super.EEHealthLevelChanged(oldLevel, newLevel, zone);
 		float damage = 1 - GetHealthLevelValue(newLevel) + 0.001;
 			
 		int cartridgeCount = GetAmmoCount();		
 		for (int i = 0; i < cartridgeCount; ++i)
 			SetCartridgeDamageAtIndex(i, damage);
 	}
-};
+	
+	override void GetDebugActions(out TSelectableActionInfoArrayEx outputList)
+	{
+		super.GetDebugActions(outputList);
+
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.SEPARATOR, "", FadeColors.LIGHT_GREY));
+		outputList.Insert(new TSelectableActionInfoWithColor(SAT_DEBUG_ACTION, EActions.PRINT_BULLETS, "Print Bullets", FadeColors.LIGHT_GREY));
+	}
+	
+	override bool OnAction(int action_id, Man player, ParamsReadContext ctx)
+	{
+		if (GetGame().IsServer())
+		{
+			if (action_id == EActions.PRINT_BULLETS)
+			{
+				Magazine magazine;
+				Class.CastTo(magazine, this);
+				for (int i = 0; i < magazine.GetAmmoCount(); i++)
+				{
+					float damage;
+					string className;
+					magazine.GetCartridgeAtIndex(i, damage, className);
+					Debug.Log(string.Format("Bullet: %1, Damage %2", className, damage));
+				}
+			}
+		}
+		
+		return super.OnAction(action_id, player, ctx);
+	}
+}
 
 class MagazineStorage : Magazine
 {

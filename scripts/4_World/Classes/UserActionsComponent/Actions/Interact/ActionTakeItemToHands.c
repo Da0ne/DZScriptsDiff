@@ -4,13 +4,13 @@ class ActionTakeItemToHands: ActionInteractBase
 	{
 		m_CommandUID        = DayZPlayerConstants.CMD_ACTIONMOD_PICKUP_HANDS;
 		m_CommandUIDProne	= DayZPlayerConstants.CMD_ACTIONFB_PICKUP_HANDS;
-		m_HUDCursorIcon     = CursorIcons.LootCorpse;
+		m_Text 				= "#take_to_hands";
 	}
 
 	override void CreateConditionComponents()  
 	{
-		m_ConditionItem = new CCINone;
-		m_ConditionTarget = new CCTObject(UAMaxDistances.DEFAULT);
+		m_ConditionItem 	= new CCINone();
+		m_ConditionTarget 	= new CCTObject(UAMaxDistances.DEFAULT);
 	}	
 	
 	override bool HasProneException()
@@ -28,31 +28,27 @@ class ActionTakeItemToHands: ActionInteractBase
 		return false;
 	}
 
-	override string GetText()
+	override bool ActionCondition(PlayerBase player, ActionTarget target, ItemBase item)
 	{
-		return "#take_to_hands";
-	}
-
-	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
-	{
-		ItemBase tgt_item = ItemBase.Cast( target.GetObject() );
-		if ( !tgt_item )
-			return false;
-		EntityAI tgt_parent = EntityAI.Cast(tgt_item.GetHierarchyParent());
-		if ( !tgt_item.IsTakeable() || tgt_item.IsBeingPlaced() || ( tgt_item.GetHierarchyParent() && !BaseBuildingBase.Cast(tgt_parent) ) || ((tgt_parent && !tgt_item.CanDetachAttachment(tgt_parent)) || (tgt_parent && !tgt_parent.CanReleaseAttachment(tgt_item))) )
+		ItemBase targetItem = ItemBase.Cast(target.GetObject());
+		if (!targetItem)
 			return false;
 		
-		return player.GetInventory().CanAddEntityIntoHands(tgt_item);
+		EntityAI targetParent = EntityAI.Cast(targetItem.GetHierarchyParent());
+		if (!targetItem.IsTakeable() || targetItem.IsBeingPlaced() || ( targetItem.GetHierarchyParent() && !BaseBuildingBase.Cast(targetParent) ) || ((targetParent && !targetItem.CanDetachAttachment(targetParent)) || (targetParent && !targetParent.CanReleaseAttachment(targetItem))))
+			return false;
+		
+		return player.GetInventory().CanAddEntityIntoHands(targetItem);
 	}
 	
-	override bool CanContinue( ActionData action_data )
+	override bool CanContinue(ActionData action_data)
 	{
 		return true;
 	}
 	
-	override void OnExecute( ActionData action_data )
+	override void OnExecute(ActionData action_data)
 	{
-		if ( GetGame().IsMultiplayer() && GetGame().IsServer() )
+		if (GetGame().IsMultiplayer() && GetGame().IsServer())
 			return;
 	
 		ItemBase ntarget = ItemBase.Cast(action_data.m_Target.GetObject());
@@ -60,44 +56,42 @@ class ActionTakeItemToHands: ActionInteractBase
 		
 		float stackable = ntarget.GetTargetQuantityMax(-1);
 		
-		if ( stackable == 0 || stackable >= ntarget.GetQuantity() )
+		if (stackable == 0 || stackable >= ntarget.GetQuantity())
 		{
-			action_data.m_Player.PredictiveTakeEntityToHands( ntarget );
+			action_data.m_Player.PredictiveTakeEntityToHands(ntarget);
 		}
 		else
 		{
-			InventoryLocation il = new InventoryLocation;
+			InventoryLocation il = new InventoryLocation();
 			il.SetHands(action_data.m_Player, ntarget);
-			ntarget.SplitIntoStackMaxToInventoryLocationClient( il );
+			ntarget.SplitIntoStackMaxToInventoryLocationClient(il);
 		}
 	}
 	
-	override void CreateAndSetupActionCallback( ActionData action_data )
+	override void CreateAndSetupActionCallback(ActionData action_data)
 	{
-		//Print("starting - CreateAndSetupActionCallback");
 		EntityAI target = EntityAI.Cast(action_data.m_Target.GetObject());
-		ActionBaseCB callback;
 		if (!target)
 			return;
 		
+		ActionBaseCB callback;
+		
 		if (target.IsHeavyBehaviour())
 		{
-			//Print("heavybehaviour");
-			Class.CastTo(callback, action_data.m_Player.StartCommand_Action(DayZPlayerConstants.CMD_ACTIONFB_PICKUP_HEAVY,GetCallbackClassTypename(),DayZPlayerConstants.STANCEMASK_ERECT));
+			Class.CastTo(callback, action_data.m_Player.StartCommand_Action(DayZPlayerConstants.CMD_ACTIONFB_PICKUP_HEAVY,GetCallbackClassTypename(), DayZPlayerConstants.STANCEMASK_ERECT));
 		}
 		else
 		{
-			//Print("else - SHOULD NOT BE HERE");
-			if( action_data.m_Player.IsPlayerInStance(DayZPlayerConstants.STANCEMASK_CROUCH | DayZPlayerConstants.STANCEMASK_ERECT) )
+			if (action_data.m_Player.IsPlayerInStance(DayZPlayerConstants.STANCEMASK_CROUCH | DayZPlayerConstants.STANCEMASK_ERECT))
 			{
-				Class.CastTo(callback, action_data.m_Player.AddCommandModifier_Action(DayZPlayerConstants.CMD_ACTIONMOD_PICKUP_HANDS,GetCallbackClassTypename()));
+				Class.CastTo(callback, action_data.m_Player.AddCommandModifier_Action(m_CommandUID,GetCallbackClassTypename()));
 			}
 			else
 			{
-				Class.CastTo(callback, action_data.m_Player.StartCommand_Action(DayZPlayerConstants.CMD_ACTIONFB_PICKUP_HANDS,GetCallbackClassTypename(),DayZPlayerConstants.STANCEMASK_PRONE));
+				Class.CastTo(callback, action_data.m_Player.StartCommand_Action(m_CommandUIDProne,GetCallbackClassTypename(),DayZPlayerConstants.STANCEMASK_PRONE));
 			}
 		}
-		//Print(callback);
+
 		callback.SetActionData(action_data); 
 		callback.InitActionComponent();
 		action_data.m_Callback = callback;
@@ -108,19 +102,19 @@ class ActionTakeItemToHands: ActionInteractBase
 	{
 		return true;
 	}
-};
+}
 
 class ActionSwapItemToHands: ActionTakeItemToHands
 {
 	bool m_Executable;
 	
-	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
+	override bool ActionCondition(PlayerBase player, ActionTarget target, ItemBase item)
 	{
-		ItemBase tgt_item = ItemBase.Cast( target.GetObject() );
-		if ( !tgt_item || !tgt_item.IsTakeable() || tgt_item.IsBeingPlaced() )
+		ItemBase targetItem = ItemBase.Cast(target.GetObject());
+		if (!targetItem || !targetItem.IsTakeable() || targetItem.IsBeingPlaced())
 			return false;
 		
-		return player.GetInventory().CanSwapEntitiesEx(tgt_item,item);
+		return player.GetInventory().CanSwapEntitiesEx(targetItem,item);
 	}
 	
 	override bool UseMainItem()
@@ -133,12 +127,13 @@ class ActionSwapItemToHands: ActionTakeItemToHands
 		return true;
 	}
 	
-	override void CreateAndSetupActionCallback( ActionData action_data )
+	override void CreateAndSetupActionCallback(ActionData action_data)
 	{
 		EntityAI target = EntityAI.Cast(action_data.m_Target.GetObject());
-		ActionBaseCB callback;
 		if (!target)
 			return;
+		
+		ActionBaseCB callback;
 		
 		if (target.IsHeavyBehaviour())
 		{
@@ -148,20 +143,18 @@ class ActionSwapItemToHands: ActionTakeItemToHands
 		{
 			return;
 		}
+
 		callback.SetActionData(action_data); 
 		callback.InitActionComponent();
 		action_data.m_Callback = callback;
 	}
 	
-	override void Start( ActionData action_data )
+	override void Start(ActionData action_data)
 	{
-		super.Start( action_data );
-		
-		//Print("action_data.m_Target.GetObject() + " + action_data.m_Target.GetObject());
-		//Print("action_data.m_MainItem + " + action_data.m_MainItem);
+		super.Start(action_data);
 		
 		bool b1 = action_data.m_MainItem.ConfigGetString("physLayer") == "item_large";
-		action_data.m_MainItem.m_ThrowItemOnDrop = b1; //hack, should be redundant anyway
+		action_data.m_MainItem.m_ThrowItemOnDrop = b1;
 		
 		EntityAI object = EntityAI.Cast(action_data.m_Target.GetObject());
 		if (!object || !object.IsHeavyBehaviour())
@@ -172,7 +165,7 @@ class ActionSwapItemToHands: ActionTakeItemToHands
 			m_Executable = true;
 	}
 	
-	override void OnExecuteServer( ActionData action_data )
+	override void OnExecuteServer(ActionData action_data)
 	{
 		if (!m_Executable)
 			return;

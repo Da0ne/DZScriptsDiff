@@ -190,6 +190,7 @@ enum TraceShape
 };
 
 //! collision and tracing
+//! WARNING: Non-managed, needs manual delete call, should not be ref'd
 class TraceContact
 {
 	float	Fraction;

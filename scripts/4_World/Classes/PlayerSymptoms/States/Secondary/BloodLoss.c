@@ -16,7 +16,7 @@ class BloodLoss extends SymptomBase
 		m_SyncToClient = true;
 		m_BloodSet = -1;
 		
-		if ( !GetGame().IsMultiplayer() || GetGame().IsClient() )
+		if ( !GetGame().IsDedicatedServer() )
 		{
 			Class.CastTo(m_RequesterBloodLoss,PPERequester_BloodLoss.Cast(PPERequesterBank.GetRequester(PPERequester_BloodLoss)));
 		}
@@ -30,7 +30,7 @@ class BloodLoss extends SymptomBase
 
 	override void OnUpdateClient(PlayerBase player, float deltatime)
 	{
-		if( player.IsPlayerSelected() && player.GetTransferValues() && player.GetTransferValues().GetBlood() != m_BloodSet ) 
+		if ( player.IsPlayerSelected() && player.GetTransferValues() && player.GetTransferValues().GetBlood() != m_BloodSet ) 
 		{
 			m_BloodSet = player.GetTransferValues().GetBlood();
 			if (m_BloodSet < 1.0)

@@ -15,6 +15,9 @@ enum WaveKind
 
 class AbstractSoundScene
 {
+	private void AbstractSoundScene() {}
+	private void ~AbstractSoundScene() {}
+	
 	proto native AbstractWave Play2D(SoundObject soundObject, SoundObjectBuilder soundBuilder);
 	proto native AbstractWave Play3D(SoundObject soundObject, SoundObjectBuilder soundBuilder);
 	proto native SoundObject BuildSoundObject(SoundObjectBuilder soundObjectbuilder);
@@ -33,6 +36,9 @@ class AbstractSoundScene
 
 	proto native float GetVOIPVolume();
 	proto native void SetVOIPVolume(float vol, float time);
+	
+	proto native float GetSilenceThreshold();
+	proto native float GetAudioLevel();
 }
 
 
@@ -56,6 +62,7 @@ class SoundObject
 	void SoundObject(SoundParams soundParams);
 	
 	proto native void SetPosition(vector position);
+	proto native vector GetPosition();
 	proto native void SetOcclusionObstruction(float occlusion, float obstruction);
 	proto native void SetKind(WaveKind kind);
 	proto native void Initialize(SoundParams soundParams);
@@ -82,16 +89,23 @@ class AbstractWaveEvents
 
 class AbstractWave
 {
-	void AbstractWave()
+	private void InitEvents()
 	{
 		AbstractWaveEvents events = new AbstractWaveEvents();
 		SetUserData(events);
 	}
+
+	#ifdef DIAG_DEVELOPER
+	private void AbstractWave() { InitEvents(); }
+	private void ~AbstractWave() {}
+	#else
+	void AbstractWave() { InitEvents(); }
+	#endif
 	
-	proto native void SetUserData(Managed inst);
-	proto native Managed GetUserData();
+	proto void SetUserData(Managed inst);
+	proto Managed GetUserData();
 	
-	proto native void Play();
+	proto void Play();
 	
 	void PlayWithOffset(float offset)
 	{
@@ -99,20 +113,24 @@ class AbstractWave
 		SetStartOffset(offset);
 	}
 	//proto native void Mute();
-	proto native void Stop();
-	proto native void Restart();
-	proto native void SetStartOffset(float offset);
+	proto void Stop();
+	proto void Restart();
+	proto void SetStartOffset(float offset);
 	//! WARNING: Blocking! Waits for header to load
-	proto native float GetLength();
-	proto native void Loop(bool setLoop);
-	proto native void SetVolume(float value);
-	proto native void SetVolumeRelative(float value);
-	proto native void SetFrequency(float value);
-	proto native float GetFrequency();
-	proto native void SetPosition(vector position);
-	proto native void SetFadeInFactor(float volume);
-	proto native void SetFadeOutFactor(float volume);
-	proto native void Skip(float timeSec);
+	proto float GetLength();
+	//! Current position in percentage of total length
+	proto float GetCurrPosition();
+	proto void Loop(bool setLoop);
+	proto float GetVolume();
+	proto void SetVolume(float value);
+	proto void SetVolumeRelative(float value);
+	proto void SetFrequency(float value);
+	proto float GetFrequency();
+	proto void SetPosition(vector position);
+	proto void SetFadeInFactor(float volume);
+	proto void SetFadeOutFactor(float volume);
+	proto void Skip(float timeSec);
+	proto bool IsHeaderLoaded();
 	
 	AbstractWaveEvents GetEvents()
 	{

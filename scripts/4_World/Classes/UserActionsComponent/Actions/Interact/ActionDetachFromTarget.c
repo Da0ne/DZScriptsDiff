@@ -9,16 +9,12 @@ class ActionDetachFromTarget: ActionInteractBase
 	
 	void ActionDetachFromTarget()
 	{
+		m_Text = "#take_to_hands";
 	}
 	
 	override typename GetInputType()
 	{
 		return ContinuousInteractActionInput;
-	}
-		
-	override string GetText()
-	{
-		return "#take_to_hands";
 	}
 	
 	override ActionData CreateActionData()
@@ -57,14 +53,14 @@ class ActionDetachFromTarget: ActionInteractBase
 	override bool SetupAction(PlayerBase player, ActionTarget target, ItemBase item, out ActionData action_data, Param extra_data = NULL)
 	{
 		int attSlotId = InventorySlots.INVALID;
-		if (!GetGame().IsMultiplayer() || GetGame().IsClient() )
+		if (!GetGame().IsDedicatedServer() )
 		{
 			attSlotId = FindSlotIdToDetach(player, target, item);
 		}
 		
 		if ( super.SetupAction( player, target, item, action_data, extra_data))
 		{
-			if (!GetGame().IsMultiplayer() || GetGame().IsClient())
+			if (!GetGame().IsDedicatedServer())
 			{
 				if(attSlotId != InventorySlots.INVALID)
 				{

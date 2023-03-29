@@ -2,12 +2,7 @@ class ActionPickupChicken: ActionInteractBase
 {
 	void ActionPickupChicken()
 	{
-		
-	}
-
-	override string GetText()
-	{
-		return "#take";
+		m_Text = "#take";
 	}
 	
 	override typename GetInputType()

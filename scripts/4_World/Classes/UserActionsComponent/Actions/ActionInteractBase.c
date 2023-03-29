@@ -7,10 +7,10 @@ class ActionInteractBaseCB : ActionBaseCB
 
 	override void OnAnimationEvent(int pEventID)	
 	{	
-#ifdef DEVELOPER
-		if( LogManager.IsActionLogEnable() )
+#ifdef DIAG_DEVELOPER
+		if ( LogManager.IsActionLogEnable() )
 		{
-			if(m_ActionData)
+			if (m_ActionData)
 				Debug.ActionLog("n/a", m_ActionData.m_Action.ToString() , "n/a", "OnAnimationEvent", m_ActionData.m_Player.ToString() );
 		}
 #endif
@@ -23,8 +23,8 @@ class ActionInteractBaseCB : ActionBaseCB
 	
 	override void InitActionComponent()
 	{
-#ifdef DEVELOPER
-		if( LogManager.IsActionLogEnable() )
+#ifdef DIAG_DEVELOPER
+		if ( LogManager.IsActionLogEnable() )
 		{
 			Debug.ActionLog("n/a", m_ActionData.m_Action.ToString() , "n/a", "InitActionComponent", m_ActionData.m_Player.ToString() );
 		}
@@ -53,13 +53,13 @@ class ActionInteractBaseCB : ActionBaseCB
 
 class ActionInteractBase : AnimatedActionBase
 {
+	//deprecated
 	string m_HUDCursorIcon;
 	
 	void ActionInteractBase() 
 	{
 		m_CallbackClass = ActionInteractBaseCB;
 		m_CommandUID = DayZPlayerConstants.CMD_ACTIONMOD_PICKUP_HANDS;
-		m_HUDCursorIcon = CursorIcons.Cursor;
 	}
 	
 	override void CreateConditionComponents()  
@@ -68,9 +68,10 @@ class ActionInteractBase : AnimatedActionBase
 		m_ConditionTarget = new CCTObject(UAMaxDistances.DEFAULT);
 	}
 	
+	//deprecated
 	string GetHUDCursorIcon()
 	{
-		return m_HUDCursorIcon;
+		return "";
 	}
 	
 	override typename GetInputType()

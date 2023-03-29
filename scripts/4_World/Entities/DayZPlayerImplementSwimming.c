@@ -30,11 +30,7 @@ class DayZPlayerImplementSwimming
 
 	bool CheckSwimmingStart(out vector waterLevel)
 	{
-		vector 	pp = m_pPlayer.GetPosition();
-		waterLevel = HumanCommandSwim.WaterLevelCheck(m_pPlayer, pp);
-			
-		//! if total water depth >= 1.5m && character is 1.5m in water 
-		return (waterLevel[0] >= m_pSettings.m_fWaterLevelIn && waterLevel[1] >= m_pSettings.m_fWaterLevelIn);
+		return DayZPlayerUtils.CheckWaterLevel(m_pPlayer,waterLevel) == EWaterLevels.LEVEL_SWIM_START;
 	}
 
 	//! ha
@@ -49,7 +45,7 @@ class DayZPlayerImplementSwimming
 		if (pCurrentCommandID != DayZPlayerConstants.COMMANDID_SWIM)
 		{
 			vector wl;
-			if ( CheckSwimmingStart(wl) )
+			if (CheckSwimmingStart(wl))
 			{
 				m_pPlayer.StartCommand_Swim();
 				m_bWasSwimming = true;
@@ -57,15 +53,36 @@ class DayZPlayerImplementSwimming
 			}
 			
 			//! now movement
-			if (pCurrentCommandID == DayZPlayerConstants.COMMANDID_MOVE)
+			if ((pCurrentCommandID == DayZPlayerConstants.COMMANDID_MOVE) && (pCMove != null))
 			{
-				if (wl[1] > m_pSettings.m_fToErectLevel)
+				pCMove.SetCurrentWaterLevel(wl[1]);
+				m_pPlayer.SetCurrentWaterLevel(wl[1]);
+				
+				if (wl[1] > m_pSettings.m_fToErectLevel && pState.m_iStanceIdx != DayZPlayerConstants.STANCEIDX_ERECT && pState.m_iStanceIdx != DayZPlayerConstants.STANCEIDX_RAISEDERECT )
 				{
-					pCMove.ForceStanceUp(DayZPlayerConstants.STANCEIDX_ERECT);
+					if ( DayZPlayerUtils.PlayerCanChangeStance(m_pPlayer, DayZPlayerConstants.STANCEIDX_ERECT) )
+					{
+						pCMove.ForceStanceUp(DayZPlayerConstants.STANCEIDX_ERECT);
+					}
+					else
+					{
+						m_pPlayer.StartCommand_Swim();
+						m_bWasSwimming = true;
+						return true;
+					}
 				}
-				else if (wl[1] > m_pSettings.m_fToCrouchLevel)
+				else if (wl[1] > m_pSettings.m_fToCrouchLevel && (pState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_PRONE || pState.m_iStanceIdx == DayZPlayerConstants.STANCEIDX_RAISEDPRONE))
 				{
-					pCMove.ForceStanceUp(DayZPlayerConstants.STANCEIDX_CROUCH);
+					if ( DayZPlayerUtils.PlayerCanChangeStance(m_pPlayer, DayZPlayerConstants.STANCEIDX_CROUCH) )
+					{
+						pCMove.ForceStanceUp(DayZPlayerConstants.STANCEIDX_CROUCH);
+					}
+					else
+					{
+						m_pPlayer.StartCommand_Swim();
+						m_bWasSwimming = true;
+						return true;
+					}
 				}
 			}
 
@@ -76,10 +93,13 @@ class DayZPlayerImplementSwimming
 		{
 			if (GetWaterDepth() < m_pSettings.m_fWaterLevelOut)
 			{
-				HumanCommandSwim hcs = m_pPlayer.GetCommand_Swim();
-				hcs.StopSwimming();
-				m_bWasSwimming = false;
-				return true;
+				if (DayZPlayerUtils.PlayerCanChangeStance(m_pPlayer, DayZPlayerConstants.STANCEIDX_ERECT, true))
+				{
+					HumanCommandSwim hcs = m_pPlayer.GetCommand_Swim();
+					hcs.StopSwimming();
+					m_bWasSwimming = false;
+					return true;
+				}
 			}
 		
 			//! handled !

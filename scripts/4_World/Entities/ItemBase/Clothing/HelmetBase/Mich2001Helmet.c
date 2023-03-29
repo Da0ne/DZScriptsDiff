@@ -3,24 +3,14 @@ class Mich2001Helmet extends HelmetBase
 	override bool CanPutAsAttachment( EntityAI parent )
 	{
 		if(!super.CanPutAsAttachment(parent)) {return false;}
-		bool is_mask_only = false;
-		bool another_NVG_holder = false;
 		
-		if ( parent.FindAttachmentBySlotName( "Mask" ) )
-		{
-			is_mask_only = parent.FindAttachmentBySlotName( "Mask" ).ConfigGetBool( "noHelmet" );
-		}
+		Clothing eyewear = Clothing.Cast(parent.FindAttachmentBySlotName("Eyewear"));
 		
-		if ( NVGHeadstrap.Cast(parent.FindAttachmentBySlotName( "Eyewear" )) )
+		if ( eyewear && eyewear.ConfigGetBool("isStrap") )
 		{
-			another_NVG_holder = true;
+			return false;
 		}
-		
-		if ( ( GetNumberOfItems() == 0 || !parent || parent.IsMan() ) && !is_mask_only && !another_NVG_holder )
-		{
-			return true;
-		}
-		return false;
+		return true;
 	}
 	
 	override void SetActions()
@@ -31,7 +21,7 @@ class Mich2001Helmet extends HelmetBase
 		AddAction(ActionTurnOffHelmetFlashlight);
 		AddAction(ActionToggleNVG);
 	}
-		
+	
 	//Debug menu Spawn Ground Special
 	override void OnDebugSpawn()
 	{

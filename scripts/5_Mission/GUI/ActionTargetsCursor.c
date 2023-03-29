@@ -26,7 +26,7 @@ class ATCCachedObject
 	//! invalidate cached objec
 	void Invalidate()
 	{
-		if ( m_CachedObject )
+		if (m_CachedObject)
 		{
 			m_CachedObject = null;
 			m_CursorWPos = vector.Zero;
@@ -62,9 +62,15 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 	protected ActionBase					m_Single;
 	protected ActionBase					m_Continuous;
 	protected ActionManagerClient 			m_AM;
+	protected IngameHud						m_Hud;
+	
+	protected UAIDWrapper 					m_UseActionWrapper;
 
 	protected int							m_InteractActionsNum;
 	protected int							m_ContinuousInteractActionsNum;
+	protected int							m_ItemActionsNum;
+	protected int							m_ContinuousItemActionsNum;
+	protected typename						m_SelectedActionCategory;
 	protected bool 							m_HealthEnabled;
 	protected bool							m_QuantityEnabled;	
 	protected bool							m_FixedOnPosition;
@@ -93,70 +99,91 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		m_CachedObject 			= new ATCCachedObject;
 		m_Hidden 				= false;
 		m_DisplayInteractTarget	= null;
+		
+		m_Hud					= GetHud();
+		
+		m_UseActionWrapper 		= GetUApi().GetInputByID(UAAction).GetPersistentWrapper();
+		
+		GetGame().GetMission().GetOnInputPresetChanged().Insert(OnInputPresetChanged);
+		GetGame().GetMission().GetOnInputDeviceChanged().Insert(OnInputDeviceChanged);
 	}
 	
 	void ~ActionTargetsCursor() {}
 	
 	// Controls appearance of the builded cursor
-	void SetHealthVisibility( bool state)
+	void SetHealthVisibility(bool state)
 	{
 		m_HealthEnabled = state;
 	}
 
-	void SetQuantityVisibility( bool state )
+	void SetQuantityVisibility(bool state)
 	{
 		m_QuantityEnabled = state;
 	}
-		
-	void SetInteractXboxIcon( string imageset_name, string image_name )
-	{
-		SetXboxIcon( "interact", imageset_name, image_name );
-	}
 
-	void SetContinuousInteractXboxIcon( string imageset_name, string image_name )
+	//! DEPRECATED
+	void SetInteractXboxIcon(string imageset_name, string image_name) {};
+	void SetContinuousInteractXboxIcon(string imageset_name, string image_name) {};
+	void SetSingleXboxIcon(string imageset_name, string image_name) {};
+	void SetContinuousXboxIcon(string imageset_name, string image_name) {};
+	protected void SetXboxIcon(string name, string imageset_name, string image_name) {};
+	//! ---------
+	
+	protected void SetControllerIcon(string pWidgetName, string pInputName)
 	{
-		SetXboxIcon( "continuous_interact", imageset_name, image_name );
+		RichTextWidget w = RichTextWidget.Cast(m_Root.FindAnyWidget(pWidgetName + "_btn_icon_xbox"));	
+		w.SetText(InputUtils.GetRichtextButtonIconFromInputAction(pInputName, "", EUAINPUT_DEVICE_CONTROLLER));
 	}
 	
-	void SetSingleXboxIcon( string imageset_name, string image_name )
-	{
-		SetXboxIcon( "single", imageset_name, image_name );
-	}
-	
-	void SetContinuousXboxIcon( string imageset_name, string image_name )
-	{
-		SetXboxIcon( "continuous", imageset_name, image_name );
-	}
-	
-	protected void SetXboxIcon( string name, string imageset_name, string image_name )
-	{
-		ImageWidget w = ImageWidget.Cast( m_Root.FindAnyWidget( name + "_btn_icon_xbox" ) );
-		w.LoadImageFile( 0, "set:"+ imageset_name + " image:" + image_name );
-	}
-
 	protected void OnWidgetScriptInit(Widget w)
 	{
 		m_Root = w;
 		m_Root.Show(false);
 		m_Root.SetHandler(this);
+		
+		//! UA -> widget icon
+		UpdateControllerInputIcons();
+		UpdatePCIconsVisibility();
 
 		m_Container = w.FindAnyWidget("container");
 		m_ItemLeft = w.FindAnyWidget("item_left");
+
 		m_Root.Update();
-
-#ifdef PLATFORM_XBOX		
-		SetSingleXboxIcon("xbox_buttons", "RT");
-		SetContinuousXboxIcon("xbox_buttons", "RT");
-		SetInteractXboxIcon("xbox_buttons", "X");
-		SetContinuousInteractXboxIcon("xbox_buttons", "X");
-#endif
-
-#ifdef PLATFORM_PS4		
-		SetSingleXboxIcon("playstation_buttons", "R2");
-		SetContinuousXboxIcon("playstation_buttons", "R2");
-		SetInteractXboxIcon("playstation_buttons", "square");
-		SetContinuousInteractXboxIcon("playstation_buttons", "square");
-#endif
+	}
+	
+	protected void OnInputPresetChanged()
+	{
+		#ifdef PLATFORM_CONSOLE
+		UpdateControllerInputIcons();
+		#endif
+	}
+	
+	protected void OnInputDeviceChanged(EInputDeviceType pInputDeviceType)
+	{
+		UpdatePCIconsVisibility();
+	}
+	
+	//! Loads icons from the latest keybinds
+	private void UpdateControllerInputIcons()
+	{
+		SetControllerIcon("interact", "UAAction");
+		SetControllerIcon("continuous_interact", "UAAction");
+		SetControllerIcon("single", "UADefaultAction");
+		SetControllerIcon("continuous", "UADefaultAction");
+	}
+	
+	//! Contains logic for icon set switching (Gamepad/M&K)
+	private void UpdatePCIconsVisibility()
+	{
+		bool showConsoleIcons = false;
+		#ifdef PLATFORM_CONSOLE
+		showConsoleIcons = GetGame().GetInput().GetCurrentInputDevice() == EInputDeviceType.CONTROLLER || !GetGame().GetInput().IsEnabledMouseAndKeyboardEvenOnServer();
+		#endif
+		
+		ShowXboxHidePCIcons("interact", showConsoleIcons);
+		ShowXboxHidePCIcons("continuous_interact", showConsoleIcons);
+		ShowXboxHidePCIcons("continuous", showConsoleIcons);
+		ShowXboxHidePCIcons("single", showConsoleIcons);
 	}
 
 	protected void PrepareCursorContent()
@@ -185,8 +212,10 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 
 		SetActionWidget(m_Single, GetActionDesc(m_Single), "single", "single_action_name");
 		SetActionWidget(m_Continuous, GetActionDesc(m_Continuous), "continuous", "continuous_action_name");
-		SetMultipleInteractAction("interact_mlt_wrapper");
-		SetMultipleContinuousInteractAction("continuous_interact_mlt_wrapper");
+		SetMultipleItemAction("single_mlt_wrapper", "single_mlt_wrapper_not_select");
+		SetMultipleContinuousItemAction("continuous_mlt_wrapper", "continuous_mlt_wrapper_not_select");
+		SetMultipleInteractAction("interact_mlt_wrapper", "interact_mlt_wrapper_not_select");
+		SetMultipleContinuousInteractAction("continuous_interact_mlt_wrapper", "continuous_interact_mlt_wrapper_not_select");
 	}
 	
 	protected void BuildFixedCursor()
@@ -204,7 +233,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 	protected void BuildFloatingCursor(bool forceRebuild)
 	{
 		float pos_x, pos_y = 0.0;
-
+		
 		PrepareCursorContent();
 		
 		//! Get OnScreenPos when forced or targeted component differs
@@ -232,15 +261,15 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		float wdg_w = 0;
 		float wdg_h = 0; 
 		
-		parentWdg.GetScreenSize( screen_w, screen_h );
-		m_Root.GetSize( wdg_w, wdg_h );
+		parentWdg.GetScreenSize(screen_w, screen_h);
+		m_Root.GetSize(wdg_w, wdg_h);
 
-		if ( pos_x + wdg_w > screen_w )
+		if (pos_x + wdg_w > screen_w)
 			pos_x = screen_w - wdg_w;
 
-		if ( pos_y + wdg_h > screen_h )
+		if (pos_y + wdg_h > screen_h)
 			pos_y = screen_h - wdg_h;
-				
+		
 		m_Root.SetPos(pos_x, pos_y);
 	}
 	
@@ -271,42 +300,56 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 			m_Player = null;
 			m_AM = null;
 		}
+		
 
 		if (!m_Player) GetPlayer();
 		if (!m_AM) GetActionManager();
+		if (m_Player.IsInVehicle()) m_Hidden = true;
 		
 		
 		//! don't show floating widget if it's disabled in profile or the player is unconscious
-		if (GetGame().GetUIManager().GetMenu() != null || !g_Game.GetProfileOption(EDayZProfilesOptions.HUD) ||m_Player.IsUnconscious() )
+		if (GetGame().GetUIManager().GetMenu() || !g_Game.GetProfileOption(EDayZProfilesOptions.HUD) || m_Hud.IsHideHudPlayer() || m_Player.IsUnconscious())
 		{
 			HideWidget();
 			return;
 		}
 
-		// TODO: if we choose to have it configurable throught options or from server settings
-		// we need to change setting of these methods;
-		//SetHealthVisibility(true);
-		//SetQuantityVisibility(true);
-
 		GetTarget();
 		GetActions();
-		if ((m_Target && !m_Hidden) || (m_Interact || m_ContinuousInteract || m_Single || m_Continuous) && m_AM.GetRunningAction() == null )
+
+		bool show_target = (m_Target && !m_Hidden) || m_Interact || m_ContinuousInteract;
+		if (!show_target)
+		{
+			//! check if action has target, otherwise don't show the widget
+			if (m_Single)
+			{
+				show_target = m_Single.HasTarget();
+			}
+
+			if (m_Continuous)
+			{
+				show_target = show_target || m_Continuous.HasTarget();
+			}
+		}
+
+		if (show_target)
 		{
 			//! cursor with fixed position (environment interaction mainly)
-			if ( m_Target.GetObject() == null && (m_Interact || m_ContinuousInteract || m_Single || m_Continuous))
+			if (m_Target.GetObject() == null && (m_Interact || m_ContinuousInteract || m_Single || m_Continuous))
 			{
 				//Print(">> fixed widget");
 				m_CachedObject.Invalidate();
 				BuildFixedCursor();
 				m_Root.Show(true);
 				m_FixedOnPosition = false;
+				m_Hidden = false;
 				return;
 			}
 			else if (m_Target.GetObject() != null && !m_Target.GetObject().IsHologram() && (!m_Target.GetParent() || m_Target.GetParent() && !m_Target.GetParent().IsHologram()))
 			{
 				CheckRefresherFlagVisibility(m_Target.GetObject());
 				//! build cursor for new target
-				if ( m_Target.GetObject() != m_CachedObject.Get() )
+				if (m_Target.GetObject() != m_CachedObject.Get())
 				{
 					if (!m_FixedOnPosition)
 					{
@@ -314,6 +357,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 						m_CachedObject.Invalidate();
 						BuildFloatingCursor(true);
 						m_Root.Show(true);
+						m_Hidden = false;
 						return;
 					}
 					else
@@ -323,6 +367,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 						BuildFixedCursor();
 						m_Root.Show(true);
 						m_FixedOnPosition = false;
+						m_Hidden = false;
 						return;
 					}
 				}
@@ -334,6 +379,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 						//Print(">> cached widget");
 						BuildFloatingCursor(false);
 						m_Root.Show(true);
+						m_Hidden = false;
 						return;
 					}
 					else
@@ -343,6 +389,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 						BuildFixedCursor();
 						m_Root.Show(true);
 						m_FixedOnPosition = false;
+						m_Hidden = false;
 						return;
 					}
 				}
@@ -352,7 +399,8 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 				if (m_Root.IsVisible())
 				{
 					m_CachedObject.Invalidate();
-					m_Root.Show(false);				
+					m_Root.Show(false);
+					m_Hidden = false;
 
 					// remove previous backlit
 					GetDayZGame().GetBacklit().HintClear();
@@ -370,15 +418,17 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 				// remove previous backlit
 				GetDayZGame().GetBacklit().HintClear();
 			}
+			
+			m_Hidden = false;
 		}
 		
 		m_MaxWidthChild = 350;
 	}
 	
-	protected void ShowXboxHidePCIcons( string widget, bool show_xbox_icon )
+	protected void ShowXboxHidePCIcons(string widget, bool show_xbox_icon)
 	{
-		m_Root.FindAnyWidget( widget + "_btn_icon_xbox" ).Show( show_xbox_icon );
-		m_Root.FindAnyWidget( widget + "_btn_icon" ).Show( !show_xbox_icon );
+		m_Root.FindAnyWidget(widget + "_btn_icon_xbox").Show(show_xbox_icon);
+		m_Root.FindAnyWidget(widget + "_btn_icon").Show(!show_xbox_icon);
 	}
 
 
@@ -389,7 +439,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		vector transformed_pos, screen_pos;
 		
 		//! get relative pos for screen from world pos vector
-		screen_pos = GetGame().GetScreenPosRelative( pWorldPos );
+		screen_pos = GetGame().GetScreenPosRelative(pWorldPos);
 		//! get size of parent widget
 		m_Root.GetParent().GetScreenSize(parent_width, parent_height);
 		
@@ -404,7 +454,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 	{
 		const float 	DEFAULT_HANDLE_OFFSET 	= 0.2;
 		const string 	CE_CENTER_COMP_NAME 	= "ce_center";
-		const string 	MEM_LOD_NAME 			= "memory";
+		const string 	MEM_LOD_NAME 			= LOD.NAME_MEMORY; //! kept for backward compatibility
 		
 		int compIdx;
 		float pivotOffset = 0.0;
@@ -418,8 +468,8 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 
 		LOD lod;
 
-		ref array<Selection> memSelections	= new array<Selection>();
-		ref array<string> components = new array<string>; // for components with multiple selection
+		array<Selection> memSelections	= new array<Selection>();
+		array<string> components = new array<string>; // for components with multiple selection
 		
 		Object object;
 
@@ -440,17 +490,17 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		{
 			if (!isTargetForced)
 			{
-				compName = object.GetActionComponentName( compIdx );
-				object.GetActionComponentNameList( compIdx, components );
+				compName = object.GetActionComponentName(compIdx);
+				object.GetActionComponentNameList(compIdx, components);
 				
-				if (object.GetActionComponentNameList( compIdx, components ) == 0 && !object.IsInventoryItem())
+				if (object.GetActionComponentNameList(compIdx, components) == 0 && !object.IsInventoryItem())
 				{
 					m_FixedOnPosition = true;
 					return;
 				}
 				
-				pivotOffset	= object.ConfigGetFloat( "actionTargetPivotOffsetY" );
-				memOffset	= object.ConfigGetFloat( "actionTargetMemOffsetY" );
+				pivotOffset	= object.ConfigGetFloat("actionTargetPivotOffsetY");
+				memOffset	= object.ConfigGetFloat("actionTargetMemOffsetY");
 	
 				//! Get memory LOD from p3d
 				lod = object.GetLODByName(MEM_LOD_NAME);
@@ -460,16 +510,16 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 					lod.GetSelections(memSelections);
 					
 					// items with CE_Center mem point
-					if ( IsComponentInSelection( memSelections, CE_CENTER_COMP_NAME ) )
+					if (MiscGameplayFunctions.IsComponentInSelection(memSelections, CE_CENTER_COMP_NAME))
 					{
-						for ( int i2 = 0; i2 < memSelections.Count(); ++i2 )
+						for (int i2 = 0; i2 < memSelections.Count(); ++i2)
 						{
-							if ( memSelections[i2].GetName() == CE_CENTER_COMP_NAME && memSelections[i2].GetVertexCount() == 1 )
+							if (memSelections[i2].GetName() == CE_CENTER_COMP_NAME && memSelections[i2].GetVertexCount() == 1)
 							{
 								m_FixedOnPosition = false;
-								modelPos = object.GetSelectionPositionMS( CE_CENTER_COMP_NAME );
-								worldPos = object.ModelToWorld( modelPos );
-								if ( memOffset != 0.0 )
+								modelPos = object.GetSelectionPositionMS(CE_CENTER_COMP_NAME);
+								worldPos = object.ModelToWorld(modelPos);
+								if (memOffset != 0.0)
 								{
 									worldPos[1] = worldPos[1] + memOffset;
 								}
@@ -484,21 +534,21 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 						m_CachedObject.Store(object, worldPos, compIdx);
 					} 
 					//! doors/handles
-					else if ( !compName.Contains("ladder") && IsComponentInSelection( memSelections, compName ) )
+					else if (!compName.Contains("ladder") && IsComponentInSelection(memSelections, compName))
 					{
-						for ( int i1 = 0; i1 < memSelections.Count(); ++i1 )
+						for (int i1 = 0; i1 < memSelections.Count(); ++i1)
 						{
 							//! single vertex in selection
-							if ( memSelections[i1].GetName() == compName && memSelections[i1].GetVertexCount() == 1 )
+							if (memSelections[i1].GetName() == compName && memSelections[i1].GetVertexCount() == 1)
 							{
-								modelPos = object.GetSelectionPositionMS( compName );
-								worldPos = object.ModelToWorld( modelPos );
+								modelPos = object.GetSelectionPositionMS(compName);
+								worldPos = object.ModelToWorld(modelPos);
 
 								m_FixedOnPosition = false;
-								if ( object.GetType() == "Fence" || object.GetType() == "Watchttower" || object.GetType() == "GardenPlot" )
+								if (object.GetType() == "Fence" || object.GetType() == "Watchttower" || object.GetType() == "GardenPlot")
 									m_FixedOnPosition = true;
 								
-								if ( memOffset != 0.0 )
+								if (memOffset != 0.0)
 								{
 									worldPos[1] = worldPos[1] + memOffset;
 								}
@@ -509,17 +559,17 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 							}
 
 							//! multiple vertices in selection
-							if ( memSelections[i1].GetName() == compName && memSelections[i1].GetVertexCount() > 1 )
+							if (memSelections[i1].GetName() == compName && memSelections[i1].GetVertexCount() > 1)
 							{
-								for ( int j = 0; j < components.Count(); ++j )
+								for (int j = 0; j < components.Count(); ++j)
 								{
-									if ( IsComponentInSelection(memSelections, components[j]) )
+									if (IsComponentInSelection(memSelections, components[j]))
 									{
-										modelPos = object.GetSelectionPositionMS( components[j] );
-										worldPos = object.ModelToWorld( modelPos );
+										modelPos = object.GetSelectionPositionMS(components[j]);
+										worldPos = object.ModelToWorld(modelPos);
 
 										m_FixedOnPosition = false;
-										if ( memOffset != 0.0 )
+										if (memOffset != 0.0)
 										{
 											worldPos[1] = worldPos[1] + memOffset;
 										}
@@ -536,27 +586,27 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 						m_CachedObject.Store(object, worldPos, -1); //! do not store component index for doors/handles
 					}
 					//! ladders handling
-					else if ( compName.Contains("ladder") && IsComponentInSelection( memSelections, compName))
+					else if (compName.Contains("ladder") && IsComponentInSelection(memSelections, compName))
 					{
 						vector ladderHandlePointLS, ladderHandlePointWS;
 						vector closestHandlePos;
 						float lastDistance = 0;
 	
-						for ( int i3 = 0; i3 < memSelections.Count(); ++i3 )
+						for (int i3 = 0; i3 < memSelections.Count(); ++i3)
 						{
-							if ( memSelections[i3].GetName() == compName && memSelections[i3].GetVertexCount() > 1 )
+							if (memSelections[i3].GetName() == compName && memSelections[i3].GetVertexCount() > 1)
 							{
 								ladderHandlePointLS = memSelections[i3].GetVertexPosition(lod, 0);
-								ladderHandlePointWS = object.ModelToWorld( ladderHandlePointLS );
+								ladderHandlePointWS = object.ModelToWorld(ladderHandlePointLS);
 								closestHandlePos = ladderHandlePointWS;
 								lastDistance = Math.AbsFloat(vector.DistanceSq(ladderHandlePointWS, m_Player.GetPosition()));
 	
-								for ( int k = 1; k < memSelections[i3].GetVertexCount(); ++k )
+								for (int k = 1; k < memSelections[i3].GetVertexCount(); ++k)
 								{
 									ladderHandlePointLS = memSelections[i3].GetVertexPosition(lod, k);
-									ladderHandlePointWS = object.ModelToWorld( ladderHandlePointLS );
+									ladderHandlePointWS = object.ModelToWorld(ladderHandlePointLS);
 									
-									if ( lastDistance > Math.AbsFloat(vector.DistanceSq(ladderHandlePointWS, m_Player.GetPosition())) )
+									if (lastDistance > Math.AbsFloat(vector.DistanceSq(ladderHandlePointWS, m_Player.GetPosition())))
 									{
 										lastDistance = Math.AbsFloat(vector.DistanceSq(ladderHandlePointWS, m_Player.GetPosition()));
 										closestHandlePos = ladderHandlePointWS;
@@ -565,7 +615,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 
 								m_FixedOnPosition = false;
 								worldPos = closestHandlePos;						
-								if ( memOffset != 0.0 )
+								if (memOffset != 0.0)
 								{
 									worldPos[1] = worldPos[1] + memOffset;
 								}
@@ -604,19 +654,10 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		isTargetForced = false;
 	}
 
-	protected bool IsComponentInSelection( array<Selection> selection, string compName )
+	// kept for backward compatibility
+	protected bool IsComponentInSelection(array<Selection> selection, string compName)
 	{
-		if (selection.Count() == 0 || compName.Length() == 0) return false;
-
-		for ( int i = 0; i < selection.Count(); ++i )
-		{
-			compName.ToLower();
-			if ( selection[i] && selection[i].GetName() == compName )
-			{
-				return true;
-			}
-		}
-		return false;
+		return MiscGameplayFunctions.IsComponentInSelection(selection, compName);
 	}
 
 	// getters
@@ -628,7 +669,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 
 	protected void GetActionManager()
 	{
-		if ( m_Player && m_Player.IsPlayerSelected() )
+		if (m_Player && m_Player.IsPlayerSelected())
 		{
 			Class.CastTo(m_AM, m_Player.GetActionManager());
 		}
@@ -650,47 +691,45 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		if (!m_Target) return;
 		if (m_Player.IsSprinting()) return;
 		if (m_Player.IsInVehicle()) return; // TODO: TMP: Car AM rework needed
-			
-		array<ActionBase> possible_interact_actions = m_AM.GetPossibleActions(InteractActionInput);
-		array<ActionBase> possible_continuous_interact_actions = m_AM.GetPossibleActions(ContinuousInteractActionInput);
-		int possible_interact_actions_index = m_AM.GetPossibleActionIndex(InteractActionInput);
-		int possible_continuous_interact_actions_index = m_AM.GetPossibleActionIndex(ContinuousInteractActionInput);
+
+		m_Interact = m_AM.GetPossibleAction(InteractActionInput);
+		m_ContinuousInteract = m_AM.GetPossibleAction(ContinuousInteractActionInput);
+		m_Single = m_AM.GetPossibleAction(DefaultActionInput);
+		m_Continuous = m_AM.GetPossibleAction(ContinuousDefaultActionInput);
 		
-		m_InteractActionsNum = possible_interact_actions.Count();
-		if ( m_InteractActionsNum > 0 )
+		m_InteractActionsNum = m_AM.GetPossibleActionCount(InteractActionInput);
+		m_ContinuousInteractActionsNum = m_AM.GetPossibleActionCount(ContinuousInteractActionInput);
+		m_ItemActionsNum = m_AM.GetPossibleActionCount(DefaultActionInput);
+		m_ContinuousItemActionsNum = m_AM.GetPossibleActionCount(ContinuousDefaultActionInput);
+		
+		m_SelectedActionCategory = m_AM.GetSelectedActionCategory();
+		
+		if (m_Interact)
 		{
-			m_Interact = possible_interact_actions[possible_interact_actions_index];
 			m_DisplayInteractTarget = m_Interact.GetDisplayInteractObject(m_Player,m_Target);
+		} 
+		else if (m_ContinuousInteract)
+		{
+			m_DisplayInteractTarget = m_ContinuousInteract.GetDisplayInteractObject(m_Player,m_Target);
 		}
 		else
 		{
-			m_DisplayInteractTarget	= null;
+			m_DisplayInteractTarget = null;
 		}
-		
-		m_ContinuousInteractActionsNum = possible_continuous_interact_actions.Count();
-		if ( m_ContinuousInteractActionsNum > 0 )
-		{
-			m_ContinuousInteract = possible_continuous_interact_actions[possible_continuous_interact_actions_index];
-			if (m_DisplayInteractTarget == null)
-				m_DisplayInteractTarget = m_ContinuousInteract.GetDisplayInteractObject(m_Player,m_Target);
-		}
-		
-		
-		m_Single = m_AM.GetPossibleAction(DefaultActionInput);
-		m_Continuous = m_AM.GetPossibleAction(ContinuousDefaultActionInput);
 	}
 
 	protected void GetTarget()
 	{
-		if (!m_AM) return;
+		if (!m_AM)
+		{
+			return;
+		}
 
 		m_Target = m_AM.FindActionTarget();
-		m_Hidden = false;
-
 		if (m_Target && m_Target.GetObject() && m_Target.GetObject().IsItemBase())
 		{
 			ItemBase item = ItemBase.Cast(m_Target.GetObject());
-			if ( !item.IsTakeable() || (m_Player && m_Player.IsInVehicle()) )
+			if (!item.IsTakeable() || (m_Player && m_Player.IsInVehicle()))
 			{
 				m_Hidden = true;
 			}
@@ -709,23 +748,23 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 	}
 	
 	//Getting NAME of the entity
-	protected string GetItemDesc( ActionBase action )
+	protected string GetItemDesc(ActionBase action)
 	{
 		string desc = "";
 		Object tgObject = m_DisplayInteractTarget;
-		if ( !tgObject && m_Target )
+		if (!tgObject && m_Target)
 		{
 			tgObject = m_Target.GetObject();
 		}
 		
-		if ( tgObject )
+		if (tgObject)
 		{
 			//BreakOut if item is ruined
 			Object tgParent = m_Target.GetParent();
-			if ( !tgObject.IsAlive() )
+			if (!tgObject.IsAlive())
 			{
 				//Fetch parent item name if one is present
-				if ( !tgParent || tgObject.DisplayNameRuinAttach() )
+				if (!tgParent || tgObject.DisplayNameRuinAttach())
 					desc = tgObject.GetDisplayName();
 				else
 					desc = tgParent.GetDisplayName();
@@ -734,59 +773,51 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 			
 			EntityAI targetEntity;
 			
-			if ( tgParent && ( tgParent.IsItemBase() || tgParent.IsTransport() ) )
+			if (tgParent && (tgParent.IsItemBase() || tgParent.IsTransport()))
 			{
-				targetEntity = EntityAI.Cast( tgParent );
+				targetEntity = EntityAI.Cast(tgParent);
 			}
 			
-			if ( tgObject.IsItemBase() || tgObject.IsTransport() )
+			if (tgObject.IsItemBase() || tgObject.IsTransport())
 			{
-				targetEntity = EntityAI.Cast( tgObject );
+				targetEntity = EntityAI.Cast(tgObject);
 			}
 			
-			if ( targetEntity )
+			if (targetEntity && targetEntity.ShowZonesHealth())
 			{
 				string zone = "";
-				string compName;
 				
 				array<string> selections = new array<string>();
 				
 				//NOTE: relevant fire geometry and view geometry selection names MUST match in order to get a valid damage zone
-				if ( targetEntity.IsInherited( TentBase ) && TentBase.Cast( targetEntity ).GetState() != TentBase.PACKED )
+				if (targetEntity.IsInherited(TentBase) && TentBase.Cast(targetEntity).GetState() != TentBase.PACKED)
 				{
 					//This is really specific to tents, as they use proxies. Hence object must be used
-					compName = tgObject.GetActionComponentName( m_Target.GetComponentIndex(), "fire" );
-					
-					if ( DamageSystem.GetDamageZoneFromComponentName( targetEntity , compName, zone ) )
+					if (DamageSystem.GetDamageZoneFromComponentName(targetEntity, tgObject.GetActionComponentName(m_Target.GetComponentIndex(), LOD.NAME_FIRE), zone))
 					{
-						desc = DamageSystem.GetDamageDisplayName( targetEntity, zone );
+						desc = DamageSystem.GetDamageDisplayName(targetEntity, zone);
 					}
 				}
 				else
 				{
-					targetEntity.GetActionComponentNameList( m_Target.GetComponentIndex(), selections, "view" );
+					targetEntity.GetActionComponentNameList(m_Target.GetComponentIndex(), selections, LOD.NAME_VIEW);
 					
 					//Important to get display name from component tied to multiple selections
-					for ( int s = 0; s < selections.Count(); s++ )
+					for (int s = 0; s < selections.Count(); s++)
 					{
-						compName = selections[s];
-	
-						if ( DamageSystem.GetDamageZoneFromComponentName( targetEntity , compName, zone))
+						if (DamageSystem.GetDamageZoneFromComponentName(targetEntity, selections[s], zone))
 						{
-							desc = DamageSystem.GetDamageDisplayName( targetEntity, zone );
+							desc = DamageSystem.GetDamageDisplayName(targetEntity, zone);
 						}
 					}
 				}
-				
-				//For cases where damagezone is ruined but entity is still alive, car parts for example
-				if ( targetEntity.GetHealthLevel( zone ) >= GameConstants.STATE_RUINED )
-					desc = targetEntity.GetDisplayName();
-				
-				//Safety check to output something to widget
-				if ( desc == "" )
-					desc = targetEntity.GetDisplayName();
 			}
+			
+			//Safety check to output something to widget
+			if (targetEntity && desc == "")
+				desc = targetEntity.GetDisplayName();
 		}
+
 		return desc;
 	}
 	
@@ -794,7 +825,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 	{
 		int health = -1;
 
-		if ( m_Interact && !m_Interact.HasTarget() )
+		if (m_Interact && !m_Interact.HasTarget())
 		{
 			return health;
 		}
@@ -805,56 +836,51 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 			tgObject = m_Target.GetObject();
 		}
 		
-		if ( tgObject )
+		if (tgObject)
 		{
 			Object tgParent = m_Target.GetParent();
 			EntityAI targetEntity;
 			
 			//Return specific part health, even if display name is from parent
-			if ( !tgObject.IsAlive() )
+			if (!tgObject.IsAlive())
 			{
 				health = tgObject.GetHealthLevel();
 				return health;
 			}
 			
-			if ( tgParent && ( tgParent.IsItemBase() || tgParent.IsTransport() ) )
+			if (tgParent && (tgParent.IsItemBase() || tgParent.IsTransport()))
 			{
-				targetEntity = EntityAI.Cast( tgParent );
+				targetEntity = EntityAI.Cast(tgParent);
 			}
 			
-			if ( tgObject.IsItemBase() || tgObject.IsTransport() )
+			if (tgObject.IsItemBase() || tgObject.IsTransport())
 			{
-				targetEntity = EntityAI.Cast( tgObject );
+				targetEntity = EntityAI.Cast(tgObject);
 			}
 			
-			if ( targetEntity )
+			if (targetEntity)
 			{
-				if ( !targetEntity.IsDamageDestroyed() )
+				if (!targetEntity.IsDamageDestroyed())
 				{
 					string zone = "";
-					string compName;
 					array<string> selections = new array<string>();
 					
-					if ( targetEntity.IsInherited( TentBase ) && TentBase.Cast( targetEntity ).GetState() != TentBase.PACKED )
+					if (targetEntity.IsInherited(TentBase) && TentBase.Cast(targetEntity).GetState() != TentBase.PACKED)
 					{
 						//This is really specific to tents, as they use proxies. Hence object must be used
-						compName = tgObject.GetActionComponentName( m_Target.GetComponentIndex(), "fire" );
-						
-						if ( DamageSystem.GetDamageZoneFromComponentName( targetEntity , compName, zone ) )
+						if (DamageSystem.GetDamageZoneFromComponentName(targetEntity, tgObject.GetActionComponentName(m_Target.GetComponentIndex(), LOD.NAME_FIRE), zone))
 						{
-							health = targetEntity.GetHealthLevel(zone);// .hea GetDamageDisplayName( targetEntity, zone );
+							health = targetEntity.GetHealthLevel(zone);
 						}
 					}
 					else
 					{
 						//NOTE: relevant view geometry and view geometry selection names MUST match in order to get a valid damage zone
-						targetEntity.GetActionComponentNameList( m_Target.GetComponentIndex(), selections, "view" );
+						targetEntity.GetActionComponentNameList(m_Target.GetComponentIndex(), selections, LOD.NAME_VIEW);
 						
-						for ( int s = 0; s < selections.Count(); s++ )
+						for (int s = 0; s < selections.Count(); s++)
 						{
-							compName = selections[s];
-		
-							if ( DamageSystem.GetDamageZoneFromComponentName( targetEntity , compName, zone))
+							if (DamageSystem.GetDamageZoneFromComponentName(targetEntity , selections[s], zone))
 							{
 								health = targetEntity.GetHealthLevel(zone);
 								break;
@@ -862,7 +888,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 						}
 					}
 	
-					if ( zone == "" )
+					if (zone == "")
 						health = targetEntity.GetHealthLevel();
 				}
 			}
@@ -890,7 +916,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 			tgObject = m_Target.GetObject();
 		}
 		
-		if ( Class.CastTo(item, tgObject) )
+		if (Class.CastTo(item, tgObject))
 		{
 			q_type = QuantityConversions.HasItemQuantity(item);
 			if (q_type > 0)
@@ -898,12 +924,10 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		}
 	}
 
-	//! returns number of item in cargo for targeted entity
+	//! returns number of items in cargo for targeted entity
 	protected void GetItemCargoCount(out int cargoCount)
 	{
-		CargoBase cargo = null;
 		EntityAI entity = null;
-		PlayerBase player;
 		
 		Object tgObject = m_DisplayInteractTarget;
 		if (!tgObject && m_Target)
@@ -911,46 +935,14 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 			tgObject = m_Target.GetObject();
 		}
 
-		if ( Class.CastTo(entity,tgObject) )
+		if (Class.CastTo(entity, tgObject))
 		{
-			//! player specific way
-			if (entity.IsInherited(PlayerBase))
-			{					
-				if (Class.CastTo(player, entity))
-				{
-					int attCount = player.GetHumanInventory().AttachmentCount();
 
-					//! go thru the each attachment slot and check cargo count
-					for (int attIdx = 0; attIdx < attCount; attIdx++)
-					{
-						EntityAI attachment = player.GetInventory().GetAttachmentFromIndex(attIdx);
-						int attachmentSlot = attachment.GetInventory().GetSlotId(0);
-						if ( attachment.GetInventory() )
-						{
-							cargo = attachment.GetInventory().GetCargo();
-							if ( cargo )
-							{
-								cargoCount += cargo.GetItemCount();
-							}
-						}
-						
-					}
-					
-					return;
-				}
-			}
-			else
+			GameInventory inventory = entity.GetInventory();
+			if (inventory)
 			{
-				if (entity.GetInventory())
-				{
-					cargo = entity.GetInventory().GetCargo();
-	
-					if (cargo)
-					{
-						cargoCount = cargo.GetItemCount();
-						return;
-					}
-				}
+				cargoCount = AttachmentsWithInventoryOrCargoCount(inventory);
+				return;
 			}
 
 			//! default cargo count
@@ -964,7 +956,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		Widget widget;
 		widget = m_Root.FindAnyWidget(itemWidget);
 		
-		//! Last message from finished User Action on target (Thermometer, Blood Test Kit, etc. )
+		//! Last message from finished User Action on target (Thermometer, Blood Test Kit, etc.)
 		PlayerBase playerT = PlayerBase.Cast(m_Target.GetObject());
 		if (playerT)
 			string msg = playerT.GetLastUAMessage();
@@ -983,11 +975,13 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 		if (cargoCount > 0)
 		{
 			descText = string.Format("[+] %1  %2", descText, msg);
-			itemName.SetText(descText);		
+			itemName.SetText(descText);
 		}
 		else
+		{
 			descText = string.Format("%1  %2", descText, msg);
 			itemName.SetText(descText);
+		}
 
 		widget.Show(true);
 	}
@@ -1046,7 +1040,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 			widget.Show(false);
 	}
 	
-	protected void SetItemQuantity(int type, float current, int min, int max, string itemWidget, string quantityPBWidget, string quantityTextWidget, bool enabled )
+	protected void SetItemQuantity(int type, float current, int min, int max, string itemWidget, string quantityPBWidget, string quantityTextWidget, bool enabled)
 	{
 		Widget widget;
 		
@@ -1084,7 +1078,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 					}
 					break;
 				case QUANTITY_PROGRESS :
-					float qty_num = Math.Round( ( current / max ) * 100 );
+					float qty_num = Math.Round((current / max) * 100);
 	
 					textWidget.Show(false);
 					progressBar.SetCurrent(qty_num);
@@ -1100,19 +1094,7 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 
 	protected void SetActionWidget(ActionBase action, string descText, string actionWidget, string descWidget)
 	{
-		Widget widget;
-		
-		widget = m_Root.FindAnyWidget(actionWidget);
-		
-#ifdef PLATFORM_XBOX
-		ShowXboxHidePCIcons( actionWidget, !GetGame().GetInput().IsEnabledMouseAndKeyboardEvenOnServer() );
-#else
-#ifdef PLATFORM_PS4
-		ShowXboxHidePCIcons( actionWidget, !GetGame().GetInput().IsEnabledMouseAndKeyboardEvenOnServer() );
-#else
-		ShowXboxHidePCIcons( actionWidget, false );
-#endif
-#endif
+		Widget widget = m_Root.FindAnyWidget(actionWidget);
 		
 		if (action)
 		{
@@ -1140,67 +1122,140 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 			}
 			else
 			{
-				widget.Show(false);			
+				widget.Show(false);
 			}
 		}
 		else
 		{
-			widget.Show(false);			
+			widget.Show(false);
 		}
 	}
 
 	//! shows arrows near the interact action if there are more than one available
-	protected void SetMultipleInteractAction(string multiActionsWidget)
+	protected void SetMultipleInteractAction(string multiActionsWidget, string multiActionsWidget_NotSelect)
 	{
-		Widget widget;
+		Widget widget, widget_not_select;
 
 		widget = m_Root.FindAnyWidget(multiActionsWidget);
+		widget_not_select = m_Root.FindAnyWidget(multiActionsWidget_NotSelect);
 
 		if (m_InteractActionsNum > 1)
-			widget.Show(true);
+		{
+			if (m_SelectedActionCategory == InteractActionInput)
+			{
+				widget.Show(true);
+				widget_not_select.Show(false);
+			}
+			else
+			{
+				widget.Show(false);
+				widget_not_select.Show(true);
+			}	
+		}
 		else
-			widget.Show(false);	
+		{
+			widget.Show(false);
+			widget_not_select.Show(false);
+		}
 	}
 	
-	protected void SetMultipleContinuousInteractAction(string multiActionsWidget)
+	protected void SetMultipleContinuousInteractAction(string multiActionsWidget, string multiActionsWidget_NotSelect)
 	{
-		Widget widget;
+		Widget widget, widget_not_select;
 
 		widget = m_Root.FindAnyWidget(multiActionsWidget);
+		widget_not_select = m_Root.FindAnyWidget(multiActionsWidget_NotSelect);
 
 		if (m_ContinuousInteractActionsNum > 1)
-			widget.Show(true);
+		{
+			if (m_SelectedActionCategory == ContinuousInteractActionInput)
+			{
+				widget.Show(true);
+				widget_not_select.Show(false);
+			}
+			else
+			{
+				widget.Show(false);
+				widget_not_select.Show(true);
+			}
+		}
 		else
-			widget.Show(false);	
+		{
+			widget.Show(false);
+			widget_not_select.Show(false);
+		}
+				
+	}
+	
+	protected void SetMultipleItemAction(string multiActionsWidget, string multiActionsWidget_NotSelect)
+	{
+		Widget widget, widget_not_select;
+
+		widget = m_Root.FindAnyWidget(multiActionsWidget);
+		widget_not_select = m_Root.FindAnyWidget(multiActionsWidget_NotSelect);
+
+		if (m_ItemActionsNum > 1)
+		{ 
+			if (m_SelectedActionCategory == DefaultActionInput)
+			{
+				widget.Show(true);
+				widget_not_select.Show(false);
+			}
+			else
+			{
+				widget.Show(false);
+				widget_not_select.Show(true);
+			}
+		}
+		else
+		{
+			widget.Show(false);
+			widget_not_select.Show(false);
+		}	
+	}
+	
+	protected void SetMultipleContinuousItemAction(string multiActionsWidget, string multiActionsWidget_NotSelect)
+	{
+		Widget widget, widget_not_select;
+
+		widget = m_Root.FindAnyWidget(multiActionsWidget);
+		widget_not_select = m_Root.FindAnyWidget(multiActionsWidget_NotSelect);
+
+		if (m_ContinuousItemActionsNum > 1)
+		{
+			if (m_SelectedActionCategory == ContinuousDefaultActionInput)
+			{
+				widget.Show(true);
+				widget_not_select.Show(false);
+			}
+			else
+			{
+				widget.Show(false);
+				widget_not_select.Show(true);
+			}
+		}
+		else
+		{
+			widget.Show(false);
+			widget_not_select.Show(false);
+		}		
 	}
 	
 	protected void SetInteractActionIcon(string actionWidget, string actionIconFrameWidget, string actionIconWidget, string actionIconTextWidget)
 	{
-		string keyName = string.Empty;
-		Widget widget, frameWidget;
+		Widget widget;
 		ImageWidget iconWidget;
 		TextWidget textWidget;
 		
 		widget = m_Root.FindAnyWidget(actionWidget);
-		Class.CastTo(frameWidget, widget.FindAnyWidget(actionIconFrameWidget));
 		Class.CastTo(iconWidget, widget.FindAnyWidget(actionIconWidget));
 		Class.CastTo(textWidget, widget.FindAnyWidget(actionIconTextWidget));
-
-		//! get name of key which is used for UAAction input 
-		UAInput i1 = GetUApi().GetInputByName("UAAction");
-		GetDayZGame().GetBacklit().HintShow(i1);
 		
-		i1.SelectAlternative(0); //! select first alternative (which is the primary bind)
-		for ( int c = 0; c < i1.BindKeyCount(); c++ )
-		{
-		  	int _hc = i1.GetBindKey(0);
-		  	keyName = GetUApi().GetButtonName(_hc);
-		}
+		GetDayZGame().GetBacklit().HintShow(m_UseActionWrapper.InputP());
 		
 		// uses text in floating widget
 		iconWidget.Show(false);
-		textWidget.SetText(keyName);
-		//frameWidget.Show(true);
+		textWidget.SetText(InputUtils.GetButtonNameFromInput("UAAction", EInputDeviceType.MOUSE_AND_KEYBOARD));
 		textWidget.Show(true);
 	}
 	
@@ -1208,9 +1263,45 @@ class ActionTargetsCursor extends ScriptedWidgetEventHandler
 	{
 		EntityAI entity;
 		Widget w = m_Root.FindAnyWidget("item_flag_icon");
-		if ( Class.CastTo(entity,object) && w )
+		if (Class.CastTo(entity,object) && w)
 		{
 			w.Show(entity.IsRefresherSignalingViable() && m_Player.IsTargetInActiveRefresherRange(entity));
 		}
+	}
+	
+	protected int AttachmentsWithInventoryOrCargoCount(notnull GameInventory inventory)
+	{
+		int attachmentsWithInventory = 0;
+		
+		CargoBase cargo = inventory.GetCargo();
+		if (cargo && cargo.GetItemCount() > 0)
+		{
+			return 1;
+		}
+		
+		for (int i = 0; i < inventory.AttachmentCount(); i++)	
+		{
+			EntityAI attachment = inventory.GetAttachmentFromIndex(i);
+			int attachmentSlotId = attachment.GetInventory().GetSlotId(0);
+			
+			if (attachment.GetInventory())
+			{
+				attachmentsWithInventory += 1;
+			}
+		}
+		
+		return attachmentsWithInventory;
+	}
+	
+	protected IngameHud GetHud()
+	{
+		Mission mission = GetGame().GetMission();
+		if (mission)
+		{
+			IngameHud hud = IngameHud.Cast(mission.GetHud());
+			return hud;
+		}
+
+		return null;
 	}
 }

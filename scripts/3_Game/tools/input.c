@@ -52,6 +52,7 @@ class Input
 		
 	/**  
 	\brief Returns true just in frame, when action was invoked (button was pressed)
+	\note if the input is limited (click, hold, doubleclick), 'Press' event is limited as well, and reacts to the limiter only! Otherwise it registeres the first event, usually 'press' (change of value from 0)
 	@param action id of action, defined in \ref 4_World/Classes/UserActionsComponent/_constants.c
 	@param check_focus if true and game is unfocused, returns 0; otherwise returns actual value
 	@return true if action was invoked in that frame, false otherwise
@@ -109,6 +110,13 @@ class Input
 	*/
 	proto native bool	IsEnabledMouseAndKeyboardEvenOnServer();
 	
+	/*!
+	@return Console: Last state queried from the platform operating system for the active gamepad. 
+			PC: Always true.
+	*/
+	proto native bool	IsMouseConnected();
+	proto native bool	IsKeyboardConnected();
+
 	//! gets currently selected profile
 	proto native int	GetCurrentProfile();
 	// gets currently selected profile keys for action
@@ -121,7 +129,7 @@ class Input
 	proto native int	SetProfile(int index);
 
 
-	// devices
+	// devices - joystick only!
 	proto native int		GetDevicesCount();
 	proto int				GetDeviceName(int device_index, out string name);
 	proto native int		IsDeviceXInput(int device_index);
@@ -143,6 +151,90 @@ class Input
 	proto native void		IdentifyGamepad(GamepadButton button);
 	//! returns true if there is an active gamepad selected.
 	proto native bool		IsActiveGamepadSelected();
+
+	//! returns true if 'Gamepad' or 'Mouse and Keyboard' is connected
+	bool IsAnyInputDeviceActive()
+	{
+		return IsActiveGamepadSelected() || IsMouseConnected() || IsKeyboardConnected();
+	}
+	
+	/**  
+	\brief returns true if 'Gamepad' or if 'Mouse/Keyboard' control is allowed locally and on server, and the respective input devicse are connected. Gamepad takes priority.
+	@param unavailableDeviceList lists all devices that SHOULD be available, but aren't. Optional.
+	*/
+	bool AreAllAllowedInputDevicesActive(out array<int> unavailableDeviceList = null)
+	{
+		bool passed = true;
+		bool gamepad = IsActiveGamepadSelected();
+		bool mouse = IsMouseConnected();
+		bool keyboard = IsKeyboardConnected();
+		bool MnKEnabled;
+		
+		if (g_Game.GetGameState() != DayZGameState.IN_GAME)
+		{
+			MnKEnabled = IsEnabledMouseAndKeyboard();
+		}
+		else if (g_Game.GetGameState() != DayZGameState.MAIN_MENU)
+		{
+			MnKEnabled = IsEnabledMouseAndKeyboardEvenOnServer();
+		}
+		else
+		{
+			return true;
+		}
+		
+		if (!MnKEnabled)
+		{
+			if (!gamepad)
+			{
+				passed = false;
+				FillUnavailableDeviceArray(EUAINPUT_DEVICE_CONTROLLER,unavailableDeviceList);
+			}
+		}
+		else
+		{
+			if (!gamepad)
+			{
+				if (!mouse)
+				{
+					passed = false;
+					FillUnavailableDeviceArray(EUAINPUT_DEVICE_MOUSE,unavailableDeviceList);
+				}
+				if (!keyboard)
+				{
+					passed = false;
+					FillUnavailableDeviceArray(EUAINPUT_DEVICE_KEYBOARD,unavailableDeviceList);
+				}
+				
+				if (!passed)
+				{
+					FillUnavailableDeviceArray(EUAINPUT_DEVICE_CONTROLLER,unavailableDeviceList);
+				}
+			}
+		}
+		return passed;
+	}
+	
+	void FillUnavailableDeviceArray(int device, inout array<int> filler)
+	{
+		if (filler)
+		{
+			filler.Insert(device);
+		}
+	}
+	
+	//! currently lists only available Gamepad, Mouse, and Keyboard. Extendable as needed.
+	void UpdateConnectedInputDeviceList()
+	{
+		g_Game.GetConnectedInputDeviceList().Clear();
+		
+		if (IsActiveGamepadSelected())
+			g_Game.GetConnectedInputDeviceList().Insert(EUAINPUT_DEVICE_CONTROLLER);
+		if (IsMouseConnected())
+			g_Game.GetConnectedInputDeviceList().Insert(EUAINPUT_DEVICE_MOUSE);
+		if (IsKeyboardConnected())
+			g_Game.GetConnectedInputDeviceList().Insert(EUAINPUT_DEVICE_KEYBOARD);
+	}
 	
 	/**
 	@return Input device, with the last input event ('mouse and keyboard', 'controller' or
@@ -163,17 +255,20 @@ class Input
 		#ifdef PLATFORM_PS4
 		BiosUser user;
 		GetGamepadUser( gamepad, user );
-		if( user && user == GetGame().GetUserManager().GetSelectedUser() )
+		if (user && user == GetGame().GetUserManager().GetSelectedUser())
 		{
 			SelectActiveGamepad(gamepad);
-			g_Game.DeleteGamepadDisconnectMenu();
+			if (GetGame().GetMission())
+				GetGame().GetMission().GetOnInputDeviceConnected().Invoke(EUAINPUT_DEVICE_CONTROLLER); //only for PS, xbox handles it on identification
 		}
 		#endif
 		
 		#ifdef PLATFORM_XBOX
-		if( IsEnabledMouseAndKeyboardEvenOnServer() && gamepad == g_Game.GetPreviousGamepad() )
+		if (gamepad == g_Game.GetPreviousGamepad())
 		{
 			SelectActiveGamepad(g_Game.GetPreviousGamepad());
+			if (GetGame().GetMission())
+				GetGame().GetMission().GetOnInputDeviceConnected().Invoke(EUAINPUT_DEVICE_CONTROLLER); //only for PS, xbox handles it on identification
 		}
 		#endif
 	}
@@ -181,31 +276,18 @@ class Input
 	//! callback that is fired when gamepad is disconnected
 	void OnGamepadDisconnected(int gamepad)
 	{
-		if( IsInactiveGamepadOrUserSelected(gamepad) )
+		if (IsInactiveGamepadOrUserSelected(gamepad))
 		{
-			#ifdef PLATFORM_PS4
-			ResetActiveGamepad();
-			#endif
+			UpdateConnectedInputDeviceList();
 			
-			if( !g_Game.IsLoading() )
+			if (!g_Game.IsLoading())
 			{
 				DayZLoadState state = g_Game.GetLoadState();
-				if( state != DayZLoadState.MAIN_MENU_START && state != DayZLoadState.MAIN_MENU_USER_SELECT )
+				if (state != DayZLoadState.MAIN_MENU_START && state != DayZLoadState.MAIN_MENU_USER_SELECT)
 				{
-					//#ifdef PLATFORM_XBOX
-					//if ( !IsEnabledMouseAndKeyboard() || GetCurrentInputDevice() != EInputDeviceType.MOUSE_AND_KEYBOARD )
-					//{
-					//	g_Game.CreateGamepadDisconnectMenu();	
-					//}
-					//#else
-					g_Game.CreateGamepadDisconnectMenu();
-					//#endif
+					if (GetGame().GetMission())
+						GetGame().GetMission().GetOnInputDeviceDisconnected().Invoke(EUAINPUT_DEVICE_CONTROLLER);
 				}
-				
-				#ifdef PLATFORM_XBOX
-				if( !IsEnabledMouseAndKeyboardEvenOnServer() )
-					IdentifyGamepad( GetEnterButton() );
-				#endif
 			}
 		}
 	}
@@ -213,19 +295,22 @@ class Input
 	//! callback that is fired when identification was requested
 	void OnGamepadIdentification(int gamepad)
 	{
-		if( gamepad > -1 )
+		if (gamepad > -1)
 		{
 			DayZLoadState state = g_Game.GetLoadState();
 			
-			g_Game.DeleteGamepadDisconnectMenu();
-			SelectActiveGamepad( gamepad );
-			g_Game.SelectUser( gamepad );
-			g_Game.SetPreviousGamepad( gamepad );
-			if( state == DayZLoadState.MAIN_MENU_START || state == DayZLoadState.MAIN_MENU_USER_SELECT )
+			UpdateConnectedInputDeviceList();
+			SelectActiveGamepad(gamepad);
+			g_Game.SelectUser(gamepad);
+			g_Game.SetPreviousGamepad(gamepad);
+			if (state == DayZLoadState.MAIN_MENU_START || state == DayZLoadState.MAIN_MENU_USER_SELECT)
 			{
-				if( GetGame().GetMission() )
+				if (GetGame().GetMission())
 					GetGame().GetMission().Reset();
 			}
+			
+			if (GetGame() && GetGame().GetMission() && GetGame().GetMission().GetOnInputDeviceConnected())
+				GetGame().GetMission().GetOnInputDeviceConnected().Invoke(EUAINPUT_DEVICE_CONTROLLER);
 		}
 	}
 	
@@ -256,14 +341,73 @@ class Input
 		return false;
 	}
 	
+	//! callback that is fired when mouse is connected (PS: and assigned to the user)
+	//! does not fire on PC - mouse/keyboard assumed to always be connected
+	void OnMouseConnected()
+	{
+		UpdateConnectedInputDeviceList();
+		if (!g_Game.IsLoading() && GetGame().GetMission())
+		{
+			DayZLoadState state = g_Game.GetLoadState();
+			if (state != DayZLoadState.MAIN_MENU_START && state != DayZLoadState.MAIN_MENU_USER_SELECT)
+			{
+				GetGame().GetMission().GetOnInputDeviceConnected().Invoke(EUAINPUT_DEVICE_MOUSE);
+			}
+		}
+	}
+
+	//! callback that is fired when mouse is disconnected
+	//! does not fire on PC - mouse/keyboard assumed to always be connected
+	void OnMouseDisconnected()
+	{
+		UpdateConnectedInputDeviceList();
+		if (!g_Game.IsLoading() && GetGame().GetMission())
+		{
+			DayZLoadState state = g_Game.GetLoadState();
+			if (state != DayZLoadState.MAIN_MENU_START && state != DayZLoadState.MAIN_MENU_USER_SELECT)
+			{
+				GetGame().GetMission().GetOnInputDeviceDisconnected().Invoke(EUAINPUT_DEVICE_MOUSE);
+			}
+		}
+	}
+
+	//! callback that is fired when keyboard is connected (PS: and assigned to the user)
+	//! does not fire on PC - mouse/keyboard assumed to always be connected
+	void OnKeyboardConnected()
+	{
+		UpdateConnectedInputDeviceList();
+		if (!g_Game.IsLoading() && GetGame().GetMission())
+		{
+			DayZLoadState state = g_Game.GetLoadState();
+			if (state != DayZLoadState.MAIN_MENU_START && state != DayZLoadState.MAIN_MENU_USER_SELECT)
+			{
+				GetGame().GetMission().GetOnInputDeviceConnected().Invoke(EUAINPUT_DEVICE_KEYBOARD);
+			}
+		}
+	}
+
+	//! callback that is fired when keyboard is disconnected
+	//! does not fire on PC - mouse/keyboard assumed to always be connected
+	void OnKeyboardDisconnected()
+	{
+		UpdateConnectedInputDeviceList();
+		if (!g_Game.IsLoading() && GetGame().GetMission())
+		{
+			DayZLoadState state = g_Game.GetLoadState();
+			if (state != DayZLoadState.MAIN_MENU_START && state != DayZLoadState.MAIN_MENU_USER_SELECT)
+			{
+				GetGame().GetMission().GetOnInputDeviceDisconnected().Invoke(EUAINPUT_DEVICE_KEYBOARD);
+			}
+		}
+	}
+	
+	//! called from code on different input device use
 	void OnLastInputDeviceChanged(EInputDeviceType inputDevice)
 	{
-		//#ifdef PLATFORM_XBOX
-		//if ( !IsActiveGamepadSelected() && inputDevice == EInputDeviceType.CONTROLLER )
-		//{
-		//	g_Game.CreateGamepadDisconnectMenu();
-		//}
-		//#endif
+		if (GetGame().GetMission())
+		{
+			GetGame().GetMission().GetOnInputDeviceChanged().Invoke(inputDevice);
+		}
 	}
 };
 

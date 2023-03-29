@@ -1,20 +1,15 @@
 class ActionPullBodyFromTransport: ActionInteractBase
 {
-	void ActionGetOutTransport()
+	void ActionPullBodyFromTransport()
 	{
 		m_StanceMask = DayZPlayerConstants.STANCEMASK_ALL;
-		m_HUDCursorIcon = "GetInDriver";
+		m_Text = "#pull_out_body";
 	}
 
 	override void CreateConditionComponents()  
 	{
 		m_ConditionItem = new CCINone;
 		m_ConditionTarget = new CCTNone;
-	}
-
-	override string GetText()
-	{
-		return "#pull_out_body";
 	}
 
 	override typename GetInputType()
@@ -30,7 +25,14 @@ class ActionPullBodyFromTransport: ActionInteractBase
 	override bool ActionCondition( PlayerBase player, ActionTarget target, ItemBase item )
 	{
 		PlayerBase targetPlayer = PlayerBase.Cast(target.GetObject());
-		if (!targetPlayer || targetPlayer.IsAlive() || !targetPlayer.GetParent() || !targetPlayer.GetParent().IsInherited(Transport) || !IsInReach(player, target, UAMaxDistances.DEFAULT))
+		if (!targetPlayer)
+			return false;
+		
+		if (targetPlayer.IsAlive())
+			return false;
+		
+		IEntity parent = targetPlayer.GetParent();
+		if (!parent || !parent.IsInherited(Transport))
 			return false;
 		
 		bool found = false;
@@ -59,24 +61,17 @@ class ActionPullBodyFromTransport: ActionInteractBase
 	}
 	*/
 	
-	override void OnStart( ActionData action_data )
+	override void OnStartServer( ActionData action_data )
 	{
-		super.OnStart( action_data );
+		super.OnStartServer( action_data );
 		
-		PlayerBase targetPlayer = PlayerBase.Cast(action_data.m_Target.GetObject());		
-		Transport transportTarget = Transport.Cast(targetPlayer.GetParent());
-			
-		for (int i = 0; i < transportTarget.CrewSize(); ++i)
+		DayZPlayerImplement player;
+		if (!Class.CastTo(player, action_data.m_Target.GetObject()))
 		{
-			if (transportTarget.CrewMember(i) == targetPlayer)
-				break;
+			return;
 		}
-			
-		transportTarget.CrewGetOut(i);
-		targetPlayer.UnlinkFromLocalSpace();
-		targetPlayer.DisableSimulation(false);
-		targetPlayer.StartCommand_Death(-1, 0, HumanCommandDeathCallback);
-		targetPlayer.ResetDeathStartTime();
+		
+		player.TriggerPullPlayerOutOfVehicle();
 	}
 	
 	/*override bool CanBeUsedInVehicle()

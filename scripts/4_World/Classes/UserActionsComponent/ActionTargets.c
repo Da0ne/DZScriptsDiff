@@ -191,23 +191,10 @@ class ActionTargets
 		m_Targets.Clear();
 	}
 	
-	vector CalculateRayStart()
-	{
-		vector rayStart = GetGame().GetCurrentCameraPosition();
-		if (m_Player.GetCurrentCamera() && m_Player.GetCurrentCamera().IsInherited(DayZPlayerCamera3rdPerson))
-		{
-			//! tmp hotfix - move the start point for a bit in 3p view (camera collision issue related)
-			rayStart = GetGame().GetCurrentCameraPosition() + GetGame().GetCurrentCameraDirection() * 0.5;
-		}
-		return rayStart;
-	}
-	
 	void Update()
 	{	
 		int i;
-#ifdef DEVELOPER
-		m_Debug = DiagMenu.GetBool(DiagMenuIDs.DM_ACTION_TARGETS_DEBUG);
-#endif
+		
 		//! clear state
 		m_VicinityObjects.ClearVicinityObjects();
 		Clear();
@@ -221,7 +208,7 @@ class ActionTargets
 		vector playerPos = m_Player.GetPosition();
 		vector headingDirection = MiscGameplayFunctions.GetHeadingVector(m_Player);
 
-		m_RayStart = CalculateRayStart();
+		m_RayStart = GetGame().GetCurrentCameraPosition();
 		m_RayEnd = m_RayStart + GetGame().GetCurrentCameraDirection() * c_RayDistance;
 
 		RaycastRVParams rayInput = new RaycastRVParams(m_RayStart, m_RayEnd, m_Player);
@@ -346,14 +333,14 @@ class ActionTargets
 		
 		m_Targets.Insert(new ActionTarget(null, null, -1, m_HitPos, 0));
 
-#ifdef DEVELOPER
-		if (m_Debug)
+#ifdef DIAG_DEVELOPER
+		if (DiagMenu.GetBool(DiagMenuIDs.MISC_ACTION_TARGETS_DEBUG))
 		{
 			ShowDebugActionTargets(true);
 			DrawDebugActionTargets(true);
 			DrawDebugCone(true);
 			DrawDebugRay(true);
-			DrawSelectionPos(DiagMenu.GetBool(DiagMenuIDs.DM_ACTION_TARGETS_SELPOS_DEBUG));
+			DrawSelectionPos(DiagMenu.GetBool(DiagMenuIDs.MISC_ACTION_TARGETS_SELPOS_DEBUG));
 		}
 		else
 		{
@@ -473,8 +460,8 @@ class ActionTargets
 	
 	private void FilterObstructedObjectsEx(Object cursor_target, array<Object> vicinityObjects)
 	{
-		#ifdef DEVELOPER
-		if (m_Debug)
+		#ifdef DIAG_DEVELOPER
+		if (DiagMenu.GetBool(DiagMenuIDs.MISC_ACTION_TARGETS_DEBUG))
 			CleanupDebugShapes(obstruction);
 		#endif
 
@@ -538,7 +525,7 @@ class ActionTargets
 		}
 	}
 	
-#ifdef DEVELOPER
+#ifdef DIAG_DEVELOPER
 	ref array<Shape> shapes = new array<Shape>();
 	ref array<Shape> dbgConeShapes = new array<Shape>();
 	ref array<Shape> rayShapes = new array<Shape>();
@@ -568,7 +555,7 @@ class ActionTargets
 					compName = obj.GetActionComponentName(compIdx);
 					obj.GetActionComponentNameList(compIdx, compNames);
 
-					if( compNames.Count() > 0 )
+					if ( compNames.Count() > 0 )
 					{
 						for ( int c = 0; c < compNames.Count(); c++ )
 						{
@@ -751,6 +738,9 @@ class ActionTargets
 	//! misc
 	private const int OBSTRUCTED_COUNT_THRESHOLD	= 3;
 	private const int GROUPING_COUNT_THRESHOLD		= 10;
+	
+	//! DEPRECATED
+	vector CalculateRayStart();
 };
 
 class ObjectGroup

@@ -2,23 +2,26 @@ class MotoHelmet_ColorBase extends HelmetBase
 {
 	override array<int> GetEffectWidgetTypes()
 	{
-		return {EffectWidgetsTypes.MOTO_OCCLUDER,EffectWidgetsTypes.MOTO_BREATH};
+		return {EffectWidgetsTypes.MOTO_OCCLUDER/*,EffectWidgetsTypes.MOTO_BREATH*/};
 	}
 	
 	override bool CanPutAsAttachment( EntityAI parent )
 	{
-		if (!super.CanPutAsAttachment(parent)) {return false;}
+		if(!super.CanPutAsAttachment(parent)) {return false;}
 		
-		if ( parent.FindAttachmentBySlotName( "Mask" ) )
+		Clothing eyewear = Clothing.Cast(parent.FindAttachmentBySlotName("Eyewear"));
+		if ( eyewear && eyewear.ConfigGetBool("isStrap") )
 		{
 			return false;
 		}
 		
-		if ( ( GetNumberOfItems() == 0 || !parent || parent.IsMan() ) )
+		Clothing mask = Clothing.Cast(parent.FindAttachmentBySlotName("Mask"));
+		if ( mask && mask.ConfigGetBool("noHelmet") ) //TODO
 		{
-			return true;
+			return false;
 		}
-		return false;
+		
+		return true;
 	}
 
 	override bool IsObstructingVoice()
@@ -39,3 +42,4 @@ class MotoHelmet_Lime extends MotoHelmet_ColorBase {};
 class MotoHelmet_Blue extends MotoHelmet_ColorBase {};
 class MotoHelmet_Red extends MotoHelmet_ColorBase {};
 class MotoHelmet_White extends MotoHelmet_ColorBase {};
+class MotoHelmet_Yellow extends MotoHelmet_ColorBase {};

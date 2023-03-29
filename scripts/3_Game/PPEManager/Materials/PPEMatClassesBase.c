@@ -1,10 +1,7 @@
-/*
-DISCLAIMER: may undergo some changes in the course of 1.14 experimental stage.
-*/
-
+//! Created once, on manager init. Script-side representation of C++ material class, separate handling.
 class PPEClassBase
 {
-	protected ref PPEManager 										m_Manager;
+	protected PPEManager 											m_Manager;
 	protected string 												m_MaterialPath = "";
 	protected Material 												m_Material;
 	
@@ -86,6 +83,7 @@ class PPEClassBase
 		m_MaterialParamMapStructure.Set(idx, parameter_data);
 	}
 	
+	//!WARNING - min/max values are usually taken from Workbench defaults, may not be actual min/max values the renderer can handle! When in doubt, try some higher/lower values...
 	protected void RegisterParameterScalarFloatEx(int idx, string parameter_name, float default_value, float min, float max, typename type)
 	{
 		PPETemplateDefFloat p = new PPETemplateDefFloat(parameter_name,default_value,min,max);
@@ -100,6 +98,7 @@ class PPEClassBase
 		m_MaterialParamMapStructure.Set(idx, parameter_data);
 	}
 	
+	//!WARNING - min/max values are usually taken from Workbench defaults, may not be actual min/max values the renderer can handle! When in doubt, try some higher/lower values...
 	protected void RegisterParameterColor(int idx, string parameter_name, float r, float g, float b, float a)
 	{
 		PPETemplateDefColor p = new PPETemplateDefColor(parameter_name,r,g,b,a);
@@ -108,6 +107,7 @@ class PPEClassBase
 		m_MaterialParamMapStructure.Set(idx, parameter_data);
 	}
 	
+	//!WARNING - min/max values are usually taken from Workbench defaults, may not be actual min/max values the renderer can handle! When in doubt, try some higher/lower values...
 	protected void RegisterParameterColorEx(int idx, string parameter_name, float r, float g, float b, float a, typename type)
 	{
 		PPETemplateDefColor p = new PPETemplateDefColor(parameter_name,r,g,b,a);
@@ -129,7 +129,7 @@ class PPEClassBase
 		m_MaterialParamMapStructure.Set(idx, parameter_data);
 	}
 	
-	//TEXTURE and RESOURCE types are not overridable during runtime..
+	//TEXTURE and RESOURCE types are not overridable during runtime..currently unused and unhandled
 	protected void RegisterParameterTexture(int idx, string parameter_name, string default_path)
 	{
 		PPETemplateDefTexture p = new PPETemplateDefTexture(parameter_name,default_path);
@@ -165,8 +165,8 @@ class PPEClassBase
 		//DbgPrnt("PPEDebug | InsertParamValueData | mat/par/req: " + GetPostProcessEffectID() + "/" + request_data.GetParameterID() + "/" + request_data.GetRequesterIDX() + " | requester: " + request_data.m_Requester);
 	}
 	
-	//Removes the request from all parameters
-	//unused; TODO - rework
+	//TODO - rework
+	//!unused, see 'RemoveActiveRequestFromMaterials' for more info
 	void RemoveRequest(int req_idx)
 	{
 		/*for (int i = 0; i < m_ActiveMaterialRequestMap.Count(); i++)

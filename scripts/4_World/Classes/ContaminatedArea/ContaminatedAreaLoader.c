@@ -62,9 +62,16 @@ class EffectAreaLoader
 				string ppeRequesterType = playerData.PPERequesterType;
 				
 				// Conversion of particle name to ID for synchronization and loading
-				params.m_ParamPartId = ParticleList.GetParticleID( string.Format("%1%2", ParticleList.GetPathToParticles(), particleName ) );
-				params.m_ParamAroundPartId = ParticleList.GetParticleID( string.Format("%1%2", ParticleList.GetPathToParticles(), aroundPartName ) );
-				params.m_ParamTinyPartId = ParticleList.GetParticleID( string.Format("%1%2", ParticleList.GetPathToParticles(), tinyPartName ) );
+				if (particleName != "")
+					params.m_ParamPartId = ParticleList.GetParticleID( particleName );
+				
+				if (aroundPartName != "")
+					params.m_ParamAroundPartId = ParticleList.GetParticleID( aroundPartName );
+				
+				if (tinyPartName != "")
+					params.m_ParamTinyPartId = ParticleList.GetParticleID( tinyPartName );
+				
+				params.m_ParamPpeRequesterType = ppeRequesterType;
 
 				EffectArea newZone; // Zones MUST inherit from EffectArea
 				
@@ -90,9 +97,9 @@ class EffectAreaLoader
 	
 	static JsonDataContaminatedAreas GetData()
 	{
-		ref JsonDataContaminatedAreas data;
+		JsonDataContaminatedAreas data;
 
-		JsonFileLoader<ref JsonDataContaminatedAreas>.JsonLoadFile( m_Path, data );
+		JsonFileLoader<JsonDataContaminatedAreas>.JsonLoadFile( m_Path, data );
 		
 		return data;
 	}
