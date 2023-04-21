@@ -1,4 +1,4 @@
-class UniversalTemperatureSourceLambdaFireplace : UniversalTemperatureSourceLambdaBase
+class UniversalTemperatureSourceLambdaFireplace : UniversalTemperatureSourceLambdaBaseImpl
 {
 	int m_FuelCount;
 	int m_SmallFireplaceTemperatureMax;

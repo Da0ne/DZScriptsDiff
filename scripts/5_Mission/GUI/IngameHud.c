@@ -364,13 +364,22 @@ class IngameHud extends Hud
 		m_BadgesWidgetNames.Set( NTFKEY_BLEEDISH, "Bleeding" );
 		m_BadgesWidgetNames.Set( NTFKEY_LIVES, "Shock" );
 		m_BadgesWidgetNames.Set( NTFKEY_PILLS, "Pills" );
+		m_BadgesWidgetNames.Set( NTFKEY_LEGS, "InjuredLegs" );
+		
+		int badgeCountMax = EnumTools.GetLastEnumValue(eBadgeLevel);
 	
 		for ( i = 0; i < m_BadgesWidgetNames.Count(); i++ )
 		{
 			string badge_name = m_BadgesWidgetNames.GetElement(  i);
 			key = m_BadgesWidgetNames.GetKey( i );
 			ImageWidget badge_widget;
+
 			Class.CastTo(badge_widget,  m_Badges.FindAnyWidget( badge_name ) );
+			
+			for ( int q = 0; q < badgeCountMax; q++ )
+			{
+				badge_widget.LoadImageFile( q, "set:dayz_gui image:icon" + badge_name + q );
+			}
 			m_BadgesWidgets.Set( key, badge_widget );
 			badge_widget.Show( false );
 			m_BadgesWidgetDisplay.Set( key, false );
@@ -614,13 +623,17 @@ class IngameHud extends Hud
 		for ( int i = 0; i < m_BadgesWidgetDisplay.Count(); i++ )
 		{
 			int badge_key = m_BadgesWidgetDisplay.GetKey( i );
+			int badge_value = m_BadgesWidgetDisplay.Get( badge_key );
 			string badge_name = m_BadgesWidgetNames.Get( badge_key );
+			
 			ImageWidget badge_widget
 			Class.CastTo(badge_widget,  m_Badges.FindAnyWidget( badge_name ) );
 			if ( badge_widget )
 			{
-				if ( m_BadgesWidgetDisplay.Get( badge_key ) > 0 )
+				if ( badge_value > 0 )
 				{
+					badge_widget.SetImage(badge_value - 1);
+
 					badge_widget.Show( true );
 					m_AnyBadgeVisible = true;
 					if( badge_key == NTFKEY_BLEEDISH )
@@ -1487,6 +1500,17 @@ class IngameHud extends Hud
 			{
 				m_HitDirEffectArray.Remove(i);
 			}
+		}
+	}
+	
+	void Debug()
+	{
+		foreach (int val:m_BadgesWidgetDisplay)
+		{
+			int key = m_BadgesWidgetDisplay.GetKeyByValue(val);
+			Print(EnumTools.EnumToString(eDisplayElements, key));
+			Print(val);
+			Print("---------------------");
 		}
 	}
 	

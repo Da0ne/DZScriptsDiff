@@ -7,6 +7,7 @@ class ContextMenu extends ScriptedWidgetEventHandler
 	private int m_max_item_width;
 	private int m_count;
 	const int ITEMS_COUNT = 27;
+	
 	//--------------------------------------------------------------------------
 	void ContextMenu()
 	{
@@ -23,7 +24,7 @@ class ContextMenu extends ScriptedWidgetEventHandler
 	//--------------------------------------------------------------------------
 	void Init(Widget layoutRoot)
 	{
-		if(!m_context_menu_root_widget)
+		if (!m_context_menu_root_widget)
 		{
 			m_context_menu_root_widget = GetGame().GetWorkspace().CreateWidgets("gui/layouts/day_z_inventory_context_menu.layout", layoutRoot);
 			m_context_menu_panel_widget = m_context_menu_root_widget.FindAnyWidget("PanelWidget");
@@ -146,14 +147,21 @@ class ContextMenu extends ScriptedWidgetEventHandler
 		
 		if (button == MouseState.LEFT && w.GetUserID() > -1 && w.GetUserID() < m_commands.Count())
 		{
-			CallQueueContext ctx = m_commands.Get( w.GetUserID() ); 
-			ctx.Call();
-			Hide();
-	
+			CallQueueContext ctx = m_commands.Get(w.GetUserID());
+
+			int actionId = Param3<ItemBase, int, int>.Cast(ctx.m_params).param2;
+			if (actionId == EActions.DELETE)
+				Hide();
+			
 			UIScriptedMenu menu = GetGame().GetUIManager().GetMenu();
-			if (menu) GetGame().GetCallQueue(CALL_CATEGORY_GUI).Call(menu.Refresh);
+			if (menu)
+				GetGame().GetCallQueue(CALL_CATEGORY_GUI).Call(menu.Refresh);
+			
+			ctx.Call();
+
 			return true;
 		}
+
 		return false;
 	}
 	

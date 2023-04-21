@@ -43,24 +43,19 @@ class KeybindingsMenu extends UIScriptedMenu
 		string version;
 		GetGame().GetVersion(version);
 		#ifdef PLATFORM_CONSOLE
-			version = "#main_menu_version" + " " + version + " (" + g_Game.GetDatabaseID() + ")";
+		version = "#main_menu_version" + " " + version + " (" + g_Game.GetDatabaseID() + ")";
 		#else
-			version = "#main_menu_version" + " " + version;
+		version = "#main_menu_version" + " " + version;
 		#endif
 		m_Version.SetText(version);
 
 		#ifdef PLATFORM_PS4
-			string back = "circle";
-			if (GetGame().GetInput().GetEnterButton() == GamepadButton.A)
-			{
-				back = "circle";
-			}
-			else
-			{
-				back = "cross";
-			}
-			ImageWidget toolbar_b = layoutRoot.FindAnyWidget("BackIcon");
-			toolbar_b.LoadImageFile(0, "set:playstation_buttons image:" + back);
+		string back = "circle";
+		if (GetGame().GetInput().GetEnterButton() != GamepadButton.A)
+			back = "cross";
+
+		ImageWidget toolbar_b = ImageWidget.Cast(layoutRoot.FindAnyWidget("BackIcon"));
+		toolbar_b.LoadImageFile(0, "set:playstation_buttons image:" + back);
 		#endif
 		
 		InitInputSortingMap();

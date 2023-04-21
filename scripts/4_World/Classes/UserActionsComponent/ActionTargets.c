@@ -35,7 +35,7 @@ class VicinityObjects
 	{
 		for (int i = 0; i < objects.Count(); i++)
 		{
-			if (objects[i].GetType() != "")
+			if (objects[i].GetType() != "" && objects[i].CanBeActionTarget())
 			{
 				StoreVicinityObject(objects[i]);
 				//Print("storing, 2nd pass: " + objects[i]);
@@ -243,7 +243,7 @@ class ActionTargets
 					
 					cursorTarget = res.obj;
 					Class.CastTo(cursorTargetEntity,cursorTarget);
-					if ( cursorTarget && ((cursorTarget.IsDamageDestroyed() && (cursorTarget.IsTree() || cursorTarget.IsBush())) || (cursorTargetEntity && cursorTargetEntity.IsHologram())) )
+					if (cursorTarget && !cursorTarget.CanBeActionTarget())
 						continue;
 					//! if the cursor target is a proxy
 					if ( res.hierLevel > 0 )

@@ -21,7 +21,6 @@ class TentBase extends ItemBase
 	static const int PITCHED 	= 1;
 	const float MAX_PLACEMENT_HEIGHT_DIFF = 1.5;
 	
-	//bool m_DamageSystemStarted = false;
 	protected int m_State;
 	protected int m_StateLocal = -1;
 	protected bool m_IsEntrance;
@@ -103,7 +102,6 @@ class TentBase extends ItemBase
 	
 	override bool OnStoreLoad(ParamsReadContext ctx, int version)
 	{
-		//Print("+-+OnStoreLoad");
 		if (!super.OnStoreLoad(ctx, version))
 			return false;
 		
@@ -221,11 +219,8 @@ class TentBase extends ItemBase
 		
 		if ((m_OpeningMaskLocal != m_OpeningMask)) //opening synchronization for physics recalculation
 		{
-			//if (m_DamageSystemStarted)
-			{
-				HandleOpeningsPhysics();
-				m_OpeningMaskLocal = m_OpeningMask;
-			}
+			HandleOpeningsPhysics();
+			m_OpeningMaskLocal = m_OpeningMask;
 			
 			if (m_State == PACKED)
 			{
@@ -236,7 +231,6 @@ class TentBase extends ItemBase
 	
 	override void EEHealthLevelChanged(int oldLevel, int newLevel, string zone)
 	{
-		//Print("EEHealthLevelChanged");
 		super.EEHealthLevelChanged(oldLevel,newLevel,zone);
 		
 		if (m_FixDamageSystemInit)
@@ -269,7 +263,6 @@ class TentBase extends ItemBase
 				}
 			}
 		}
-		//m_DamageSystemStarted = true;
 	}
 	
 	void HideAllAnimationsAndProxyPhysics(bool hide_animations = true, bool hide_physics = true)
@@ -568,7 +561,7 @@ class TentBase extends ItemBase
 						
 		DestroyClutterCutter();
 		
-		if (GetGame().IsServer())
+		if (GetGame().IsServer() && !IsHologram())
 			MiscGameplayFunctions.DropAllItemsInInventoryInBounds(this, m_HalfExtents);
 		
 		SetSynchDirty();

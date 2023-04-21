@@ -70,7 +70,6 @@ class CfgGameplayHandler
 	{
 		GetGame().GetMission().OnGameplayDataHandlerLoad();
 		DayZGame.Cast(GetGame()).OnGameplayDataHandlerLoad();
-		ObjectSpawnerHandler.OnGameplayDataHandlerLoad();
 	}
 	
 	//---------------------------------------------------------------------------------------
@@ -202,7 +201,7 @@ class CfgGameplayHandler
 	{
 		return m_Data.PlayerData.StaminaData.staminaMinCap;
 	}
-	//----------------------------------------------------------------------------------	
+	//----------------------------------------------------------------------------------
 	static float GetMeleeStaminaModifier()
 	{
 		return m_Data.PlayerData.StaminaData.meleeStaminaModifier;

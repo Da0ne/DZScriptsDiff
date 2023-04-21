@@ -171,13 +171,18 @@ class ActionDeployObject: ActionDeployBase
 		poActionData = PlaceObjectActionData.Cast(action_data);
 		if (!poActionData.m_AlreadyPlaced)
 		{
-			EntityAI entity_for_placing = action_data.m_MainItem;
 			action_data.m_Player.PlacingCancelLocal();
 			
 			//action terminated locally, send cancel to server
 			poActionData.m_Player.GetActionManager().RequestEndAction();
 			if (action_data.m_Player.GetHologramLocal())
 				action_data.m_Player.GetHologramLocal().SetUpdatePosition(true);
+			
+			InventoryLocation source = new InventoryLocation;
+			if (action_data.m_MainItem.GetInventory().GetCurrentInventoryLocation(source) && source.GetType() == InventoryLocationType.GROUND)
+			{
+				action_data.m_Player.PredictiveTakeEntityToHands(action_data.m_MainItem);
+			}
 		}
 	}
 	
@@ -190,8 +195,7 @@ class ActionDeployObject: ActionDeployBase
 		poActionData = PlaceObjectActionData.Cast(action_data);
 		if (!poActionData.m_AlreadyPlaced)
 		{
-			EntityAI entity_for_placing = action_data.m_MainItem;
-			GetGame().ClearJunctureEx(action_data.m_Player, entity_for_placing);
+			GetGame().ClearJunctureEx(action_data.m_Player, action_data.m_MainItem);
 			action_data.m_MainItem.SetIsBeingPlaced(false);
 		
 			if (GetGame().IsMultiplayer())
@@ -205,17 +209,9 @@ class ActionDeployObject: ActionDeployBase
 				action_data.m_Player.PlacingCancelLocal();
 				action_data.m_Player.PlacingCancelServer();
 			}
-			
-			InventoryLocation source = new InventoryLocation;
-			if (action_data.m_MainItem.GetInventory().GetCurrentInventoryLocation(source) && source.GetType() == InventoryLocationType.GROUND)
-			{
-				action_data.m_Player.ServerTakeEntityToHands(action_data.m_MainItem);
-			}
 		}
 		else
 		{
-			//TODO: make OnEND placement event and move there
-			
 			action_data.m_MainItem.SetIsDeploySound(false);
 			action_data.m_MainItem.SetIsPlaceSound(false);
 			action_data.m_MainItem.SoundSynchRemoteReset();
